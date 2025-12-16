@@ -18,8 +18,8 @@ export async function processInitialQuestionsStage(
   const lowerInput = userInput.toLowerCase();
   
   // Track what the user has answered
-  const hasWhen = state.brief?.when?.timeframe || detectTimeframe(lowerInput);
-  const hasWhere = state.brief?.where?.destination || detectDestination(lowerInput);
+  const hasWhen = state.brief?.when_at?.timeframe || detectTimeframe(lowerInput);
+  const hasWhere = state.brief?.where_at?.destination || detectDestination(lowerInput);
   const hasTheme = state.brief?.theme || detectTheme(lowerInput);
   
   // User must answer at least ONE question
@@ -52,8 +52,8 @@ export async function processInitialQuestionsStage(
       
       const updatedBrief = {
         ...state.brief,
-        when: hasWhen ? state.brief?.when : { timeframe: month || 'flexible', dates: null, flexibility: 'flexible' },
-        where: {
+        when_at: hasWhen ? state.brief?.when_at : { timeframe: month || 'flexible', dates: null, flexibility: 'flexible' },
+        where_at: {
           destination: topRec.destination.name,
           regions: [topRec.destination.region],
           hints: topRec.destination.description || ''
@@ -175,8 +175,8 @@ function extractMonth(input: string, state: SessionState): string | undefined {
   }
   
   // Check brief state
-  if (state.brief?.when?.timeframe) {
-    return state.brief.when.timeframe;
+  if (state.brief?.when_at?.timeframe) {
+    return state.brief.when_at.timeframe;
   }
   
   return undefined;
@@ -198,8 +198,8 @@ function extractDestinationQuery(input: string, state: SessionState): string | u
     }
   }
   
-  if (state.brief?.where?.destination) {
-    return state.brief.where.destination;
+  if (state.brief?.where_at?.destination) {
+    return state.brief.where_at.destination;
   }
   
   return undefined;
