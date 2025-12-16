@@ -33,7 +33,6 @@ export function initializeScheduler(): void {
       console.error('[Scheduler] Data quality check failed:', error);
     }
   }, {
-    scheduled: true,
     timezone: 'UTC'
   });
 
