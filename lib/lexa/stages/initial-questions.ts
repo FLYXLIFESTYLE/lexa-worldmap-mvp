@@ -52,7 +52,13 @@ export async function processInitialQuestionsStage(
       
       const updatedBrief = {
         ...state.brief,
-        when_at: hasWhen ? state.brief?.when_at : { timeframe: month || 'flexible', dates: null, flexibility: 'flexible' },
+        when_at: hasWhen
+          ? state.brief?.when_at
+          : {
+              timeframe: month || 'flexible',
+              dates: null,
+              flexibility: 'flexible_by_days',
+            },
         where_at: {
           destination: topRec.destination.name,
           regions: [topRec.destination.region],
