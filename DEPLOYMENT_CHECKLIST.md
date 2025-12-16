@@ -71,7 +71,7 @@ Quick checklist for deploying to production.
 - [ ] Click "Deploy" in Vercel
 - [ ] Build completes successfully
 - [ ] Note the Vercel URL (e.g., `https://lexa-worldmap-mvp.vercel.app`)
-- [ ] Update `NEXT_PUBLIC_SITE_URL` in Vercel
+- [ ] Update `lexa-worldmap-mvp.vercel.app` in Vercel
 - [ ] Redeploy
 
 ---
