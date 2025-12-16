@@ -157,9 +157,3 @@ function parseTextDocument(text: string, filename: string): ParsedConversation[]
   }];
 }
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
