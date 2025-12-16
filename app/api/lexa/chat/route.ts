@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
       assistantMessage = claudeResponse.assistantMessage;
       
       // Apply state machine transition
-      const transition = transitionStage(sessionState, userMessage);
+      const transition = await transitionStage(sessionState, userMessage);
       updatedState = {
         ...updatedState,
         ...transition.updatedState,
