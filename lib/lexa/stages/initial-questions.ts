@@ -73,11 +73,7 @@ export async function processInitialQuestionsStage(
       return {
         nextStage: 'MIRROR',
         updatedState: {
-          brief: updatedBrief,
-          context: {
-            ...state.context,
-            neo4j_recommendations: recommendations
-          }
+          brief: updatedBrief
         },
         message
       };
