@@ -64,12 +64,16 @@ export async function POST(req: Request) {
 
     const extracted = await processConversation(conversation);
 
+    // Extract tags from wisdom entries
+    const allTags = extracted.wisdom.flatMap(w => w.tags);
+    const uniqueTags = [...new Set(allTags)];
+
     // Return extracted data for the frontend to use
     return NextResponse.json({
       success: true,
-      title: extracted.metadata?.title || title,
+      title: title || extracted.metadata.conversationTitle,
       content: text.substring(0, 1000), // First 1000 chars
-      tags: extracted.metadata?.tags || [],
+      tags: uniqueTags,
       pois: extracted.pois.map(p => p.name),
     });
   } catch (error) {
