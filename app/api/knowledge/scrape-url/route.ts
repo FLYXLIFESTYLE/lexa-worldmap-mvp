@@ -5,10 +5,15 @@
 
 import { NextResponse } from 'next/server';
 import { processConversation, type ParsedConversation } from '@/lib/knowledge';
+import { 
+  checkURLStatus, 
+  recordScrapedURL, 
+  extractLinks 
+} from '@/lib/knowledge/url-tracker';
 
 export async function POST(req: Request) {
   try {
-    const { url } = await req.json();
+    const { url, force = false } = await req.json();
 
     if (!url) {
       return NextResponse.json(
@@ -24,6 +29,20 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'Invalid URL format' },
         { status: 400 }
+      );
+    }
+
+    // Check if URL has been scraped before
+    const urlStatus = await checkURLStatus(url);
+    if (urlStatus.alreadyScraped && !urlStatus.canRescrape && !force) {
+      return NextResponse.json(
+        { 
+          error: 'URL already scraped recently',
+          lastScrapedAt: urlStatus.lastScrapedAt,
+          canRescrape: urlStatus.canRescrape,
+          message: 'Use force=true to re-scrape'
+        },
+        { status: 409 }
       );
     }
 
@@ -68,6 +87,20 @@ export async function POST(req: Request) {
     const allTags = extracted.wisdom.flatMap(w => w.tags);
     const uniqueTags = [...new Set(allTags)];
 
+    // Extract subpage links
+    const subpageLinks = extractLinks(html, url);
+    
+    // Record the scraped URL
+    await recordScrapedURL({
+      url,
+      scrapedAt: new Date(),
+      status: 'success',
+      knowledgeCount: extracted.wisdom.length,
+      poisExtracted: extracted.pois.length,
+      relationshipsCreated: extracted.relationships.length,
+      subpagesFound: subpageLinks.slice(0, 20), // Store up to 20 subpages
+    });
+
     // Return extracted data for the frontend to use
     return NextResponse.json({
       success: true,
@@ -75,9 +108,27 @@ export async function POST(req: Request) {
       content: text.substring(0, 1000), // First 1000 chars
       tags: uniqueTags,
       pois: extracted.pois.map(p => p.name),
+      subpagesFound: subpageLinks.length,
+      subpages: subpageLinks.slice(0, 10), // Return first 10 for UI
     });
   } catch (error) {
     console.error('URL scraping error:', error);
+    
+    // Record failed attempt
+    try {
+      await recordScrapedURL({
+        url: (await req.json()).url,
+        scrapedAt: new Date(),
+        status: 'failed',
+        knowledgeCount: 0,
+        poisExtracted: 0,
+        relationshipsCreated: 0,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } catch (recordError) {
+      console.error('Failed to record scraping error:', recordError);
+    }
+    
     return NextResponse.json(
       {
         error: 'Failed to scrape URL',
