@@ -59,11 +59,11 @@ export async function GET() {
     message: 'LEXA Recommendation API',
     usage: {
       method: 'POST',
-      body: {
-        preset: 'ultraLuxury | romanticGetaway | adventureSeeker | culturalExplorer | culinaryJourney',
-        or: 'filters: { minLuxuryScore, themes, activities, destinations, etc. }',
-        or: 'userId + conversationContext for personalized recommendations',
-      },
+      bodyOptions: [
+        'Option 1: { preset: "ultraLuxury | romanticGetaway | adventureSeeker | culturalExplorer | culinaryJourney" }',
+        'Option 2: { filters: { minLuxuryScore, themes, activities, destinations, etc. } }',
+        'Option 3: { userId: string, conversationContext: object }',
+      ],
     },
     availablePresets: Object.keys(RecommendationPresets),
   });
