@@ -191,7 +191,7 @@ function suggestDestinationFromTheme(
   const themeLower = theme.toLowerCase();
   const emotionKeywords = emotions.desired.map(e => e.toLowerCase());
   
-  let candidates = DESTINATIONS;
+  let candidates: readonly string[] = DESTINATIONS;
   
   // Filter by season if provided
   if (when) {
