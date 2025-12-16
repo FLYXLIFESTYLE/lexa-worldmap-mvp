@@ -127,8 +127,8 @@ export function areAllBriefFieldsCollected(state: SessionState): boolean {
   const { brief, emotions } = state;
   
   const requiredFields = [
-    brief.when,
-    brief.where,
+    brief.when_at,
+    brief.where_at,
     brief.theme,
     brief.budget,
     brief.duration,
