@@ -14,10 +14,10 @@ import {
 // STAGE TRANSITION LOGIC
 // ============================================================================
 
-export function transitionStage(
+export async function transitionStage(
   currentState: SessionState,
   userInput: string
-): StageTransitionResult {
+): Promise<StageTransitionResult> {
   const stage = currentState.stage;
 
   switch (stage) {
@@ -25,7 +25,7 @@ export function transitionStage(
       return handleWelcomeStage(currentState, userInput);
     
     case 'INITIAL_QUESTIONS':
-      return handleInitialQuestionsStage(currentState, userInput);
+      return await handleInitialQuestionsStage(currentState, userInput);
     
     case 'DISARM':
       return handleDisarmStage(currentState, userInput);
