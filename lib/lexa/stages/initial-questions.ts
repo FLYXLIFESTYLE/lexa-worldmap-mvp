@@ -3,7 +3,7 @@
  * Core questions to activate RAG system
  */
 
-import { SessionState, StageTransitionResult } from '../types';
+import { SessionState, StageTransitionResult, Brief } from '../types';
 import { 
   getRecommendations, 
   getDestinationsByMonth, 
