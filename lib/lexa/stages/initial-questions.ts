@@ -50,14 +50,14 @@ export async function processInitialQuestionsStage(
       // Store recommendations in state
       const topRec = recommendations[0];
       
-      const updatedBrief = {
+      const updatedBrief: Brief = {
         ...state.brief,
         when_at: hasWhen
           ? state.brief?.when_at
           : {
               timeframe: month || 'flexible',
               dates: null,
-              flexibility: 'flexible_by_days',
+              flexibility: 'flexible_by_days' as const,
             },
         where_at: {
           destination: topRec.destination.name,
