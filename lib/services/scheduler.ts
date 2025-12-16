@@ -6,7 +6,7 @@
 import cron from 'node-cron';
 import { runFullCheck } from '../neo4j/data-quality-agent';
 
-let scheduledTask: cron.ScheduledTask | null = null;
+let scheduledTask: ReturnType<typeof cron.schedule> | null = null;
 
 /**
  * Initialize the scheduler
