@@ -6,14 +6,22 @@ LEXA is a production-ready conversational AI agent for luxury travel experience 
 
 ## Features
 
+### LEXA Chat Agent
 ✅ **10-Stage Conversation Flow** - From WELCOME to HANDOFF with intelligent state management  
 ✅ **Voice Input/Output** - Browser-native speech recognition and synthesis  
 ✅ **Flexible Data Collection** - Intelligently gathers 10 required fields for experience briefs  
 ✅ **Suggestion Engine** - Recommends destinations/themes based on partial input  
 ✅ **Operations Agent Handoff** - Creates structured experience briefs for downstream processing  
-✅ **Clerk Authentication** - Secure user authentication and session management  
-✅ **Supabase Backend** - Postgres database with Row Level Security  
-✅ **Anthropic Claude Integration** - Powered by Claude 3.5 Sonnet  
+✅ **Neo4j RAG Integration** - Graph database for POI recommendations
+
+### Captain's Knowledge Portal
+✅ **Knowledge Upload** - Process transcripts, PDFs, itineraries (files not stored)  
+✅ **Rich Knowledge Editor** - URL scraping, photos, coordinates, best practices  
+✅ **Commission Tracking** - Automatic attribution and commission calculation  
+✅ **User Management** - Admin-controlled user creation with roles  
+✅ **Supabase Authentication** - Secure user authentication and session management  
+✅ **Neo4j Knowledge Graph** - Structured knowledge storage with relationships  
+✅ **AI-Powered Extraction** - Claude AI extracts structured data from unstructured content  
 
 ---
 
@@ -184,28 +192,29 @@ lexa-worldmap-mvp/
 
 ## Deployment to Vercel
 
-### One-Click Deploy
+### Quick Deploy
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/your-repo/lexa-ui-agent)
+1. **Push to GitHub:**
+   ```bash
+   git add .
+   git commit -m "Ready for deployment"
+   git push origin main
+   ```
 
-### Manual Deployment
+2. **Connect to Vercel:**
+   - Go to [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Add all environment variables (see `.env.example`)
+   - Click "Deploy"
 
-1. Install Vercel CLI:
-```bash
-npm install -g vercel
-```
+3. **Complete Setup:**
+   - Run Supabase migrations (see `DEPLOYMENT_GUIDE.md`)
+   - Create first admin user
+   - Test all features
 
-2. Deploy:
-```bash
-vercel --prod
-```
+**📖 Full deployment guide:** See `DEPLOYMENT_GUIDE.md` for detailed instructions.
 
-3. Add environment variables in Vercel Dashboard:
-   - Go to your project settings
-   - Add all variables from `.env.local`
-   - Redeploy
-
-**Important:** Make sure to add all environment variables in Vercel before deploying!
+**✅ Quick checklist:** See `DEPLOYMENT_CHECKLIST.md` for step-by-step verification.
 
 ---
 
@@ -364,5 +373,6 @@ For issues or questions:
 ---
 
 **Built with ❤️ for luxury travel experience design**
-#   l e x a - w o r l d m a p - m v p  
+#   l e x a - w o r l d m a p - m v p 
+ 
  

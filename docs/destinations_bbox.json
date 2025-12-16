@@ -1,0 +1,61 @@
+{
+  "destinations": [
+    {
+      "name": "French Riviera",
+      "bbox": [6.5, 43.2, 7.5, 43.8]
+    },
+    {
+      "name": "Amalfi Coast",
+      "bbox": [14.0, 40.5, 15.0, 40.8]
+    },
+    {
+      "name": "Balearics",
+      "bbox": [1.0, 38.5, 4.5, 40.0]
+    },
+    {
+      "name": "Cyclades",
+      "bbox": [24.0, 36.5, 26.0, 38.0]
+    },
+    {
+      "name": "BVI",
+      "bbox": [-64.8, 18.3, -64.3, 18.8]
+    },
+    {
+      "name": "USVI",
+      "bbox": [-65.1, 17.6, -64.5, 18.4]
+    },
+    {
+      "name": "Bahamas",
+      "bbox": [-80.0, 20.5, -72.0, 27.0]
+    },
+    {
+      "name": "Dutch Antilles",
+      "bbox": [-70.0, 12.0, -68.0, 13.0]
+    },
+    {
+      "name": "French Antilles",
+      "bbox": [-61.8, 14.4, -61.0, 16.3]
+    },
+    {
+      "name": "Arabian Gulf (UAE)",
+      "bbox": [51.0, 22.5, 56.0, 26.0]
+    },
+    {
+      "name": "Adriatic (North)",
+      "bbox": [12.0, 44.8, 15.8, 46.9]
+    },
+    {
+      "name": "Adriatic (Central)",
+      "bbox": [12.8, 43.2, 17.8, 44.9]
+    },
+    {
+      "name": "Adriatic (South)",
+      "bbox": [13.5, 40.9, 19.8, 43.3]
+    },
+    {
+      "name": "Ionian Sea",
+      "bbox": [19.0, 36.0, 22.0, 40.8]
+    }
+  ]
+}
+

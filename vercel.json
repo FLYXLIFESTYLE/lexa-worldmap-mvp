@@ -1,0 +1,45 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": {
+      "description": "Supabase project URL",
+      "value": ""
+    },
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
+      "description": "Supabase anon/public key",
+      "value": ""
+    },
+    "SUPABASE_SERVICE_ROLE_KEY": {
+      "description": "Supabase service role key (server-side, required for user creation)",
+      "value": ""
+    },
+    "ANTHROPIC_API_KEY": {
+      "description": "Anthropic Claude API key for AI knowledge extraction",
+      "value": ""
+    },
+    "NEO4J_URI": {
+      "description": "Neo4j database URI (neo4j+s://... for Aura)",
+      "value": ""
+    },
+    "NEO4J_USER": {
+      "description": "Neo4j database username",
+      "value": ""
+    },
+    "NEO4J_PASSWORD": {
+      "description": "Neo4j database password",
+      "value": ""
+    },
+    "NEXT_PUBLIC_SITE_URL": {
+      "description": "Production site URL (for password reset emails)",
+      "value": ""
+    },
+    "GOOGLE_PLACES_API_KEY": {
+      "description": "Google Places API key (optional, for POI enrichment)",
+      "value": ""
+    }
+  }
+}
+
