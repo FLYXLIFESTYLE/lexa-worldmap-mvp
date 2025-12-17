@@ -8,6 +8,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { InfoTooltip } from '@/components/knowledge/info-tooltip';
+import { POISearch } from '@/components/admin/poi-search';
+import { POIEditModal } from '@/components/admin/poi-edit-modal';
 
 interface KnowledgeEntry {
   title: string;
@@ -88,6 +90,10 @@ export default function KnowledgeEditorPage() {
   const [destinationInput, setDestinationInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isScrapingUrl, setIsScrapingUrl] = useState(false);
+  
+  // POI search & edit state
+  const [selectedPOIId, setSelectedPOIId] = useState<string | null>(null);
+  const [showPOIModal, setShowPOIModal] = useState(false);
 
   const addTag = () => {
     if (tagInput.trim() && !entry.tags.includes(tagInput.trim())) {
@@ -258,6 +264,24 @@ export default function KnowledgeEditorPage() {
           <p className="text-zinc-600">
             Add your expertise to help LEXA create extraordinary experiences
           </p>
+        </div>
+
+        {/* POI Search & Edit Section */}
+        <div className="bg-gradient-to-r from-lexa-navy to-lexa-gold p-6 rounded-2xl shadow-lg mb-8">
+          <div className="mb-4">
+            <h2 className="text-2xl font-bold text-white mb-2">
+              🔍 Edit Existing POIs
+            </h2>
+            <p className="text-white/90 text-sm">
+              Search for locations like &quot;Club55&quot;, &quot;St. Tropez&quot;, or &quot;Monaco&quot; to update luxury scores, add comments, and share your insider knowledge
+            </p>
+          </div>
+          <POISearch 
+            onSelectPOI={(poi) => {
+              setSelectedPOIId(poi.poi_uid);
+              setShowPOIModal(true);
+            }}
+          />
         </div>
 
         {/* Form */}
@@ -648,6 +672,21 @@ export default function KnowledgeEditorPage() {
           </div>
         </div>
       </div>
+
+      {/* POI Edit Modal */}
+      {showPOIModal && selectedPOIId && (
+        <POIEditModal
+          poiId={selectedPOIId}
+          onClose={() => {
+            setShowPOIModal(false);
+            setSelectedPOIId(null);
+          }}
+          onSaved={() => {
+            // Refresh or show success message
+            alert('POI updated successfully! ✨');
+          }}
+        />
+      )}
     </div>
   );
 }
