@@ -54,6 +54,9 @@ const TOPICS = [
   'Cultural Insights',
   'Yacht Operations',
   'Guest Services',
+  'Concierge Service',
+  'Agent',
+  'Yacht Broker',
   'Other',
 ];
 
