@@ -1,0 +1,273 @@
+'use client';
+
+/**
+ * Destination Browser - POI Coverage and Quality Assessment
+ * 
+ * Shows all destinations with POI statistics
+ * Helps identify data gaps and quality issues
+ */
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface DestinationStats {
+  destination: string;
+  total_pois: number;
+  luxury_pois: number;
+  avg_luxury_score: number | null;
+  poi_types: string[];
+  has_captain_comments: number;
+  top_types: Array<{ type: string; count: number }>;
+}
+
+interface OverallStats {
+  total_pois: number;
+  total_destinations: number;
+  luxury_pois: number;
+  avg_luxury_score: number | null;
+  unscored_pois: number;
+}
+
+export default function DestinationBrowserPage() {
+  const router = useRouter();
+  const [destinations, setDestinations] = useState<DestinationStats[]>([]);
+  const [overallStats, setOverallStats] = useState<OverallStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState('total_pois');
+  const [order, setOrder] = useState('DESC');
+
+  useEffect(() => {
+    fetchDestinations();
+  }, [sortBy, order]);
+
+  const fetchDestinations = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(
+        `/api/neo4j/destinations?sortBy=${sortBy}&order=${order}&limit=100`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch destinations');
+      }
+
+      const data = await response.json();
+      setDestinations(data.destinations);
+      setOverallStats(data.overallStats);
+
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Failed to load destinations');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setOrder(order === 'DESC' ? 'ASC' : 'DESC');
+    } else {
+      setSortBy(field);
+      setOrder('DESC');
+    }
+  };
+
+  const getQualityColor = (destination: DestinationStats) => {
+    const luxuryPercent = destination.total_pois > 0 
+      ? (destination.luxury_pois / destination.total_pois) * 100 
+      : 0;
+    
+    if (luxuryPercent >= 30 && destination.avg_luxury_score && destination.avg_luxury_score >= 7) {
+      return 'text-green-600 bg-green-50';
+    } else if (luxuryPercent >= 15 || (destination.avg_luxury_score && destination.avg_luxury_score >= 6)) {
+      return 'text-yellow-600 bg-yellow-50';
+    } else {
+      return 'text-red-600 bg-red-50';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-100 flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <div className="animate-spin h-8 w-8 border-4 border-lexa-gold border-t-transparent rounded-full"></div>
+          <span className="text-lexa-navy font-semibold">Loading destinations...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-100">
+      <div className="max-w-7xl mx-auto p-8">
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={() => router.push('/admin/knowledge')}
+            className="text-lexa-navy hover:text-lexa-gold mb-4 flex items-center gap-2"
+          >
+            ← Back to Portal
+          </button>
+          <h1 className="text-4xl font-bold text-lexa-navy mb-2">
+            🌍 Destination Browser
+          </h1>
+          <p className="text-zinc-600">
+            Explore POI coverage and quality across all destinations
+          </p>
+        </div>
+
+        {/* Overall Statistics */}
+        {overallStats && (
+          <div className="grid grid-cols-5 gap-4 mb-8">
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <div className="text-3xl font-bold text-lexa-navy mb-1">
+                {overallStats.total_pois.toLocaleString()}
+              </div>
+              <div className="text-sm text-zinc-600">Total POIs</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <div className="text-3xl font-bold text-lexa-gold mb-1">
+                {overallStats.total_destinations}
+              </div>
+              <div className="text-sm text-zinc-600">Destinations</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <div className="text-3xl font-bold text-green-600 mb-1">
+                {overallStats.luxury_pois.toLocaleString()}
+              </div>
+              <div className="text-sm text-zinc-600">Luxury POIs (≥7)</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <div className="text-3xl font-bold text-purple-600 mb-1">
+                {overallStats.avg_luxury_score?.toFixed(1) || 'N/A'}
+              </div>
+              <div className="text-sm text-zinc-600">Avg Luxury Score</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <div className="text-3xl font-bold text-red-600 mb-1">
+                {overallStats.unscored_pois.toLocaleString()}
+              </div>
+              <div className="text-sm text-zinc-600">Unscored POIs</div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        {/* Destinations Table */}
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gradient-to-r from-lexa-navy to-lexa-gold text-white">
+              <tr>
+                <th 
+                  onClick={() => handleSort('destination')}
+                  className="px-6 py-4 text-left font-semibold cursor-pointer hover:bg-white/10"
+                >
+                  Destination {sortBy === 'destination' && (order === 'DESC' ? '↓' : '↑')}
+                </th>
+                <th 
+                  onClick={() => handleSort('total_pois')}
+                  className="px-6 py-4 text-right font-semibold cursor-pointer hover:bg-white/10"
+                >
+                  Total POIs {sortBy === 'total_pois' && (order === 'DESC' ? '↓' : '↑')}
+                </th>
+                <th 
+                  onClick={() => handleSort('luxury_pois')}
+                  className="px-6 py-4 text-right font-semibold cursor-pointer hover:bg-white/10"
+                >
+                  Luxury POIs {sortBy === 'luxury_pois' && (order === 'DESC' ? '↓' : '↑')}
+                </th>
+                <th 
+                  onClick={() => handleSort('avg_luxury_score')}
+                  className="px-6 py-4 text-right font-semibold cursor-pointer hover:bg-white/10"
+                >
+                  Avg Score {sortBy === 'avg_luxury_score' && (order === 'DESC' ? '↓' : '↑')}
+                </th>
+                <th className="px-6 py-4 text-left font-semibold">
+                  Top POI Types
+                </th>
+                <th className="px-6 py-4 text-center font-semibold">
+                  Captain Comments
+                </th>
+                <th className="px-6 py-4 text-center font-semibold">
+                  Quality
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {destinations.map((dest, idx) => (
+                <tr key={idx} className="border-b border-zinc-100 hover:bg-zinc-50">
+                  <td className="px-6 py-4 font-semibold text-lexa-navy">
+                    {dest.destination}
+                  </td>
+                  <td className="px-6 py-4 text-right text-lexa-navy">
+                    {dest.total_pois.toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 text-right text-green-600 font-semibold">
+                    {dest.luxury_pois}
+                    <span className="text-xs text-zinc-500 ml-1">
+                      ({((dest.luxury_pois / dest.total_pois) * 100).toFixed(0)}%)
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {dest.avg_luxury_score 
+                      ? <span className="font-semibold text-purple-600">
+                          {dest.avg_luxury_score.toFixed(1)}
+                        </span>
+                      : <span className="text-zinc-400">N/A</span>
+                    }
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-1">
+                      {dest.top_types.slice(0, 3).map((type, tidx) => (
+                        <span 
+                          key={tidx}
+                          className="px-2 py-1 bg-zinc-100 text-zinc-700 text-xs rounded"
+                        >
+                          {type.type} ({type.count})
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                      dest.has_captain_comments > 0 
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-zinc-100 text-zinc-500'
+                    }`}>
+                      {dest.has_captain_comments}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getQualityColor(dest)}`}>
+                      {((dest.luxury_pois / dest.total_pois) * 100) >= 30 ? '🟢 High' : 
+                       ((dest.luxury_pois / dest.total_pois) * 100) >= 15 ? '🟡 Medium' : 
+                       '🔴 Low'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-6 bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+          <strong className="text-blue-800">💡 Quality Rating:</strong>
+          <div className="text-sm text-blue-700 mt-2 space-y-1">
+            <div>🟢 <strong>High:</strong> ≥30% luxury POIs AND avg score ≥7</div>
+            <div>🟡 <strong>Medium:</strong> 15-30% luxury POIs OR avg score 6-7</div>
+            <div>🔴 <strong>Low:</strong> &lt;15% luxury POIs OR avg score &lt;6</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

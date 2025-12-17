@@ -11,6 +11,14 @@ export default function KnowledgePortalPage() {
 
   const features = [
     {
+      icon: '💬',
+      title: 'ChatNeo4j',
+      description: 'Ask questions in plain English about your travel database - AI-powered insights',
+      action: () => router.push('/admin/chat-neo4j'),
+      color: 'from-lexa-gold to-lexa-navy',
+      featured: true,
+    },
+    {
       icon: '📤',
       title: 'Upload Knowledge',
       description: 'Upload ChatGPT conversations, Zoom transcripts, itineraries, or any travel documents',
@@ -25,11 +33,26 @@ export default function KnowledgePortalPage() {
       color: 'from-green-500 to-green-600',
     },
     {
+      icon: '🌍',
+      title: 'Destination Browser',
+      description: 'Explore POI coverage and quality across all destinations worldwide',
+      action: () => router.push('/admin/destinations'),
+      color: 'from-orange-500 to-red-600',
+      featured: true,
+    },
+    {
       icon: '🔍',
       title: 'Browse Knowledge',
       description: 'Search and explore all contributed knowledge in the database',
       action: () => router.push('/admin/knowledge/browse'),
       color: 'from-purple-500 to-purple-600',
+    },
+    {
+      icon: '🏖️',
+      title: 'Scraped URLs',
+      description: 'View and manage all URLs scraped for knowledge extraction',
+      action: () => router.push('/admin/knowledge/scraped-urls'),
+      color: 'from-pink-500 to-rose-600',
     },
   ];
 
@@ -69,9 +92,14 @@ export default function KnowledgePortalPage() {
             {features.map((feature, idx) => (
               <div
                 key={idx}
-                className="bg-white rounded-2xl shadow-lg border border-zinc-200/60 p-6 hover:shadow-xl transition-all cursor-pointer"
+                className={`bg-white rounded-2xl shadow-lg border ${feature.featured ? 'border-lexa-gold/50 ring-2 ring-lexa-gold/20' : 'border-zinc-200/60'} p-6 hover:shadow-xl transition-all cursor-pointer relative`}
                 onClick={feature.action}
               >
+                {feature.featured && (
+                  <div className="absolute -top-2 -right-2 bg-lexa-gold text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                    NEW!
+                  </div>
+                )}
                 <div className="text-5xl mb-4">{feature.icon}</div>
                 <h3 className="text-xl font-bold text-lexa-navy mb-2">
                   {feature.title}
@@ -80,7 +108,7 @@ export default function KnowledgePortalPage() {
                   {feature.description}
                 </p>
                 <button className={`w-full px-4 py-2 bg-gradient-to-r ${feature.color} text-white rounded-lg font-semibold hover:shadow-md transition-all`}>
-                  Get Started →
+                  {feature.featured ? '✨ Try It Now →' : 'Get Started →'}
                 </button>
               </div>
             ))}

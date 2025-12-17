@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { InfoTooltip } from '@/components/knowledge/info-tooltip';
 import { POISearch } from '@/components/admin/poi-search';
 import { POIEditModal } from '@/components/admin/poi-edit-modal';
+import { CreatePOIForm } from '@/components/admin/create-poi-form';
 
 interface KnowledgeEntry {
   title: string;
@@ -94,6 +95,7 @@ export default function KnowledgeEditorPage() {
   // POI search & edit state
   const [selectedPOIId, setSelectedPOIId] = useState<string | null>(null);
   const [showPOIModal, setShowPOIModal] = useState(false);
+  const [showCreatePOI, setShowCreatePOI] = useState(false);
 
   const addTag = () => {
     if (tagInput.trim() && !entry.tags.includes(tagInput.trim())) {
@@ -268,13 +270,21 @@ export default function KnowledgeEditorPage() {
 
         {/* POI Search & Edit Section */}
         <div className="bg-gradient-to-r from-lexa-navy to-lexa-gold p-6 rounded-2xl shadow-lg mb-8">
-          <div className="mb-4">
-            <h2 className="text-2xl font-bold text-white mb-2">
-              🔍 Edit Existing POIs
-            </h2>
-            <p className="text-white/90 text-sm">
-              Search for locations like &quot;Club55&quot;, &quot;St. Tropez&quot;, or &quot;Monaco&quot; to update luxury scores, add comments, and share your insider knowledge
-            </p>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">
+                🔍 Edit Existing POIs
+              </h2>
+              <p className="text-white/90 text-sm">
+                Search for locations like &quot;Club55&quot;, &quot;St. Tropez&quot;, or &quot;Monaco&quot; to update luxury scores, add comments, and share your insider knowledge
+              </p>
+            </div>
+            <button
+              onClick={() => setShowCreatePOI(true)}
+              className="px-4 py-2 bg-white text-lexa-navy rounded-lg font-semibold hover:shadow-lg transition-all"
+            >
+              ➕ Create New POI
+            </button>
           </div>
           <POISearch 
             onSelectPOI={(poi) => {
@@ -686,6 +696,21 @@ export default function KnowledgeEditorPage() {
             alert('POI updated successfully! ✨');
           }}
         />
+      )}
+
+      {/* Create POI Modal */}
+      {showCreatePOI && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto p-4">
+          <div className="max-w-4xl w-full">
+            <CreatePOIForm
+              onSuccess={() => {
+                setShowCreatePOI(false);
+                alert('POI created successfully! You can now search for it. ✨');
+              }}
+              onCancel={() => setShowCreatePOI(false)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
