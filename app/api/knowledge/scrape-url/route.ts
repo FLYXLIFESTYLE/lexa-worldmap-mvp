@@ -96,7 +96,7 @@ export async function POST(req: Request) {
     const subpageLinks = extractLinks(html, url);
 
     // Get user attribution for tracking
-    const attribution = await getCurrentUserAttribution('url_scrape', url, 'url');
+    const attribution = await getCurrentUserAttribution('scraped', url, 'url');
     
     // **FIX: Actually save to Neo4j!**
     const ingestionStats = await ingestKnowledge(extracted, {
@@ -107,7 +107,7 @@ export async function POST(req: Request) {
       author: attribution?.contributorName || 'Unknown',
       contributedBy: attribution?.contributedBy,
       contributorName: attribution?.contributorName,
-      contributionType: 'url_scrape',
+      contributionType: 'scraped',
     });
     
     // Record the scraped URL with actual stats
