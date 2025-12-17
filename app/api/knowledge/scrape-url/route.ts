@@ -4,12 +4,17 @@
  */
 
 import { NextResponse } from 'next/server';
-import { processConversation, type ParsedConversation } from '@/lib/knowledge';
+import { 
+  processConversation, 
+  ingestKnowledge,
+  type ParsedConversation 
+} from '@/lib/knowledge';
 import { 
   checkURLStatus, 
   recordScrapedURL, 
   extractLinks 
 } from '@/lib/knowledge/url-tracker';
+import { getCurrentUserAttribution } from '@/lib/knowledge/track-contribution';
 
 export async function POST(req: Request) {
   try {
@@ -89,16 +94,33 @@ export async function POST(req: Request) {
 
     // Extract subpage links
     const subpageLinks = extractLinks(html, url);
+
+    // Get user attribution for tracking
+    const attribution = await getCurrentUserAttribution('url_scrape', url, 'url');
     
-    // Record the scraped URL
+    // **FIX: Actually save to Neo4j!**
+    const ingestionStats = await ingestKnowledge(extracted, {
+      source: 'url_scrape',
+      sourceId: url,
+      sourceTitle: title || 'Scraped URL',
+      sourceDate: new Date(),
+      author: attribution?.contributorName || 'Unknown',
+      contributedBy: attribution?.contributedBy,
+      contributorName: attribution?.contributorName,
+      contributionType: 'url_scrape',
+    });
+    
+    // Record the scraped URL with actual stats
     await recordScrapedURL({
       url,
       scrapedAt: new Date(),
       status: 'success',
-      knowledgeCount: extracted.wisdom.length,
-      poisExtracted: extracted.pois.length,
-      relationshipsCreated: extracted.relationships.length,
+      knowledgeCount: ingestionStats.wisdomCreated,
+      poisExtracted: ingestionStats.poisCreated + ingestionStats.poisUpdated,
+      relationshipsCreated: ingestionStats.relationshipsCreated,
       subpagesFound: subpageLinks.slice(0, 20), // Store up to 20 subpages
+      contributedBy: attribution?.contributedBy,
+      contributorName: attribution?.contributorName,
     });
 
     // Return extracted data for the frontend to use
@@ -108,8 +130,15 @@ export async function POST(req: Request) {
       content: text.substring(0, 1000), // First 1000 chars
       tags: uniqueTags,
       pois: extracted.pois.map(p => p.name),
+      wisdom: extracted.wisdom.map(w => w.content),
+      relationships: extracted.relationships.map(r => `${r.from} → ${r.to}`),
       subpagesFound: subpageLinks.length,
       subpages: subpageLinks.slice(0, 10), // Return first 10 for UI
+      saved: {
+        wisdom: ingestionStats.wisdomCreated,
+        pois: ingestionStats.poisCreated + ingestionStats.poisUpdated,
+        relationships: ingestionStats.relationshipsCreated,
+      },
     });
   } catch (error) {
     console.error('URL scraping error:', error);
