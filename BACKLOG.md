@@ -1,6 +1,6 @@
 # LEXA Feature & Improvement Backlog
 
-**Last Updated:** December 16, 2024
+**Last Updated:** December 17, 2024
 
 This backlog tracks feature ideas, improvements, enhancements, and tasks for LEXA. Items are categorized by priority and complexity.
 
@@ -31,6 +31,7 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
 - [ ] **Bulk Import Status Page** - Track progress of large ChatGPT imports (Complexity: Low)
 
 ### **Improvements**
+- [x] **POI Search & Edit Feature** - Allow Captains to search and edit existing POIs (Complexity: Medium) ✅ **COMPLETED Dec 17, 2024**
 - [ ] **Enhance Voice Integration** - Current voice is "terrible" per user, need better TTS/STT (Complexity: High)
 - [ ] **Add Search to Knowledge Browser** - Full-text search across all knowledge (Complexity: Medium)
 - [ ] **POI Deduplication in UI** - Show when POIs are duplicates before merge (Complexity: Medium)
@@ -231,13 +232,13 @@ Future exploration (not prioritized yet):
 
 ## 📊 Backlog Statistics
 
-- **Total Items**: 85+
+- **Total Items**: 92+
 - **High Priority**: 13
 - **Medium Priority**: 26
 - **Low Priority**: 27
 - **Quick Wins**: 24
 - **In Progress**: 0
-- **Completed**: 14
+- **Completed**: 16
 
 ---
 
