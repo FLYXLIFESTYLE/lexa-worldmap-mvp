@@ -34,7 +34,7 @@ export default function UnauthorizedPage() {
           </h1>
           
           <p className="text-zinc-400 mb-6">
-            You don't have permission to access this area.
+            You don&apos;t have permission to access this area.
           </p>
         </div>
 

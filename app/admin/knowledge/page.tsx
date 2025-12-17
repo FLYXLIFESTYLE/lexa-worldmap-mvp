@@ -39,7 +39,7 @@ export default function KnowledgePortalPage() {
       <div className="bg-gradient-to-r from-lexa-navy to-lexa-gold text-white px-6 py-16">
         <div className="mx-auto max-w-5xl">
           <h1 className="text-5xl font-bold mb-4">
-            🌍 Captain's Knowledge Portal
+            🌍 Captain&apos;s Knowledge Portal
           </h1>
           <p className="text-xl opacity-90 mb-6">
             Share your travel expertise to help LEXA create extraordinary experiences
@@ -175,7 +175,7 @@ export default function KnowledgePortalPage() {
                 </div>
                 <h4 className="font-semibold text-lexa-navy mb-2">Knowledge Graph</h4>
                 <p className="text-sm text-zinc-600">
-                  Data is added to LEXA's Neo4j knowledge base
+                  Data is added to LEXA&apos;s Neo4j knowledge base
                 </p>
               </div>
               <div className="text-center">
