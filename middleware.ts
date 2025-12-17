@@ -7,8 +7,10 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  // Only run middleware for protected routes
-  if (!request.nextUrl.pathname.startsWith('/app') && !request.nextUrl.pathname.startsWith('/api')) {
+  const path = request.nextUrl.pathname;
+  
+  // Skip middleware for public routes
+  if (!path.startsWith('/app') && !path.startsWith('/api') && !path.startsWith('/admin')) {
     return NextResponse.next();
   }
 
@@ -54,10 +56,41 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Protect /app routes - redirect to signin if not authenticated
-  if (request.nextUrl.pathname.startsWith('/app') && !user) {
+  if (path.startsWith('/app') && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/signin';
+    url.searchParams.set('redirectTo', path);
     return NextResponse.redirect(url);
+  }
+
+  // Protect /admin routes - require captain profile
+  if (path.startsWith('/admin')) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth/signin';
+      url.searchParams.set('redirectTo', path);
+      return NextResponse.redirect(url);
+    }
+
+    // Check for captain profile
+    const { data: profile, error: profileError } = await supabase
+      .from('captain_profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/unauthorized';
+      return NextResponse.redirect(url);
+    }
+
+    // Admin-only routes
+    if (path.startsWith('/admin/users') && profile.role !== 'admin') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/unauthorized';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;
