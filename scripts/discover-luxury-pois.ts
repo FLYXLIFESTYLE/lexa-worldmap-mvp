@@ -192,7 +192,7 @@ async function searchLuxuryPlaces(destination: typeof TARGET_DESTINATIONS[0], ty
   }
 }
 
-async function checkPOIExists(driver: neo4j.Driver, name: string, lat: number, lon: number): Promise<boolean> {
+async function checkPOIExists(driver: any, name: string, lat: number, lon: number): Promise<boolean> {
   const session = driver.session();
   try {
     // Check if POI exists within 100m radius and same name
@@ -215,7 +215,7 @@ async function checkPOIExists(driver: neo4j.Driver, name: string, lat: number, l
   }
 }
 
-async function addPOIToDatabase(driver: neo4j.Driver, place: DiscoveredPlace, destination: string) {
+async function addPOIToDatabase(driver: any, place: DiscoveredPlace, destination: string) {
   const session = driver.session();
   
   try {
