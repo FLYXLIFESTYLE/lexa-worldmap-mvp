@@ -31,11 +31,17 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
 
 ## 🟡 Medium Priority (Do Next)
 
+### **Real-time Data & Integrations**
+- [ ] **Weather Integration** - Real-time weather data via Tavily or dedicated API (Complexity: Medium)
+- [ ] **Best Time to Travel Table** - Seasonal recommendations per destination with weather, events, pricing (Complexity: Medium)
+- [ ] **Visa Requirements Integration** - IATA Travel Centre, embassy APIs for visa info (Complexity: Medium)
+- [ ] **Travel Warnings & Restrictions** - State Dept, WHO, CDC advisories integration (Complexity: Medium)
+- [ ] **Codebreaker AI Integration** - Enhanced conversation analysis and insights (Complexity: High)
+
 ### **Features**
 - [ ] **Budget-Aware Recommendations** - Filter by daily/total budget (Complexity: Medium, Enhancement doc ready!)
 - [ ] **Multi-Destination Itinerary Builder** - Day-by-day scheduling across destinations (Complexity: High)
 - [ ] **Collaborative Filtering** - "Users like you also loved..." (Complexity: High)
-- [ ] **Weather-Based Recommendations** - Integrate weather API (Complexity: Medium)
 - [ ] **Event Calendar Integration** - Boost POIs during local events (Complexity: Medium)
 - [ ] **POI Photo Gallery** - Display photos from enrichment APIs (Complexity: Low)
 - [ ] **Export Itinerary to PDF** - Generate beautiful PDF itineraries (Complexity: Medium)
