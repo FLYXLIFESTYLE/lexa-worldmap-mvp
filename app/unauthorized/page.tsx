@@ -45,7 +45,7 @@ export default function UnauthorizedPage() {
           </h2>
           
           <p className="text-zinc-400 text-sm mb-4">
-            The Captain's Knowledge Portal and admin features are restricted to
+            The Captain&apos;s Knowledge Portal and admin features are restricted to
             LEXA team members and verified travel experts.
           </p>
           

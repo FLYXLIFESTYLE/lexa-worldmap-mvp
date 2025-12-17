@@ -152,7 +152,7 @@ function SetPasswordForm() {
 
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
             <p className="text-zinc-400 text-sm">
-              After setting your password, you'll be redirected to the Knowledge Portal
+              After setting your password, you&apos;ll be redirected to the Knowledge Portal
             </p>
           </div>
         </div>
