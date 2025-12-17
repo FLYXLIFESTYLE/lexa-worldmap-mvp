@@ -8,6 +8,21 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
 
 ## 🔴 High Priority (Do First)
 
+### **Security & Compliance**
+- [ ] **LEXA Compliance & Safety Rules** (Complexity: High, CRITICAL)
+  - [ ] Non-racist, non-discriminatory responses
+  - [ ] No hallucination - only factual, verified information
+  - [ ] Travel-only responses - refuse off-topic questions
+  - [ ] No system insights - never reveal processes, architecture, database structure
+  - [ ] Content moderation filters
+  - [ ] Automated safety checks on all AI responses
+  - [ ] Logging & monitoring for compliance violations
+  - [ ] Human review queue for flagged responses
+- [ ] **Role-Based Access Control (RBAC)** - Separate user/captain/admin roles (Complexity: Medium)
+- [ ] **Input Validation & Sanitization** - Prevent injection attacks (Complexity: Medium)
+- [ ] **Rate Limiting** - Prevent abuse and API overuse (Complexity: Medium)
+- [ ] **Audit Logging** - Track all admin actions (Complexity: Low)
+
 ### **Features**
 - [ ] **User Profile Management** - Store user preferences, past searches, favorites (Complexity: Medium)
 - [ ] **Captain Analytics Dashboard** - Show which Captains contribute most, knowledge usage stats (Complexity: Medium)
