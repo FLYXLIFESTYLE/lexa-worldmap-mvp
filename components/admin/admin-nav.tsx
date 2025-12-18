@@ -46,6 +46,12 @@ const adminPages = [
     href: '/admin/documentation',
     icon: '📖',
     description: 'LEXA Architecture'
+  },
+  {
+    name: 'Release Notes',
+    href: '/admin/release-notes',
+    icon: '📝',
+    description: 'Daily changelog'
   }
 ];
 

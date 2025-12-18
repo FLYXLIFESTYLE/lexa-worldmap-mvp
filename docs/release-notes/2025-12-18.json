@@ -1,0 +1,106 @@
+[
+  {
+    "id": "2025-12-18-1734520000-admin-dashboard",
+    "date": "2025-12-18",
+    "timestamp": "2025-12-18T11:00:00.000Z",
+    "category": "feature",
+    "title": "Admin Dashboard Deployed",
+    "description": "Comprehensive admin dashboard with quick stats, admin tools grid, quick actions, and system status indicators.",
+    "details": "The admin dashboard provides a centralized view of all admin tools including Captain's Portal, ChatNeo4j, Destinations Browser, POI Search & Edit, Scraped URLs Manager, and Documentation. Includes real-time statistics for Total POIs (203K+), Luxury POIs (50K+), Destinations (256), and Activities (384K+).",
+    "author": "System",
+    "isPublic": true,
+    "tags": ["admin", "ui", "dashboard"],
+    "relatedFiles": ["app/admin/dashboard/page.tsx"],
+    "githubCommit": "0e61a53"
+  },
+  {
+    "id": "2025-12-18-1734520001-admin-nav",
+    "date": "2025-12-18",
+    "timestamp": "2025-12-18T11:00:01.000Z",
+    "category": "feature",
+    "title": "Admin Navigation Dropdown Menu",
+    "description": "Top-right dropdown navigation menu for easy access to all admin tools across pages.",
+    "details": "The navigation dropdown shows the current page, all available admin tools with descriptions and icons, and provides quick navigation between pages. Includes 'Back to LEXA' link and highlights the active page.",
+    "author": "System",
+    "isPublic": true,
+    "tags": ["admin", "ui", "navigation"],
+    "relatedFiles": ["components/admin/admin-nav.tsx"],
+    "githubCommit": "0e61a53"
+  },
+  {
+    "id": "2025-12-18-1734520002-documentation",
+    "date": "2025-12-18",
+    "timestamp": "2025-12-18T11:00:02.000Z",
+    "category": "feature",
+    "title": "LEXA Architecture Documentation Page",
+    "description": "Admin page displaying complete LEXA architecture documentation with beautiful markdown rendering.",
+    "details": "The documentation page renders the full LEXA_ARCHITECTURE.md file with syntax highlighting, responsive design, and quick links to other admin tools. Includes all system architecture details, features, technical specifications, and data flow diagrams.",
+    "author": "System",
+    "isPublic": true,
+    "tags": ["documentation", "admin", "architecture"],
+    "relatedFiles": ["app/admin/documentation/page.tsx", "public/docs/LEXA_ARCHITECTURE.md"],
+    "githubCommit": "0e61a53"
+  },
+  {
+    "id": "2025-12-18-1734520003-occasion-timeout",
+    "date": "2025-12-18",
+    "timestamp": "2025-12-18T11:00:03.000Z",
+    "category": "bugfix",
+    "title": "Fixed Occasion Categories Timeout",
+    "description": "Resolved 60-second timeout issue in occasion categories script by implementing batch processing.",
+    "details": "The script now processes POI-occasion relationships in batches of 5,000 instead of all at once, preventing database connection timeouts. This allows the script to handle millions of POIs without errors.",
+    "author": "System",
+    "isPublic": false,
+    "tags": ["occasion-categories", "performance", "database"],
+    "relatedFiles": ["scripts/create-occasion-categories.ts"],
+    "githubCommit": "0e61a53"
+  },
+  {
+    "id": "2025-12-18-1734520004-reverse-geocoding",
+    "date": "2025-12-18",
+    "timestamp": "2025-12-18T11:00:04.000Z",
+    "category": "feature",
+    "title": "Google Geocoding API Integration",
+    "description": "Implemented reverse geocoding using Google Geocoding API to add city relationships to 202K POIs.",
+    "details": "Created a script that uses Google's Geocoding API (not Nominatim, which forbids bulk geocoding per their terms) to convert coordinates to city names. Processes 1,000 POIs per batch at ~20 requests/second. Cost: $5 per 1,000 requests (first 40K/month free). Estimated total cost for 202K POIs: ~$810.",
+    "author": "System",
+    "isPublic": false,
+    "tags": ["geocoding", "google-api", "database", "poi"],
+    "relatedFiles": ["scripts/reverse-geocode-pois.ts"],
+    "githubCommit": "latest"
+  },
+  {
+    "id": "2025-12-18-1734520005-release-notes",
+    "date": "2025-12-18",
+    "timestamp": "2025-12-18T11:00:05.000Z",
+    "category": "feature",
+    "title": "Release Notes System",
+    "description": "Built comprehensive release notes system with daily capture, sorting, and filtering capabilities.",
+    "details": "The release notes system stores daily changes in JSON files (docs/release-notes/YYYY-MM-DD.json), provides API endpoints for CRUD operations, and includes an admin UI with sorting (newest-first, oldest-first, by-feature) and filtering (all, public, internal). Supports 8 categories: feature, enhancement, bugfix, performance, documentation, infrastructure, security, and database.",
+    "author": "System",
+    "isPublic": true,
+    "tags": ["release-notes", "changelog", "documentation", "admin"],
+    "relatedFiles": [
+      "lib/release-notes/types.ts",
+      "lib/release-notes/manager.ts",
+      "app/api/release-notes/route.ts",
+      "app/admin/release-notes/page.tsx"
+    ],
+    "githubCommit": "latest"
+  },
+  {
+    "id": "2025-12-18-1734520006-build-error",
+    "date": "2025-12-18",
+    "timestamp": "2025-12-18T11:00:06.000Z",
+    "category": "bugfix",
+    "title": "Fixed Vercel Build Error",
+    "description": "Resolved TypeScript error preventing Vercel deployment by removing duplicate geocode-scraped-pois.ts file.",
+    "details": "The build was failing due to a neo4j.float() type error in scripts/geocode-scraped-pois.ts. This was a duplicate/old version of the file. The issue was fixed by deleting the problematic file.",
+    "author": "System",
+    "isPublic": false,
+    "tags": ["build", "vercel", "bugfix"],
+    "relatedFiles": [],
+    "githubCommit": "latest"
+  }
+]
+
