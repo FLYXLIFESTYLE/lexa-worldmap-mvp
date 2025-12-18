@@ -34,7 +34,20 @@ export async function GET(req: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'total_pois'; // total_pois, luxury_pois, avg_luxury_score, destination
     const order = searchParams.get('order') || 'DESC';
 
-    const driver = getNeo4jDriver();
+    let driver;
+    try {
+      driver = getNeo4jDriver();
+    } catch (driverError) {
+      console.error('Neo4j driver error:', driverError);
+      return NextResponse.json(
+        {
+          error: 'Database connection failed',
+          details: 'Could not connect to Neo4j. Please check your database configuration.'
+        },
+        { status: 500 }
+      );
+    }
+
     const session = driver.session();
 
     try {
@@ -63,6 +76,8 @@ export async function GET(req: NextRequest) {
         `,
         { limit }
       );
+
+      console.log(`[Destinations API] Found ${result.records.length} destinations`);
 
       const destinations: DestinationStats[] = result.records.map(record => ({
         destination: record.get('destination'),
@@ -106,11 +121,17 @@ export async function GET(req: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Destination browser error:', error);
+    console.error('===== DESTINATION BROWSER ERROR =====');
+    console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('Error message:', error instanceof Error ? error.message : error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('=====================================');
+    
     return NextResponse.json(
       {
         error: 'Failed to fetch destinations',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        type: error instanceof Error ? error.constructor.name : 'UnknownError'
       },
       { status: 500 }
     );

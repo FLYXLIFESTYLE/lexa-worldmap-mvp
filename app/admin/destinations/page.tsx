@@ -45,21 +45,38 @@ export default function DestinationBrowserPage() {
   const fetchDestinations = async () => {
     try {
       setIsLoading(true);
+      setError(null);
+      
+      console.log('[Destination Browser] Fetching destinations...');
+      
       const response = await fetch(
         `/api/neo4j/destinations?sortBy=${sortBy}&order=${order}&limit=100`
       );
 
+      console.log('[Destination Browser] Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error('Failed to fetch destinations');
+        const errorData = await response.json();
+        console.error('[Destination Browser] API Error:', errorData);
+        throw new Error(errorData.details || errorData.error || 'Failed to fetch destinations');
       }
 
       const data = await response.json();
+      console.log('[Destination Browser] Received data:', {
+        destinationsCount: data.destinations?.length,
+        hasOverallStats: !!data.overallStats
+      });
+
+      if (!data.destinations || !Array.isArray(data.destinations)) {
+        throw new Error('Invalid response format from API');
+      }
+
       setDestinations(data.destinations);
-      setOverallStats(data.overallStats);
+      setOverallStats(data.overallStats || null);
 
     } catch (err) {
-      console.error('Fetch error:', err);
-      setError('Failed to load destinations');
+      console.error('[Destination Browser] Fetch error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load destinations. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -90,10 +107,67 @@ export default function DestinationBrowserPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-100 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="animate-spin h-8 w-8 border-4 border-lexa-gold border-t-transparent rounded-full"></div>
-          <span className="text-lexa-navy font-semibold">Loading destinations...</span>
+      <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-100">
+        <div className="max-w-7xl mx-auto p-8">
+          <div className="flex justify-end mb-4">
+            <AdminNav />
+          </div>
+          <div className="flex items-center justify-center py-20">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin h-8 w-8 border-4 border-lexa-gold border-t-transparent rounded-full"></div>
+              <span className="text-lexa-navy font-semibold">Loading destinations...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-100">
+        <div className="max-w-7xl mx-auto p-8">
+          <div className="flex justify-end mb-4">
+            <AdminNav />
+          </div>
+          <div className="bg-red-50 border-2 border-red-200 rounded-xl p-8 text-center">
+            <div className="text-5xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-red-900 mb-2">Failed to Load Destinations</h2>
+            <p className="text-red-700 mb-4">{error}</p>
+            <button
+              onClick={fetchDestinations}
+              className="px-6 py-3 bg-lexa-navy text-white rounded-lg hover:bg-lexa-gold transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (destinations.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-100">
+        <div className="max-w-7xl mx-auto p-8">
+          <div className="flex justify-end mb-4">
+            <AdminNav />
+          </div>
+          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-8 text-center">
+            <div className="text-5xl mb-4">📍</div>
+            <h2 className="text-2xl font-bold text-yellow-900 mb-2">No Destinations Found</h2>
+            <p className="text-yellow-700 mb-4">
+              No destinations with POIs found in the database. 
+              <br />
+              Import some POI data first or check your database connection.
+            </p>
+            <button
+              onClick={() => router.push('/admin/knowledge')}
+              className="px-6 py-3 bg-lexa-navy text-white rounded-lg hover:bg-lexa-gold transition-colors"
+            >
+              Go to Knowledge Portal
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -171,12 +245,16 @@ export default function DestinationBrowserPage() {
           </div>
         )}
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-            {error}
-          </div>
-        )}
+        {/* Refresh Button */}
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={fetchDestinations}
+            disabled={isLoading}
+            className="px-4 py-2 bg-lexa-navy text-white rounded-lg hover:bg-lexa-gold transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            🔄 Refresh Data
+          </button>
+        </div>
 
         {/* Destinations Table */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
