@@ -39,13 +39,26 @@ export default function DocumentationPage() {
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-start justify-between mb-4">
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 LEXA Architecture & Features
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600 mb-4">
                 Complete system architecture, features, and technical documentation
               </p>
+              
+              {/* Why - What - How */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-1.5 max-w-2xl">
+                <div className="text-sm">
+                  <strong className="text-purple-900">WHY:</strong> <span className="text-gray-700">Understand LEXA's architecture for effective contribution and troubleshooting</span>
+                </div>
+                <div className="text-sm">
+                  <strong className="text-purple-900">WHAT:</strong> <span className="text-gray-700">Complete system overview, components, scoring, relationships, and data flow</span>
+                </div>
+                <div className="text-sm">
+                  <strong className="text-purple-900">HOW:</strong> <span className="text-gray-700">Scroll through sections or use browser search (Ctrl+F) to find specific topics</span>
+                </div>
+              </div>
             </div>
             <AdminNav />
           </div>
