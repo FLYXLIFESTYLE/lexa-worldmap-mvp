@@ -327,8 +327,8 @@ async function findDuplicate(session: neo4j.Session, poi: POIInput): Promise<str
     RETURN p.poi_uid as poi_uid
     LIMIT 1
   `, {
-    lat: neo4j.float(poi.lat),
-    lon: neo4j.float(poi.lon),
+    lat: poi.lat,
+    lon: poi.lon,
     name: poi.name
   });
   
@@ -371,13 +371,13 @@ async function createOrUpdatePOI(session: neo4j.Session, poi: EnrichedPOI): Prom
       poi_uid: poi.poi_uid,
       name: poi.name,
       type: poi.type || null,
-      lat: poi.lat ? neo4j.float(poi.lat) : null,
-      lon: poi.lon ? neo4j.float(poi.lon) : null,
+      lat: poi.lat || null,
+      lon: poi.lon || null,
       luxury_score: neo4j.int(poi.luxury_score),
-      luxury_confidence: neo4j.float(poi.luxury_confidence),
+      luxury_confidence: poi.luxury_confidence,
       luxury_evidence: poi.luxury_evidence,
       description: poi.description || null,
-      rating: poi.rating ? neo4j.float(poi.rating) : null,
+      rating: poi.rating || null,
       price_level: poi.price_level ? neo4j.int(poi.price_level) : null,
       website: poi.website || null,
       phone: poi.phone || null,
