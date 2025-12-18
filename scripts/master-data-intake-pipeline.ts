@@ -566,9 +566,6 @@ async function main() {
   await driver.close();
 }
 
-// Export for use in other scripts
-export { processPOI };
-
 // Run as standalone script
 if (import.meta.url === `file://${process.argv[1]}`) {
   main();
