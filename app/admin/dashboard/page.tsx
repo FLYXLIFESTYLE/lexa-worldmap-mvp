@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import AdminNav from '@/components/admin/admin-nav';
+import BacklogManager from '@/components/admin/backlog-manager';
 
 const adminTools = [
   {
@@ -239,6 +240,11 @@ export default function AdminDashboard() {
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Development Backlog */}
+        <div className="mt-6">
+          <BacklogManager />
         </div>
       </div>
     </div>
