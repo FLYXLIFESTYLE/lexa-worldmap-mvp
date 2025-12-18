@@ -65,8 +65,6 @@ const categoryEmojis: Record<string, string> = {
   infrastructure: '🏗️',
   data: '💾',
   ui: '🎨',
-  security: '🔒',
-  documentation: '📝',
   other: '📌'
 };
 
@@ -522,8 +520,6 @@ export default function BacklogPage() {
                   <option value="infrastructure">🏗️ Infrastructure</option>
                   <option value="data">💾 Data</option>
                   <option value="ui">🎨 UI</option>
-                  <option value="security">🔒 Security</option>
-                  <option value="documentation">📝 Documentation</option>
                   <option value="other">📌 Other</option>
                 </select>
                 <input

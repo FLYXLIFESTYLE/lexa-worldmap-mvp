@@ -25,10 +25,10 @@ INSERT INTO backlog_items (title, description, priority, category, status, estim
 
 -- Security & Compliance (High Priority)
 INSERT INTO backlog_items (title, description, priority, category, status, estimated_hours, tags, order_index) VALUES
-('LEXA Compliance & Safety Rules', 'Non-racist, non-discriminatory responses. No hallucination. Travel-only responses. No system insights. Content moderation filters. Automated safety checks. Logging & monitoring. Human review queue.', 'high', 'security', 'pending', 40, '{compliance,safety,critical}', 12),
-('Role-Based Access Control (RBAC)', 'Separate user/captain/admin roles with granular permissions.', 'high', 'security', 'pending', 16, '{rbac,security}', 13),
-('Input Validation & Sanitization', 'Prevent injection attacks and malicious input.', 'high', 'security', 'pending', 12, '{security,validation}', 14),
-('Rate Limiting', 'Prevent abuse and API overuse.', 'high', 'security', 'pending', 8, '{security,rate-limiting}', 15),
+('LEXA Compliance & Safety Rules', 'Non-racist, non-discriminatory responses. No hallucination. Travel-only responses. No system insights. Content moderation filters. Automated safety checks. Logging & monitoring. Human review queue.', 'high', 'infrastructure', 'pending', 40, '{compliance,safety,critical}', 12),
+('Role-Based Access Control (RBAC)', 'Separate user/captain/admin roles with granular permissions.', 'high', 'infrastructure', 'pending', 16, '{rbac,security}', 13),
+('Input Validation & Sanitization', 'Prevent injection attacks and malicious input.', 'high', 'infrastructure', 'pending', 12, '{security,validation}', 14),
+('Rate Limiting', 'Prevent abuse and API overuse.', 'high', 'infrastructure', 'pending', 8, '{security,rate-limiting}', 15),
 ('Audit Logging', 'Track all admin actions for compliance and debugging.', 'high', 'infrastructure', 'pending', 6, '{logging,audit}', 16);
 
 -- Features (High Priority)
@@ -88,7 +88,7 @@ INSERT INTO backlog_items (title, description, priority, category, status, estim
 
 -- Documentation (Normal Priority)
 INSERT INTO backlog_items (title, description, priority, category, status, estimated_hours, tags, order_index) VALUES
-('Cypher Queries Documentation', 'Create documentation page for most common and recurring Cypher queries and npx commands.', 'normal', 'documentation', 'pending', 4, '{documentation,neo4j}', 45);
+('Cypher Queries Documentation', 'Create documentation page for most common and recurring Cypher queries and npx commands.', 'normal', 'other', 'pending', 4, '{documentation,neo4j}', 45);
 
 -- Data & Real-time Features (Normal Priority)
 INSERT INTO backlog_items (title, description, priority, category, status, estimated_hours, tags, order_index) VALUES
