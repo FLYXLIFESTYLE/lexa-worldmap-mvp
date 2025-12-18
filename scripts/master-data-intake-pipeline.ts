@@ -46,6 +46,7 @@ interface POIInput {
   country?: string;
   website?: string;
   source: string;
+  poi_uid?: string; // Generated during processing or from duplicate check
 }
 
 interface EnrichedPOI extends POIInput {
