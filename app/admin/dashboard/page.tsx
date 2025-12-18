@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import AdminNav from '@/components/admin/admin-nav';
-import BacklogManager from '@/components/admin/backlog-manager';
 
 const adminTools = [
   {
@@ -91,10 +90,10 @@ const adminTools = [
 ];
 
 const quickStats = [
-  { label: 'Total POIs', value: '203,000+', icon: '📍' },
-  { label: 'Luxury POIs', value: '50,000+', icon: '💎' },
-  { label: 'Destinations', value: '256', icon: '🏙️' },
-  { label: 'Activities', value: '384K+', icon: '🎯' }
+  { label: 'Total POIs', value: '203,000+', icon: '📍', link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb' },
+  { label: 'Luxury POIs', value: '50,000+', icon: '💎', link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb' },
+  { label: 'Destinations', value: '256', icon: '🏙️', link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb' },
+  { label: 'Activities', value: '384K+', icon: '🎯', link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb' }
 ];
 
 export default function AdminDashboard() {
@@ -130,22 +129,29 @@ export default function AdminDashboard() {
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           {quickStats.map((stat) => (
-            <div key={stat.label} className="bg-white rounded-lg shadow-sm p-6">
+            <a 
+              key={stat.label} 
+              href={stat.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
                   <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                  <p className="text-xs text-blue-600 mt-1">View in Neo4j →</p>
                 </div>
                 <div className="text-4xl">{stat.icon}</div>
               </div>
-            </div>
+            </a>
           ))}
         </div>
 
         {/* Quick Actions - MOVED ABOVE TOOLS */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <button
               className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-left"
               onClick={() => window.location.href = '/admin/knowledge/editor'}
@@ -168,6 +174,14 @@ export default function AdminDashboard() {
             >
               <div className="font-semibold mb-1">📚 Upload Knowledge</div>
               <div className="text-sm text-purple-100">Add files or scrape URLs</div>
+            </button>
+
+            <button
+              className="px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-left"
+              onClick={() => window.location.href = '/admin/backlog'}
+            >
+              <div className="font-semibold mb-1">📋 Add to Backlog</div>
+              <div className="text-sm text-orange-100">Create new task or feature</div>
             </button>
           </div>
         </div>
@@ -240,11 +254,6 @@ export default function AdminDashboard() {
               </span>
             </div>
           </div>
-        </div>
-
-        {/* Development Backlog */}
-        <div className="mt-6">
-          <BacklogManager />
         </div>
       </div>
     </div>

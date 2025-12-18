@@ -25,6 +25,12 @@ const adminPages = [
     description: 'Query database'
   },
   {
+    name: 'Backlog',
+    href: '/admin/backlog',
+    icon: '📋',
+    description: 'Development tasks'
+  },
+  {
     name: 'Destinations',
     href: '/admin/destinations',
     icon: '🗺️',
