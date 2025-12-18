@@ -1,14 +1,10 @@
 'use client';
 
-/**
- * Backlog Overview Page
- * Dedicated page for viewing and managing all backlog items
- * Similar to Release Notes but for development tasks
- */
-
 import { useState, useEffect } from 'react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import AdminNav from '@/components/admin/admin-nav';
 import Link from 'next/link';
+import { format } from 'date-fns';
 
 interface BacklogItem {
   id: string;
@@ -55,6 +51,13 @@ const priorityColors = {
   }
 };
 
+const statusColors = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  in_progress: 'bg-blue-100 text-blue-800',
+  completed: 'bg-green-100 text-green-800',
+  cancelled: 'bg-gray-100 text-gray-800'
+};
+
 const categoryEmojis: Record<string, string> = {
   feature: '✨',
   bug: '🐛',
@@ -62,7 +65,9 @@ const categoryEmojis: Record<string, string> = {
   infrastructure: '🏗️',
   data: '💾',
   ui: '🎨',
-  other: '📝'
+  security: '🔒',
+  documentation: '📝',
+  other: '📌'
 };
 
 export default function BacklogPage() {
@@ -72,9 +77,11 @@ export default function BacklogPage() {
     high: [],
     normal: []
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({ total: 0, open: 0, resolved: 0, critical: 0, high: 0 });
   const [statusFilter, setStatusFilter] = useState<'pending' | 'in_progress' | 'completed' | 'all'>('pending');
+  const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingItem, setEditingItem] = useState<BacklogItem | null>(null);
   const [newItem, setNewItem] = useState({
     title: '',
     description: '',
@@ -88,6 +95,7 @@ export default function BacklogPage() {
   }, [statusFilter]);
 
   async function fetchBacklog() {
+    setIsLoading(true);
     try {
       const response = await fetch(`/api/admin/backlog?status=${statusFilter}`);
       const data = await response.json();
@@ -95,6 +103,7 @@ export default function BacklogPage() {
       if (data.success) {
         setItems(data.items);
         setGrouped(data.grouped);
+        setStats(data.stats);
       }
     } catch (error) {
       console.error('Failed to fetch backlog:', error);
@@ -134,19 +143,116 @@ export default function BacklogPage() {
     }
   }
 
-  async function handleUpdateStatus(id: string, status: string) {
+  async function handleUpdateItem(item: BacklogItem) {
     try {
       const response = await fetch('/api/admin/backlog', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status })
+        body: JSON.stringify(item)
+      });
+
+      if (response.ok) {
+        setEditingItem(null);
+        fetchBacklog();
+      }
+    } catch (error) {
+      console.error('Failed to update item:', error);
+    }
+  }
+
+  async function handleDeleteItem(id: string) {
+    if (!confirm('Are you sure you want to delete this item?')) return;
+
+    try {
+      const response = await fetch('/api/admin/backlog', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
       });
 
       if (response.ok) {
         fetchBacklog();
       }
     } catch (error) {
-      console.error('Failed to update item:', error);
+      console.error('Failed to delete item:', error);
+    }
+  }
+
+  async function onDragEnd(result: DropResult) {
+    const { source, destination } = result;
+
+    if (!destination) return;
+
+    // Same position, no change
+    if (source.droppableId === destination.droppableId && source.index === destination.index) {
+      return;
+    }
+
+    const sourcePriority = source.droppableId as 'critical' | 'high' | 'normal';
+    const destPriority = destination.droppableId as 'critical' | 'high' | 'normal';
+
+    // Create new grouped state
+    const newGrouped = { ...grouped };
+    const sourceItems = Array.from(newGrouped[sourcePriority]);
+    const [movedItem] = sourceItems.splice(source.index, 1);
+
+    // Update item priority if moving between buckets
+    if (sourcePriority !== destPriority) {
+      movedItem.priority = destPriority;
+    }
+
+    if (sourcePriority === destPriority) {
+      // Moving within same priority
+      sourceItems.splice(destination.index, 0, movedItem);
+      newGrouped[sourcePriority] = sourceItems;
+    } else {
+      // Moving between priorities
+      const destItems = Array.from(newGrouped[destPriority]);
+      destItems.splice(destination.index, 0, movedItem);
+      newGrouped[sourcePriority] = sourceItems;
+      newGrouped[destPriority] = destItems;
+    }
+
+    // Optimistic update
+    setGrouped(newGrouped);
+
+    // Update server
+    try {
+      // Update priority if changed
+      if (sourcePriority !== destPriority) {
+        await fetch('/api/admin/backlog', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: movedItem.id, priority: destPriority })
+        });
+      }
+
+      // Reorder all items in affected priorities
+      const updates = [];
+      if (sourcePriority === destPriority) {
+        // Update only one priority
+        newGrouped[sourcePriority].forEach((item, index) => {
+          updates.push({ id: item.id, order_index: index });
+        });
+      } else {
+        // Update both priorities
+        newGrouped[sourcePriority].forEach((item, index) => {
+          updates.push({ id: item.id, order_index: index });
+        });
+        newGrouped[destPriority].forEach((item, index) => {
+          updates.push({ id: item.id, order_index: index });
+        });
+      }
+
+      // Send batch update
+      await fetch('/api/admin/backlog/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reorderedItems: updates })
+      });
+    } catch (error) {
+      console.error('Failed to reorder items:', error);
+      fetchBacklog(); // Revert on error
     }
   }
 
@@ -159,93 +265,125 @@ export default function BacklogPage() {
       normal: 'NORMAL'
     };
 
-    if (priorityItems.length === 0) return null;
-
     return (
-      <div key={priority} className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-3xl">{colors.icon}</span>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {priorityLabels[priority]}
-            </h2>
-            <p className="text-sm text-gray-600">
-              {priorityItems.length} item{priorityItems.length !== 1 ? 's' : ''}
-              {priorityItems.some(i => i.estimated_hours) && (
-                <span className="ml-2">
-                  • Total: {priorityItems.reduce((sum, item) => sum + (item.estimated_hours || 0), 0)}h estimated
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {priorityItems.map((item) => (
-            <div
-              key={item.id}
-              className={`${colors.bg} ${colors.border} border-2 rounded-lg p-5 hover:shadow-md transition-all`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-start gap-3 mb-2">
-                    <span className="text-2xl">
-                      {categoryEmojis[item.category || 'other']}
+      <Droppable droppableId={priority} key={priority}>
+        {(provided, snapshot) => (
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-3xl">{colors.icon}</span>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {priorityLabels[priority]}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {priorityItems.length} item{priorityItems.length !== 1 ? 's' : ''}
+                  {priorityItems.some(i => i.estimated_hours) && (
+                    <span className="ml-2">
+                      • Total: {priorityItems.reduce((sum, item) => sum + (item.estimated_hours || 0), 0)}h estimated
                     </span>
-                    <div className="flex-1">
-                      <h3 className={`text-lg font-semibold ${colors.text} mb-1`}>
-                        {item.title}
-                      </h3>
-                      {item.description && (
-                        <p className="text-gray-700 text-sm leading-relaxed">
-                          {item.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 mt-3 ml-11">
-                    {item.category && (
-                      <span className="px-3 py-1 bg-white/60 text-gray-700 text-xs font-medium rounded-full">
-                        {item.category}
-                      </span>
-                    )}
-                    {item.estimated_hours && (
-                      <span className="px-3 py-1 bg-white/60 text-gray-700 text-xs font-medium rounded-full">
-                        ⏱️ {item.estimated_hours}h
-                      </span>
-                    )}
-                    {item.status === 'in_progress' && (
-                      <span className="px-3 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
-                        ▶️ In Progress
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {item.status === 'pending' && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleUpdateStatus(item.id, 'in_progress')}
-                      className="px-4 py-2 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 transition-colors"
-                      title="Start working"
-                    >
-                      ▶️ Start
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(item.id, 'completed')}
-                      className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
-                      title="Mark complete"
-                    >
-                      ✅ Done
-                    </button>
-                  </div>
-                )}
+                  )}
+                </p>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              className={`space-y-3 min-h-[100px] rounded-lg p-4 transition-colors ${
+                snapshot.isDraggingOver ? 'bg-gray-100' : 'bg-transparent'
+              }`}
+            >
+              {priorityItems.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  Drop items here or they'll appear when you add them
+                </div>
+              )}
+
+              {priorityItems.map((item, index) => (
+                <Draggable key={item.id} draggableId={item.id} index={index}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      className={`${colors.bg} ${colors.border} border-2 rounded-lg p-5 ${
+                        snapshot.isDragging ? 'shadow-lg rotate-2' : ''
+                      }`}
+                    >
+                      {editingItem?.id === item.id ? (
+                        <EditItemForm
+                          item={editingItem}
+                          onSave={handleUpdateItem}
+                          onCancel={() => setEditingItem(null)}
+                          onDelete={() => handleDeleteItem(item.id)}
+                        />
+                      ) : (
+                        <div className="flex items-start justify-between gap-4">
+                          <div {...provided.dragHandleProps} className="flex items-start gap-3 flex-1 cursor-grab active:cursor-grabbing">
+                            <div className="text-gray-400 mt-1">⋮⋮</div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <span className="text-xl">
+                                  {categoryEmojis[item.category || 'other']}
+                                </span>
+                                {item.category && (
+                                  <span className="px-2 py-1 bg-white/60 text-gray-700 text-xs font-medium rounded-full">
+                                    {item.category}
+                                  </span>
+                                )}
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[item.status]}`}>
+                                  {item.status.replace('_', ' ')}
+                                </span>
+                                {item.estimated_hours && (
+                                  <span className="px-2 py-1 bg-white/60 text-gray-700 text-xs font-medium rounded-full">
+                                    ⏱️ {item.estimated_hours}h
+                                  </span>
+                                )}
+                              </div>
+
+                              <h3 className={`text-lg font-bold ${colors.text} mb-2`}>
+                                {item.title}
+                              </h3>
+
+                              {item.description && (
+                                <p className="text-gray-700 text-sm leading-relaxed mb-2">
+                                  {item.description}
+                                </p>
+                              )}
+
+                              {item.tags && item.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {item.tags.map((tag, idx) => (
+                                    <span key={idx} className="px-2 py-1 bg-white/80 text-gray-600 text-xs rounded-full">
+                                      #{tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="text-xs text-gray-500 mt-3">
+                                Created: {format(new Date(item.created_at), 'MMM d, yyyy')} • 
+                                Updated: {format(new Date(item.updated_at), 'MMM d, yyyy')}
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => setEditingItem(item)}
+                            className="px-3 py-2 bg-white text-gray-700 text-sm rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
+                          >
+                            ✏️ Edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          </div>
+        )}
+      </Droppable>
     );
   }
 
@@ -270,10 +408,10 @@ export default function BacklogPage() {
         <div className="flex items-start justify-between mb-8">
           <div className="flex-1">
             <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              Development Backlog
+              📋 Development Backlog
             </h1>
             <p className="text-lg text-gray-600 mb-4">
-              Track and manage all development tasks, features, and improvements
+              Drag & drop to reorder • Click Edit for inline editing
             </p>
             
             {/* Why - What - How */}
@@ -282,10 +420,10 @@ export default function BacklogPage() {
                 <strong className="text-purple-900">WHY:</strong> <span className="text-gray-700">Keep all tasks organized by priority for efficient development planning</span>
               </div>
               <div className="text-sm">
-                <strong className="text-purple-900">WHAT:</strong> <span className="text-gray-700">View all backlog items grouped by priority (Critical/High/Normal)</span>
+                <strong className="text-purple-900">WHAT:</strong> <span className="text-gray-700">Drag to reorder within or between priority buckets, click Edit for inline changes</span>
               </div>
               <div className="text-sm">
-                <strong className="text-purple-900">HOW:</strong> <span className="text-gray-700">Filter by status, add new items, or mark tasks as started/completed</span>
+                <strong className="text-purple-900">HOW:</strong> <span className="text-gray-700">Grab ⋮⋮ icon to drag, click Edit button to modify, filter by status</span>
               </div>
             </div>
           </div>
@@ -384,7 +522,9 @@ export default function BacklogPage() {
                   <option value="infrastructure">🏗️ Infrastructure</option>
                   <option value="data">💾 Data</option>
                   <option value="ui">🎨 UI</option>
-                  <option value="other">📝 Other</option>
+                  <option value="security">🔒 Security</option>
+                  <option value="documentation">📝 Documentation</option>
+                  <option value="other">📌 Other</option>
                 </select>
                 <input
                   type="number"
@@ -406,26 +546,26 @@ export default function BacklogPage() {
           </div>
         )}
 
-        {/* Backlog Items by Priority */}
-        <div>
+        {/* Drag & Drop Context */}
+        <DragDropContext onDragEnd={onDragEnd}>
           {renderPrioritySection('critical')}
           {renderPrioritySection('high')}
           {renderPrioritySection('normal')}
+        </DragDropContext>
 
-          {totalItems === 0 && (
-            <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-              <p className="text-gray-500 text-lg">
-                No {statusFilter !== 'all' ? statusFilter : ''} backlog items found.
-              </p>
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="mt-4 px-6 py-3 bg-lexa-gold text-white rounded-lg hover:bg-lexa-navy transition-colors"
-              >
-                Add Your First Item
-              </button>
-            </div>
-          )}
-        </div>
+        {totalItems === 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+            <p className="text-gray-500 text-lg">
+              No {statusFilter !== 'all' ? statusFilter : ''} backlog items found.
+            </p>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="mt-4 px-6 py-3 bg-lexa-gold text-white rounded-lg hover:bg-lexa-navy transition-colors"
+            >
+              Add Your First Item
+            </button>
+          </div>
+        )}
 
         {/* Back to Dashboard */}
         <div className="mt-8 text-center">
@@ -441,3 +581,78 @@ export default function BacklogPage() {
   );
 }
 
+// Inline Edit Form Component
+function EditItemForm({ 
+  item, 
+  onSave, 
+  onCancel, 
+  onDelete 
+}: { 
+  item: BacklogItem; 
+  onSave: (item: BacklogItem) => void; 
+  onCancel: () => void; 
+  onDelete: () => void;
+}) {
+  const [editedItem, setEditedItem] = useState(item);
+
+  const handleSave = () => {
+    onSave(editedItem);
+  };
+
+  return (
+    <div className="space-y-3">
+      <input
+        type="text"
+        value={editedItem.title}
+        onChange={(e) => setEditedItem({ ...editedItem, title: e.target.value })}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+      />
+      <textarea
+        value={editedItem.description || ''}
+        onChange={(e) => setEditedItem({ ...editedItem, description: e.target.value })}
+        rows={2}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <select
+          value={editedItem.status}
+          onChange={(e) => setEditedItem({ ...editedItem, status: e.target.value as any })}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+        >
+          <option value="pending">Pending</option>
+          <option value="in_progress">In Progress</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <input
+          type="number"
+          step="0.5"
+          value={editedItem.estimated_hours || ''}
+          onChange={(e) => setEditedItem({ ...editedItem, estimated_hours: parseFloat(e.target.value) || null })}
+          placeholder="Hours"
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handleSave}
+          className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+        >
+          ✓ Save
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
+        >
+          ✕ Cancel
+        </button>
+        <button
+          onClick={onDelete}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+        >
+          🗑️
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -1,8 +1,8 @@
 # LEXA - Luxury Experience Agent
 ## Complete Architecture Overview & Feature List
 
-**Version**: 1.0  
-**Last Updated**: December 17, 2024  
+**Version**: 1.1  
+**Last Updated**: December 18, 2024  
 **Deployment**: [lexa-worldmap-mvp.vercel.app](https://lexa-worldmap-mvp.vercel.app/)
 
 ---
@@ -890,6 +890,47 @@ Conversational AI interface for designing luxury travel experiences.
 - **Purpose**: Real-time web search
 - **Types**: destination_info, events, weather, poi, travel_requirements, general
 
+#### 5. Backlog Management APIs
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/admin/backlog` | GET | Fetch backlog items with filtering |
+| `/api/admin/backlog` | POST | Create new backlog item |
+| `/api/admin/backlog` | PATCH | Update backlog item |
+| `/api/admin/backlog` | DELETE | Delete backlog item (admin only) |
+| `/api/admin/backlog/reorder` | PATCH | Reorder items via drag & drop |
+
+#### 6. Bug Reports APIs
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/bugs` | GET | Fetch bug reports (all users can view own, admins see all) |
+| `/api/bugs` | POST | Submit new bug report (available to ALL users) |
+| `/api/bugs` | PATCH | Update bug status (admins only) |
+| `/api/bugs` | DELETE | Delete bug report (admins only) |
+
+#### 7. Error Logging APIs
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/errors` | GET | Fetch error logs (admins only) |
+| `/api/errors` | PATCH | Update error status (admins only) |
+| `/api/errors/log` | POST | Log new error (automatic) |
+
+#### 8. Presence Tracking API
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/admin/presence` | GET | Fetch online admin users |
+| `/api/admin/presence` | POST | Update user presence (heartbeat) |
+
+#### 9. Neo4j Query APIs
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/neo4j/chat` | POST | Natural language to Cypher queries |
+| `/api/neo4j/destinations` | GET | Fetch destinations with statistics |
+
 ### External APIs
 
 #### Anthropic Claude
@@ -926,6 +967,60 @@ Conversational AI interface for designing luxury travel experiences.
 - **Auth**: None (rate-limited)
 - **Usage**: Reverse geocoding, unnamed POI enrichment
 - **Rate Limit**: 1 request/second
+- **Note**: Bulk geocoding prohibited by usage policy
+
+#### Google Geocoding API
+- **Endpoint**: `https://maps.googleapis.com/maps/api/geocode/json`
+- **Auth**: API key
+- **Usage**: Reverse geocoding (replacement for Nominatim bulk use)
+- **Cost**: $5 per 1,000 requests
+
+---
+
+## Tools & Libraries
+
+### Frontend Libraries
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| `next` | 15.0.0 | React framework |
+| `react` | 19.0.0 | UI library |
+| `react-dom` | 19.0.0 | React DOM rendering |
+| `tailwindcss` | 4.0.0 | CSS framework |
+| `@hello-pangea/dnd` | Latest | Drag & drop (maintained fork of react-beautiful-dnd) |
+| `date-fns` | Latest | Date formatting |
+| `react-leaflet` | Latest | Interactive maps |
+| `leaflet` | Latest | Map library |
+| `lodash.debounce` | Latest | Debouncing utility |
+
+### Backend Libraries
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| `@anthropic-ai/sdk` | Latest | Claude AI integration |
+| `neo4j-driver` | 6.0.1 | Neo4j database driver |
+| `@supabase/supabase-js` | Latest | Supabase client |
+| `@supabase/ssr` | Latest | Supabase SSR support |
+| `axios` | Latest | HTTP client |
+| `cheerio` | Latest | HTML parsing (web scraping) |
+| `node-cron` | Latest | Task scheduling |
+| `uuid` | Latest | UUID generation |
+| `ts-node` | Latest | TypeScript execution |
+| `dotenv` | Latest | Environment variables |
+| `csv-parse` | Latest | CSV parsing |
+
+### Development Tools
+
+| Tool | Purpose |
+|------|---------|
+| TypeScript | Type safety |
+| ESLint | Code linting |
+| Prettier | Code formatting |
+| Git | Version control |
+| GitHub | Code repository |
+| Vercel | Deployment platform |
+| Supabase Dashboard | Database management |
+| Neo4j Aura Console | Graph database management |
 
 ---
 

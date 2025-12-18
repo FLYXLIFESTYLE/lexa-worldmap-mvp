@@ -69,10 +69,20 @@ export async function GET(request: NextRequest) {
       normal: items?.filter(item => item.priority === 'normal') || []
     };
 
+    // Calculate stats
+    const stats = {
+      total: items?.length || 0,
+      open: items?.filter(item => ['pending', 'in_progress'].includes(item.status)).length || 0,
+      resolved: items?.filter(item => ['completed', 'cancelled'].includes(item.status)).length || 0,
+      critical: items?.filter(item => item.priority === 'critical').length || 0,
+      high: items?.filter(item => item.priority === 'high').length || 0
+    };
+
     return NextResponse.json({
       success: true,
       items: items || [],
       grouped,
+      stats,
       total: items?.length || 0
     });
 
