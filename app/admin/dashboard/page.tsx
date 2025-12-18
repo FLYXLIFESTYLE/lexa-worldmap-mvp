@@ -68,6 +68,33 @@ const adminTools = [
     features: ['Daily updates', 'Feature tracking', 'Version history']
   },
   {
+    id: 'backlog',
+    name: 'Development Backlog',
+    description: 'Track and manage all development tasks and priorities',
+    icon: '📋',
+    href: '/admin/backlog',
+    color: 'bg-indigo-500',
+    features: ['Open/Resolved tracking', 'Priority management', 'Status tracking']
+  },
+  {
+    id: 'bug-reports',
+    name: 'Bug Reports',
+    description: 'User-reported bugs and issues requiring attention',
+    icon: '🐛',
+    href: '/admin/bugs',
+    color: 'bg-red-500',
+    features: ['Open/Resolved tickets', 'Severity levels', 'Auto-backlog integration']
+  },
+  {
+    id: 'error-logs',
+    name: 'Error Logs',
+    description: 'System errors and exceptions with auto-tracking',
+    icon: '⚠️',
+    href: '/admin/errors',
+    color: 'bg-orange-500',
+    features: ['Auto-deduplication', 'Occurrence tracking', 'Stack traces']
+  },
+  {
     id: 'data-quality',
     name: 'Data Quality Agent',
     description: 'Run data quality checks, merge duplicates, and fix relationships',

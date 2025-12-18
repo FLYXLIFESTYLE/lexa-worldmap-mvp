@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
+import OnlineUsersIndicator from './online-users-indicator';
 
 const adminPages = [
   {
@@ -29,6 +30,18 @@ const adminPages = [
     href: '/admin/backlog',
     icon: '📋',
     description: 'Development tasks'
+  },
+  {
+    name: 'Bug Reports',
+    href: '/admin/bugs',
+    icon: '🐛',
+    description: 'User-reported bugs'
+  },
+  {
+    name: 'Error Logs',
+    href: '/admin/errors',
+    icon: '⚠️',
+    description: 'System errors'
   },
   {
     name: 'Destinations',
@@ -105,16 +118,21 @@ export default function AdminNav() {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      {/* Dropdown Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-      >
-        <span className="text-xl">{currentPage.icon}</span>
-        <span className="font-medium text-gray-900">{currentPage.name}</span>
-        <svg
-          className={`w-5 h-5 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+    <div className="flex items-center gap-3">
+      {/* Online Users Indicator */}
+      <OnlineUsersIndicator />
+      
+      {/* Dropdown */}
+      <div className="relative" ref={dropdownRef}>
+        {/* Dropdown Button */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+        >
+          <span className="text-xl">{currentPage.icon}</span>
+          <span className="font-medium text-gray-900">{currentPage.name}</span>
+          <svg
+            className={`w-5 h-5 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -216,6 +234,7 @@ export default function AdminNav() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
