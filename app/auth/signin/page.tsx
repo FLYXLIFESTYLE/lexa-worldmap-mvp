@@ -4,18 +4,23 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
-export default function SignInPage() {
+function SignInForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  // Get redirectTo from URL params
+  const redirectTo = searchParams.get('redirectTo') || '/app';
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +35,8 @@ export default function SignInPage() {
 
       if (error) throw error;
 
-      router.push('/app');
+      // Redirect to the original URL or default to /app
+      router.push(redirectTo);
       router.refresh();
     } catch (error: any) {
       setError(error.message || 'An error occurred during sign in');
@@ -127,6 +133,14 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+      <SignInForm />
+    </Suspense>
   );
 }
 
