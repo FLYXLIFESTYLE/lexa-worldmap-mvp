@@ -44,10 +44,10 @@ const adminPages = [
     description: 'Browse POIs'
   },
   {
-    name: 'Documentation',
+    name: 'Platform Architecture',
     href: '/admin/documentation',
     icon: '📖',
-    description: 'LEXA Architecture'
+    description: 'Documentation'
   },
   {
     name: 'Error Logs',

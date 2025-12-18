@@ -26,12 +26,15 @@ const categoryIcons = {
   database: '💾'
 };
 
+type CategoryType = 'feature' | 'enhancement' | 'bugfix' | 'performance' | 'documentation' | 'infrastructure' | 'security' | 'database';
+
 export default function ReleaseNotesPage() {
   const [days, setDays] = useState<ReleaseDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest-first');
   const [filterScope, setFilterScope] = useState<FilterScope>('all');
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<CategoryType>>(new Set());
 
   useEffect(() => {
     fetchReleaseNotes();
@@ -63,6 +66,16 @@ export default function ReleaseNotesPage() {
     setExpandedDays(newExpanded);
   }
 
+  function toggleCategory(category: CategoryType) {
+    const newCategories = new Set(selectedCategories);
+    if (newCategories.has(category)) {
+      newCategories.delete(category);
+    } else {
+      newCategories.add(category);
+    }
+    setSelectedCategories(newCategories);
+  }
+
   function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { 
@@ -72,6 +85,14 @@ export default function ReleaseNotesPage() {
       day: 'numeric' 
     });
   }
+
+  // Filter days based on selected categories
+  const filteredDays = days.map(day => ({
+    ...day,
+    notes: selectedCategories.size === 0 
+      ? day.notes 
+      : day.notes.filter(note => selectedCategories.has(note.category as CategoryType))
+  })).filter(day => day.notes.length > 0);
 
   if (loading) {
     return (
@@ -149,27 +170,58 @@ export default function ReleaseNotesPage() {
             </div>
           </div>
 
+          {/* Category Filters */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Filter by Category (select multiple)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(categoryColors) as CategoryType[]).map(category => (
+                <button
+                  key={category}
+                  onClick={() => toggleCategory(category)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedCategories.has(category)
+                      ? `${categoryColors[category]} ring-2 ring-offset-2 ring-current`
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className="mr-1">{categoryIcons[category]}</span>
+                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                </button>
+              ))}
+              {selectedCategories.size > 0 && (
+                <button
+                  onClick={() => setSelectedCategories(new Set())}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                >
+                  ✕ Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Stats */}
           <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{days.length}</p>
-              <p className="text-sm text-gray-600">Days</p>
+              <p className="text-2xl font-bold text-gray-900">{filteredDays.length}</p>
+              <p className="text-sm text-gray-600">Days {selectedCategories.size > 0 && '(Filtered)'}</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-900">
-                {days.reduce((sum, day) => sum + day.totalChanges, 0)}
+                {filteredDays.reduce((sum, day) => sum + day.notes.length, 0)}
               </p>
-              <p className="text-sm text-gray-600">Total Changes</p>
+              <p className="text-sm text-gray-600">{selectedCategories.size > 0 ? 'Filtered' : 'Total'} Changes</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-blue-900">
-                {days.reduce((sum, day) => sum + day.notes.filter(n => n.category === 'feature').length, 0)}
+                {filteredDays.reduce((sum, day) => sum + day.notes.filter(n => n.category === 'feature').length, 0)}
               </p>
               <p className="text-sm text-gray-600">Features</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-red-900">
-                {days.reduce((sum, day) => sum + day.notes.filter(n => n.category === 'bugfix').length, 0)}
+                {filteredDays.reduce((sum, day) => sum + day.notes.filter(n => n.category === 'bugfix').length, 0)}
               </p>
               <p className="text-sm text-gray-600">Bugfixes</p>
             </div>
@@ -177,16 +229,22 @@ export default function ReleaseNotesPage() {
         </div>
 
         {/* Release Days */}
-        {days.length === 0 ? (
+        {filteredDays.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <p className="text-gray-500 text-lg">No release notes found.</p>
+            <p className="text-gray-500 text-lg">
+              {selectedCategories.size > 0 
+                ? 'No release notes match the selected categories.' 
+                : 'No release notes found.'}
+            </p>
             <p className="text-gray-400 text-sm mt-2">
-              Release notes will be captured automatically daily at midnight.
+              {selectedCategories.size > 0 
+                ? 'Try selecting different categories or clearing filters.' 
+                : 'Release notes will be captured automatically daily at midnight.'}
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {days.map((day) => {
+            {filteredDays.map((day) => {
               const isExpanded = expandedDays.has(day.date);
               
               return (
@@ -205,7 +263,8 @@ export default function ReleaseNotesPage() {
                           {formatDate(day.date)}
                         </h3>
                         <p className="text-sm text-gray-500">
-                          {day.totalChanges} change{day.totalChanges !== 1 ? 's' : ''}
+                          {day.notes.length} change{day.notes.length !== 1 ? 's' : ''}
+                          {selectedCategories.size > 0 && ` (filtered)`}
                         </p>
                       </div>
                     </div>

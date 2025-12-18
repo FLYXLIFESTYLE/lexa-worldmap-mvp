@@ -9,12 +9,22 @@ export default function DocumentationPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load LEXA Architecture markdown
+    // Load Platform Architecture markdown
     fetch('/docs/LEXA_ARCHITECTURE.md')
       .then(res => res.text())
       .then(text => {
         setArchitecture(text);
         setLoading(false);
+        
+        // Enable anchor link navigation after content loads
+        setTimeout(() => {
+          if (window.location.hash) {
+            const element = document.getElementById(window.location.hash.substring(1));
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth' });
+            }
+          }
+        }, 100);
       })
       .catch(err => {
         console.error('Failed to load architecture:', err);
@@ -41,7 +51,7 @@ export default function DocumentationPage() {
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                LEXA Architecture & Features
+                📖 Platform Architecture & Documentation
               </h1>
               <p className="text-gray-600 mb-4">
                 Complete system architecture, features, and technical documentation
@@ -69,10 +79,22 @@ export default function DocumentationPage() {
           <div className="prose prose-blue max-w-none">
             <ReactMarkdown
               components={{
-                h1: ({node, ...props}) => <h1 className="text-4xl font-bold mt-8 mb-4 text-gray-900" {...props} />,
-                h2: ({node, ...props}) => <h2 className="text-3xl font-bold mt-6 mb-3 text-gray-800" {...props} />,
-                h3: ({node, ...props}) => <h3 className="text-2xl font-semibold mt-4 mb-2 text-gray-700" {...props} />,
-                h4: ({node, ...props}) => <h4 className="text-xl font-semibold mt-3 mb-2 text-gray-700" {...props} />,
+                h1: ({node, children, ...props}) => {
+                  const id = String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                  return <h1 id={id} className="text-4xl font-bold mt-8 mb-4 text-gray-900 scroll-mt-4" {...props}>{children}</h1>;
+                },
+                h2: ({node, children, ...props}) => {
+                  const id = String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                  return <h2 id={id} className="text-3xl font-bold mt-6 mb-3 text-gray-800 scroll-mt-4" {...props}>{children}</h2>;
+                },
+                h3: ({node, children, ...props}) => {
+                  const id = String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                  return <h3 id={id} className="text-2xl font-semibold mt-4 mb-2 text-gray-700 scroll-mt-4" {...props}>{children}</h3>;
+                },
+                h4: ({node, children, ...props}) => {
+                  const id = String(children).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                  return <h4 id={id} className="text-xl font-semibold mt-3 mb-2 text-gray-700 scroll-mt-4" {...props}>{children}</h4>;
+                },
                 p: ({node, ...props}) => <p className="mb-4 text-gray-600 leading-relaxed" {...props} />,
                 ul: ({node, ...props}) => <ul className="list-disc list-inside mb-4 space-y-2" {...props} />,
                 ol: ({node, ...props}) => <ol className="list-decimal list-inside mb-4 space-y-2" {...props} />,
