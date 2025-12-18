@@ -76,7 +76,8 @@ export default function BacklogPage() {
     normal: []
   });
   const [stats, setStats] = useState({ total: 0, open: 0, resolved: 0, critical: 0, high: 0 });
-  const [statusFilter, setStatusFilter] = useState<'pending' | 'in_progress' | 'completed' | 'all'>('pending');
+  const [statusFilter, setStatusFilter] = useState<'open' | 'resolved' | 'all'>('open');
+  const [categoryFilter, setCategoryFilter] = useState<string | 'all'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingItem, setEditingItem] = useState<BacklogItem | null>(null);
@@ -90,18 +91,57 @@ export default function BacklogPage() {
 
   useEffect(() => {
     fetchBacklog();
-  }, [statusFilter]);
+  }, [statusFilter, categoryFilter]);
 
   async function fetchBacklog() {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/backlog?status=${statusFilter}`);
+      const response = await fetch(`/api/admin/backlog`);
       const data = await response.json();
       
       if (data.success) {
-        setItems(data.items);
-        setGrouped(data.grouped);
-        setStats(data.stats);
+        let filteredItems = data.items;
+        
+        // Filter by open/resolved status
+        if (statusFilter === 'open') {
+          filteredItems = filteredItems.filter((item: BacklogItem) => 
+            item.status === 'pending' || item.status === 'in_progress'
+          );
+        } else if (statusFilter === 'resolved') {
+          filteredItems = filteredItems.filter((item: BacklogItem) => 
+            item.status === 'completed' || item.status === 'cancelled'
+          );
+        }
+        
+        // Filter by category
+        if (categoryFilter !== 'all') {
+          filteredItems = filteredItems.filter((item: BacklogItem) => item.category === categoryFilter);
+        }
+        
+        // Regroup filtered items
+        const newGrouped: GroupedItems = {
+          critical: filteredItems.filter((item: BacklogItem) => item.priority === 'critical').sort((a: BacklogItem, b: BacklogItem) => a.order_index - b.order_index),
+          high: filteredItems.filter((item: BacklogItem) => item.priority === 'high').sort((a: BacklogItem, b: BacklogItem) => a.order_index - b.order_index),
+          normal: filteredItems.filter((item: BacklogItem) => item.priority === 'normal').sort((a: BacklogItem, b: BacklogItem) => a.order_index - b.order_index)
+        };
+        
+        // Calculate stats
+        const openCount = data.items.filter((item: BacklogItem) => 
+          item.status === 'pending' || item.status === 'in_progress'
+        ).length;
+        const resolvedCount = data.items.filter((item: BacklogItem) => 
+          item.status === 'completed' || item.status === 'cancelled'
+        ).length;
+        
+        setItems(filteredItems);
+        setGrouped(newGrouped);
+        setStats({
+          total: data.items.length,
+          open: openCount,
+          resolved: resolvedCount,
+          critical: newGrouped.critical.length,
+          high: newGrouped.high.length
+        });
       }
     } catch (error) {
       console.error('Failed to fetch backlog:', error);
@@ -463,20 +503,52 @@ export default function BacklogPage() {
           </div>
 
           {/* Status Filter */}
-          <div className="flex gap-2">
-            {['pending', 'in_progress', 'completed', 'all'].map((status) => (
-              <button
-                key={status}
-                onClick={() => setStatusFilter(status as any)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  statusFilter === status
-                    ? 'bg-lexa-navy text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
-              </button>
-            ))}
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              {[
+                { value: 'open', label: 'Open', count: stats.open },
+                { value: 'resolved', label: 'Resolved', count: stats.resolved },
+                { value: 'all', label: 'All', count: stats.total }
+              ].map(({ value, label, count }) => (
+                <button
+                  key={value}
+                  onClick={() => setStatusFilter(value as any)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    statusFilter === value
+                      ? 'bg-lexa-navy text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {label} ({count})
+                </button>
+              ))}
+            </div>
+            
+            {/* Category Filter */}
+            <div className="flex gap-2">
+              {[
+                { value: 'all', label: 'All Categories', emoji: '📋' },
+                { value: 'feature', label: 'Feature', emoji: '✨' },
+                { value: 'bug', label: 'Bug', emoji: '🐛' },
+                { value: 'enhancement', label: 'Enhancement', emoji: '🚀' },
+                { value: 'infrastructure', label: 'Infrastructure', emoji: '🏗️' },
+                { value: 'data', label: 'Data', emoji: '💾' },
+                { value: 'ui', label: 'UI', emoji: '🎨' },
+                { value: 'other', label: 'Other', emoji: '📌' }
+              ].map(({ value, label, emoji }) => (
+                <button
+                  key={value}
+                  onClick={() => setCategoryFilter(value)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    categoryFilter === value
+                      ? 'bg-lexa-gold text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                  }`}
+                >
+                  {emoji} {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -609,7 +681,7 @@ function EditItemForm({
         rows={2}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
       />
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <select
           value={editedItem.status}
           onChange={(e) => setEditedItem({ ...editedItem, status: e.target.value as any })}
@@ -619,6 +691,19 @@ function EditItemForm({
           <option value="in_progress">In Progress</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
+        </select>
+        <select
+          value={editedItem.category || 'other'}
+          onChange={(e) => setEditedItem({ ...editedItem, category: e.target.value })}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+        >
+          <option value="feature">✨ Feature</option>
+          <option value="bug">🐛 Bug</option>
+          <option value="enhancement">🚀 Enhancement</option>
+          <option value="infrastructure">🏗️ Infrastructure</option>
+          <option value="data">💾 Data</option>
+          <option value="ui">🎨 UI</option>
+          <option value="other">📌 Other</option>
         </select>
         <input
           type="number"
