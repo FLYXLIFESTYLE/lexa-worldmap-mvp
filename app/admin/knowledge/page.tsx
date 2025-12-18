@@ -5,6 +5,7 @@
  */
 
 import { useRouter } from 'next/navigation';
+import AdminNav from '@/components/admin/admin-nav';
 
 export default function KnowledgePortalPage() {
   const router = useRouter();
@@ -61,12 +62,30 @@ export default function KnowledgePortalPage() {
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-lexa-navy to-lexa-gold text-white px-6 py-16">
         <div className="mx-auto max-w-5xl">
-          <h1 className="text-5xl font-bold mb-4">
-            🌍 Captain&apos;s Knowledge Portal
-          </h1>
-          <p className="text-xl opacity-90 mb-6">
-            Share your travel expertise to help LEXA create extraordinary experiences
-          </p>
+          <div className="flex items-start justify-between mb-6">
+            <div className="flex-1">
+              <h1 className="text-5xl font-bold mb-4">
+                🌍 Captain&apos;s Knowledge Portal
+              </h1>
+              <p className="text-xl opacity-90 mb-4">
+                Share your travel expertise to help LEXA create extraordinary experiences
+              </p>
+              
+              {/* Why - What - How */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 space-y-2">
+                <div>
+                  <strong className="text-lexa-gold">WHY:</strong> Your knowledge transforms LEXA from a database into an intelligent travel companion
+                </div>
+                <div>
+                  <strong className="text-lexa-gold">WHAT:</strong> Capture hidden gems, insider tips, and luxury experiences that only experts know
+                </div>
+                <div>
+                  <strong className="text-lexa-gold">HOW:</strong> Upload files, scrape URLs, write directly, or search existing POIs - choose your preferred method
+                </div>
+              </div>
+            </div>
+            <AdminNav />
+          </div>
           <div className="flex gap-4">
             <button
               onClick={() => router.push('/admin/knowledge/upload')}

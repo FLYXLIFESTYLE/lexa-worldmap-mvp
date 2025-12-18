@@ -172,6 +172,54 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
   - [ ] Gamifies onboarding
   - [ ] See: `docs/HIGH_VALUE_QUICK_WINS.md`
 
+## 🐛 Bug Fixes & Admin UI Improvements (Urgent) ⚠️ NEW - Dec 18
+
+### **Build & Deployment**
+- [ ] **Fix Vercel TypeScript Build** (Complexity: Low, 1 hour) ⚠️
+  - Scripts folder causing TypeScript errors in Vercel build
+  - Solution: Exclude scripts from Next.js TypeScript check
+  - Add `"exclude": ["scripts"]` to `tsconfig.json`
+  - Current workaround: Manual redeployment successful
+  - Priority: Medium (annoying but has workaround)
+
+### **Admin UI Navigation**
+- [ ] **Add Admin Nav to All Pages** (Complexity: Low, 30 min) 🔴 URGENT
+  - Missing on Captain's Knowledge Portal (`/admin/knowledge`)
+  - Missing on Destination Browser (`/admin/destinations`)
+  - Missing on other admin subpages
+  - Solution: Add `<AdminNav />` component to all admin pages
+  - User reported: "Menu dropdown not available on all subpages"
+  
+- [ ] **Fix Destination Browser** (Complexity: Medium, 2 hours) 🔴 URGENT
+  - Failed to load destinations
+  - Check API endpoint `/api/neo4j/destinations`
+  - Verify Neo4j query is correct
+  - Add error handling and loading states
+  - User reported: "Destination browser failed to load destinations"
+
+### **Admin Page Descriptions**
+- [ ] **Add Why-What-How Descriptions** (Complexity: Low, 2 hours) ⚠️
+  - Add to all admin pages: Why created, What user gets, How to use
+  - Format: Short description at top of each page
+  - Pages to update:
+    - `/admin/dashboard`
+    - `/admin/documentation`
+    - `/admin/knowledge`
+    - `/admin/knowledge/editor`
+    - `/admin/chat-neo4j`
+    - `/admin/destinations`
+    - `/admin/knowledge/scraped-urls`
+    - `/admin/release-notes`
+  - User requested: "Why - What - How descriptions on all pages"
+
+### **Authentication & Routing**
+- [ ] **Fix Sign-in Redirect** (Complexity: Medium, 2 hours) 🔴 CRITICAL
+  - After sign-in, user is redirected to chatbot instead of original URL
+  - Should preserve the intended destination URL through auth flow
+  - Solution: Store `returnUrl` in session/query params
+  - Update Supabase auth flow to use `redirectTo` parameter
+  - User reported: "After sign in I am in LEXA Chatbot and not the original url"
+
 ## 🟡 Medium Priority (Do Next)
 
 ### **Knowledge Ingestion & Captain Portal**
