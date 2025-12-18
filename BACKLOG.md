@@ -213,14 +213,53 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
   - User requested: "Why - What - How descriptions on all pages"
 
 ### **Authentication & Routing**
-- [ ] **Fix Sign-in Redirect** (Complexity: Medium, 2 hours) 🔴 CRITICAL
+- [x] **Fix Sign-in Redirect** ✅ COMPLETED - Dec 18
   - After sign-in, user is redirected to chatbot instead of original URL
-  - Should preserve the intended destination URL through auth flow
-  - Solution: Store `returnUrl` in session/query params
-  - Update Supabase auth flow to use `redirectTo` parameter
-  - User reported: "After sign in I am in LEXA Chatbot and not the original url"
+  - ✅ Fixed: Now reads `redirectTo` parameter and preserves original URL
+  - Users return to intended page after authentication
+
+### **User Management & Authentication** ⚠️ NEW - Dec 18
+- [ ] **Add Sign-out Option** (Complexity: Low, 30 min) 🔴 URGENT
+  - No way to sign out currently
+  - Add to AdminNav dropdown
+  - User reported: "There is no option to log out"
+
+- [ ] **Add User Profile View** (Complexity: Low, 1 hour) 🔴 URGENT  
+  - Display current user info
+  - Show role (Admin/Captain/Contributor)
+  - Edit profile settings
+  - User reported: "No option to see my user profile"
+
+- [ ] **User Management for Captains** (Complexity: Medium, 3 hours) 🔴 HIGH PRIORITY
+  - Create admin page: `/admin/users`
+  - List all Captains/Contributors
+  - Add new users (invite system)
+  - Edit roles: Admin, Captain, Contributor (new role!)
+  - Deactivate/reactivate users
+  - User requested: "Need user management to add more captains"
+
+- [ ] **New Role: Contributor** (Complexity: Low, 1 hour) ⚠️
+  - Less permissions than Captain
+  - Can contribute knowledge but limited admin access
+  - Cannot access ChatNeo4j or edit other users' content
+  - User requested: "New user role: Contributor"
 
 ## 🟡 Medium Priority (Do Next)
+
+### **Valuable Website & RAG System** 🌐 NEW - Dec 18
+- [ ] **Implement Valuable Website Feature** (Complexity: High, 2-3 weeks) ⭐ HIGH VALUE
+  - RAG-optimized knowledge extraction from industry sources
+  - 5 content types: market intel, destination insights, POI news, travel behavior, competitive intel
+  - Entity extraction + relationship mapping for graph queries
+  - Semantic chunking with embeddings for vector search
+  - See: `docs/VALUABLE_WEBSITE_RAG_SYSTEM.md`
+  - User requested: "How to get most out of unstructured data for RAG"
+  - **Phases:**
+    - [ ] Phase 1: Enhanced URL scraper with RAG optimization
+    - [ ] Phase 2: AI extraction with Claude (entity + relationship)
+    - [ ] Phase 3: Smart content categorization
+    - [ ] Phase 4: Vector embedding generation for semantic search
+  - **Impact:** Transforms unstructured web content into queryable knowledge graph
 
 ### **Knowledge Ingestion & Captain Portal**
 - [ ] **ChatGPT Conversation Import** (Complexity: High, HIGH VALUE)

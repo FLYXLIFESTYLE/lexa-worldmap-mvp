@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client-browser';
 
 const adminPages = [
   {
@@ -57,8 +58,20 @@ const adminPages = [
 
 export default function AdminNav() {
   const [isOpen, setIsOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
+
+  // Get user info
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserEmail(user?.email || null);
+    };
+    getUser();
+  }, [supabase.auth]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -71,6 +84,13 @@ export default function AdminNav() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Handle sign out
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/auth/signin');
+    router.refresh();
+  };
 
   // Find current page
   const currentPage = adminPages.find(page => pathname === page.href) || {
@@ -138,6 +158,41 @@ export default function AdminNav() {
                 </Link>
               );
             })}
+          </div>
+
+          {/* User Section */}
+          <div className="border-t border-gray-100 p-2">
+            <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Account
+            </div>
+            
+            {/* User Profile */}
+            <Link
+              href="/admin/profile"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              <div className="w-8 h-8 bg-lexa-gold rounded-full flex items-center justify-center text-white font-semibold">
+                {userEmail?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {userEmail || 'User'}
+                </p>
+                <p className="text-xs text-gray-500">View Profile</p>
+              </div>
+            </Link>
+
+            {/* Sign Out */}
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-red-50 transition-colors text-left mt-1"
+            >
+              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span className="text-sm font-medium text-red-600">Sign Out</span>
+            </button>
           </div>
 
           {/* Footer */}

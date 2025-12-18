@@ -10,35 +10,24 @@ import AdminNav from '@/components/admin/admin-nav';
 export default function KnowledgePortalPage() {
   const router = useRouter();
 
+  // TOP ROW: Write, Upload, Browse
+  // SECOND ROW: ChatNeo4j, Destinations, Scraped URLs
   const features = [
+    // Top Row
     {
-      icon: '💬',
-      title: 'ChatNeo4j',
-      description: 'Ask questions in plain English about your travel database - AI-powered insights',
-      action: () => router.push('/admin/chat-neo4j'),
-      color: 'from-lexa-gold to-lexa-navy',
+      icon: '✏️',
+      title: 'Write Knowledge',
+      description: 'Manually add your travel insights, tips, and hidden gems directly',
+      action: () => router.push('/admin/knowledge/editor'),
+      color: 'from-green-500 to-green-600',
       featured: true,
     },
     {
       icon: '📤',
       title: 'Upload Knowledge',
-      description: 'Upload ChatGPT conversations, Zoom transcripts, itineraries, or any travel documents',
+      description: 'Upload ChatGPT conversations, Zoom transcripts, itineraries, or documents',
       action: () => router.push('/admin/knowledge/upload'),
       color: 'from-blue-500 to-blue-600',
-    },
-    {
-      icon: '✏️',
-      title: 'Write Knowledge',
-      description: 'Manually add your travel insights, tips, and hidden gems',
-      action: () => router.push('/admin/knowledge/editor'),
-      color: 'from-green-500 to-green-600',
-    },
-    {
-      icon: '🌍',
-      title: 'Destination Browser',
-      description: 'Explore POI coverage and quality across all destinations worldwide',
-      action: () => router.push('/admin/destinations'),
-      color: 'from-orange-500 to-red-600',
       featured: true,
     },
     {
@@ -47,6 +36,22 @@ export default function KnowledgePortalPage() {
       description: 'Search and explore all contributed knowledge in the database',
       action: () => router.push('/admin/knowledge/browse'),
       color: 'from-purple-500 to-purple-600',
+      featured: true,
+    },
+    // Second Row
+    {
+      icon: '💬',
+      title: 'ChatNeo4j',
+      description: 'Ask questions in plain English about your travel database - AI insights',
+      action: () => router.push('/admin/chat-neo4j'),
+      color: 'from-lexa-gold to-lexa-navy',
+    },
+    {
+      icon: '🌍',
+      title: 'Destination Browser',
+      description: 'Explore POI coverage and quality across all destinations worldwide',
+      action: () => router.push('/admin/destinations'),
+      color: 'from-orange-500 to-red-600',
     },
     {
       icon: '🏖️',

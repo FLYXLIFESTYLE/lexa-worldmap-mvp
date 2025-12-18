@@ -59,6 +59,15 @@ const adminTools = [
     features: ['System architecture', 'Features list', 'Technical docs']
   },
   {
+    id: 'release-notes',
+    name: 'Release Notes',
+    description: 'Daily changelog of features, improvements, and bug fixes',
+    icon: '📝',
+    href: '/admin/release-notes',
+    color: 'bg-teal-500',
+    features: ['Daily updates', 'Feature tracking', 'Version history']
+  },
+  {
     id: 'data-quality',
     name: 'Data Quality Agent',
     description: 'Run data quality checks, merge duplicates, and fix relationships',
@@ -93,13 +102,26 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header with Navigation */}
         <div className="flex items-start justify-between mb-8">
-          <div>
+          <div className="flex-1">
             <h1 className="text-4xl font-bold text-gray-900 mb-2">
               Admin Dashboard
             </h1>
-            <p className="text-lg text-gray-600">
+            <p className="text-lg text-gray-600 mb-4">
               Manage LEXA's knowledge base, data quality, and system operations
             </p>
+            
+            {/* Why - What - How */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2 max-w-3xl">
+              <div className="text-sm">
+                <strong className="text-blue-900">WHY:</strong> <span className="text-gray-700">Centralized command center for all LEXA admin operations and monitoring</span>
+              </div>
+              <div className="text-sm">
+                <strong className="text-blue-900">WHAT:</strong> <span className="text-gray-700">Access tools, track stats, manage knowledge, and monitor system health</span>
+              </div>
+              <div className="text-sm">
+                <strong className="text-blue-900">HOW:</strong> <span className="text-gray-700">Click any tool card or use Quick Actions for common tasks</span>
+              </div>
+            </div>
           </div>
           <AdminNav />
         </div>
@@ -117,6 +139,36 @@ export default function AdminDashboard() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Quick Actions - MOVED ABOVE TOOLS */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-left"
+              onClick={() => window.location.href = '/admin/knowledge/editor'}
+            >
+              <div className="font-semibold mb-1">📝 Add New POI</div>
+              <div className="text-sm text-blue-100">Create a new point of interest</div>
+            </button>
+            
+            <button
+              className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-left"
+              onClick={() => window.location.href = '/admin/chat-neo4j'}
+            >
+              <div className="font-semibold mb-1">💬 Query Database</div>
+              <div className="text-sm text-green-100">Ask questions in natural language</div>
+            </button>
+            
+            <button
+              className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-left"
+              onClick={() => window.location.href = '/admin/knowledge'}
+            >
+              <div className="font-semibold mb-1">📚 Upload Knowledge</div>
+              <div className="text-sm text-purple-100">Add files or scrape URLs</div>
+            </button>
+          </div>
         </div>
 
         {/* Admin Tools Grid */}
@@ -164,37 +216,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button
-              className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-left"
-              onClick={() => window.location.href = '/admin/knowledge/editor'}
-            >
-              <div className="font-semibold mb-1">📝 Add New POI</div>
-              <div className="text-sm text-blue-100">Create a new point of interest</div>
-            </button>
-            
-            <button
-              className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-left"
-              onClick={() => window.location.href = '/admin/chat-neo4j'}
-            >
-              <div className="font-semibold mb-1">💬 Query Database</div>
-              <div className="text-sm text-green-100">Ask questions in natural language</div>
-            </button>
-            
-            <button
-              className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-left"
-              onClick={() => window.location.href = '/admin/knowledge'}
-            >
-              <div className="font-semibold mb-1">📚 Upload Knowledge</div>
-              <div className="text-sm text-purple-100">Add files or scrape URLs</div>
-            </button>
-          </div>
-        </div>
-
-        {/* System Status (placeholder for future) */}
+        {/* System Status */}
         <div className="mt-6 bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">System Status</h2>
           <div className="space-y-3">
