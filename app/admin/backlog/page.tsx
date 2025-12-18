@@ -226,7 +226,7 @@ export default function BacklogPage() {
       }
 
       // Reorder all items in affected priorities
-      const updates = [];
+      const updates: Array<{ id: string; order_index: number }> = [];
       if (sourcePriority === destPriority) {
         // Update only one priority
         newGrouped[sourcePriority].forEach((item, index) => {
