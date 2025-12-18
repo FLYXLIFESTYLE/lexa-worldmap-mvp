@@ -6,7 +6,7 @@
  */
 
 import dotenv from 'dotenv';
-import neo4j from 'neo4j-driver';
+import * as neo4j from 'neo4j-driver';
 
 // Load from .env.local first, then .env
 dotenv.config({ path: '.env.local' });

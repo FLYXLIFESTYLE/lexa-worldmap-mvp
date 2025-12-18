@@ -6,7 +6,7 @@
  */
 
 import dotenv from 'dotenv';
-import neo4j from 'neo4j-driver';
+import * as neo4j from 'neo4j-driver';
 import { v4 as uuidv4 } from 'uuid';
 
 // Load from .env.local first, then .env
