@@ -12,6 +12,8 @@ export default function BugReportButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [screenshot, setScreenshot] = useState<string | null>(null);
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -24,6 +26,37 @@ export default function BugReportButton() {
     reporter_email: ''
   });
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Screenshot must be smaller than 5MB');
+        return;
+      }
+      
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please upload an image file');
+        return;
+      }
+      
+      setScreenshotFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setScreenshot(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function removeScreenshot() {
+    setScreenshot(null);
+    setScreenshotFile(null);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
@@ -34,7 +67,10 @@ export default function BugReportButton() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          page_url: window.location.href
+          page_url: window.location.href,
+          screenshot: screenshot || null,
+          user_agent: navigator.userAgent,
+          screen_resolution: `${window.screen.width}x${window.screen.height}`
         })
       });
 
@@ -56,6 +92,8 @@ export default function BugReportButton() {
             reporter_name: '',
             reporter_email: ''
           });
+          setScreenshot(null);
+          setScreenshotFile(null);
         }, 3000);
       } else {
         alert('Failed to submit bug report: ' + data.error);
@@ -143,6 +181,54 @@ export default function BugReportButton() {
                     rows={3}
                     required
                   />
+                </div>
+
+                {/* Screenshot Upload */}
+                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    📸 Screenshot (Optional)
+                  </label>
+                  
+                  {screenshot ? (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <img 
+                          src={screenshot} 
+                          alt="Screenshot preview" 
+                          className="w-full max-h-64 object-contain rounded-lg border border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeScreenshot}
+                          className="absolute top-2 right-2 bg-red-600 text-white p-2 rounded-full hover:bg-red-700 shadow-lg"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      <p className="text-xs text-green-600">✓ Screenshot attached</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors rounded-lg p-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-sm text-gray-600">Click to upload screenshot</span>
+                        <span className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                      </label>
+                      <p className="text-xs text-gray-500 text-center">
+                        💡 Tip: Press <kbd className="px-2 py-1 bg-gray-200 rounded text-xs">Print Screen</kbd> or <kbd className="px-2 py-1 bg-gray-200 rounded text-xs">Win + Shift + S</kbd> to capture your screen
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Severity & Category */}

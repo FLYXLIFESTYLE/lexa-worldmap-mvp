@@ -14,18 +14,6 @@ const adminPages = [
     description: 'Main admin overview'
   },
   {
-    name: "Captain's Portal",
-    href: '/admin/knowledge',
-    icon: '📚',
-    description: 'Knowledge management'
-  },
-  {
-    name: 'ChatNeo4j',
-    href: '/admin/chat-neo4j',
-    icon: '💬',
-    description: 'Query database'
-  },
-  {
     name: 'Backlog',
     href: '/admin/backlog',
     icon: '📋',
@@ -38,10 +26,16 @@ const adminPages = [
     description: 'User-reported bugs'
   },
   {
-    name: 'Error Logs',
-    href: '/admin/errors',
-    icon: '⚠️',
-    description: 'System errors'
+    name: "Captain's Portal",
+    href: '/admin/knowledge',
+    icon: '📚',
+    description: 'Knowledge management'
+  },
+  {
+    name: 'ChatNeo4j',
+    href: '/admin/chat-neo4j',
+    icon: '💬',
+    description: 'Query database'
   },
   {
     name: 'Destinations',
@@ -50,28 +44,34 @@ const adminPages = [
     description: 'Browse POIs'
   },
   {
-    name: 'POI Editor',
-    href: '/admin/knowledge/editor',
-    icon: '✏️',
-    description: 'Search & edit POIs'
-  },
-  {
-    name: 'Scraped URLs',
-    href: '/admin/knowledge/scraped-urls',
-    icon: '🌐',
-    description: 'Manage scraped content'
-  },
-  {
     name: 'Documentation',
     href: '/admin/documentation',
     icon: '📖',
     description: 'LEXA Architecture'
   },
   {
+    name: 'Error Logs',
+    href: '/admin/errors',
+    icon: '⚠️',
+    description: 'System errors'
+  },
+  {
+    name: 'POI Editor',
+    href: '/admin/knowledge/editor',
+    icon: '✏️',
+    description: 'Search & edit POIs'
+  },
+  {
     name: 'Release Notes',
     href: '/admin/release-notes',
     icon: '📝',
     description: 'Daily changelog'
+  },
+  {
+    name: 'Scraped URLs',
+    href: '/admin/knowledge/scraped-urls',
+    icon: '🌐',
+    description: 'Manage scraped content'
   }
 ];
 

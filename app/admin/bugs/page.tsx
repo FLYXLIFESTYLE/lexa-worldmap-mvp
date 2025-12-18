@@ -20,6 +20,8 @@ interface BugReport {
   steps_to_reproduce: string | null;
   expected_behavior: string | null;
   actual_behavior: string | null;
+  screenshot_data: string | null;
+  browser_info: string | null;
 }
 
 const severityColors = {
@@ -167,6 +169,27 @@ export default function BugReportsPage() {
                           <div>
                             <strong className="text-gray-800">Actual:</strong>
                             <p className="text-gray-700">{bug.actual_behavior}</p>
+                          </div>
+                        )}
+                        {bug.screenshot_data && (
+                          <div>
+                            <strong className="text-gray-800">📸 Screenshot:</strong>
+                            <div className="mt-2">
+                              <img 
+                                src={bug.screenshot_data} 
+                                alt="Bug screenshot" 
+                                className="max-w-full max-h-96 object-contain rounded-lg border-2 border-gray-300 cursor-pointer hover:border-red-500 transition-colors"
+                                onClick={() => window.open(bug.screenshot_data!, '_blank')}
+                                title="Click to open in new tab"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">Click to view full size</p>
+                            </div>
+                          </div>
+                        )}
+                        {bug.browser_info && (
+                          <div>
+                            <strong className="text-gray-800">🖥️ Browser Info:</strong>
+                            <p className="text-gray-700 text-sm font-mono bg-gray-100 p-2 rounded">{bug.browser_info}</p>
                           </div>
                         )}
                       </div>

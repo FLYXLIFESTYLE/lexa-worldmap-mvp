@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
 import { createClient } from '@/lib/supabase/server';
+import * as neo4j from 'neo4j-driver';
 
 interface DestinationStats {
   destination: string;
@@ -74,7 +75,7 @@ export async function GET(req: NextRequest) {
         LIMIT $limit
         RETURN destination, total_pois, luxury_pois, avg_luxury_score, poi_types, has_captain_comments, top_types
         `,
-        { limit }
+        { limit: neo4j.int(limit) }
       );
 
       console.log(`[Destinations API] Found ${result.records.length} destinations`);

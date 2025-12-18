@@ -92,7 +92,10 @@ export async function POST(request: Request) {
       expected_behavior,
       actual_behavior,
       reporter_email,
-      reporter_name
+      reporter_name,
+      screenshot,
+      user_agent,
+      screen_resolution
     } = body;
 
     // Validation
@@ -104,7 +107,10 @@ export async function POST(request: Request) {
     }
 
     // Get browser info from headers if not provided
-    const userAgent = browser_info || request.headers.get('user-agent') || 'Unknown';
+    const browserInfo = browser_info || user_agent || request.headers.get('user-agent') || 'Unknown';
+    const fullBrowserInfo = screen_resolution 
+      ? `${browserInfo} | Screen: ${screen_resolution}` 
+      : browserInfo;
 
     // Create bug report
     const { data, error } = await supabase
@@ -115,13 +121,14 @@ export async function POST(request: Request) {
         page_url,
         severity,
         category,
-        browser_info: userAgent,
+        browser_info: fullBrowserInfo,
         steps_to_reproduce,
         expected_behavior,
         actual_behavior,
         reported_by: user?.id || null,
         reporter_email: reporter_email || user?.email || null,
         reporter_name: reporter_name || null,
+        screenshot_data: screenshot || null,
         status: 'open'
       })
       .select()
