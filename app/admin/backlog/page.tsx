@@ -197,6 +197,10 @@ export default function BacklogPage() {
 
   async function handleUpdateItem(item: BacklogItem) {
     try {
+      // Save current scroll position
+      const scrollPosition = window.scrollY;
+      const itemElement = document.getElementById(`backlog-item-${item.id}`);
+      
       const response = await fetch('/api/admin/backlog', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -204,8 +208,17 @@ export default function BacklogPage() {
       });
 
       if (response.ok) {
+        await fetchBacklog();
         setEditingItem(null);
-        fetchBacklog();
+        
+        // Restore scroll position after re-render
+        setTimeout(() => {
+          if (itemElement) {
+            itemElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } else {
+            window.scrollTo({ top: scrollPosition, behavior: 'instant' });
+          }
+        }, 50);
       }
     } catch (error) {
       console.error('Failed to update item:', error);
@@ -355,6 +368,7 @@ export default function BacklogPage() {
                 <Draggable key={item.id} draggableId={item.id} index={index}>
                   {(provided, snapshot) => (
                     <div
+                      id={`backlog-item-${item.id}`}
                       ref={provided.innerRef}
                       {...provided.draggableProps}
                       className={`${colors.bg} ${colors.border} border-2 rounded-lg p-5 ${

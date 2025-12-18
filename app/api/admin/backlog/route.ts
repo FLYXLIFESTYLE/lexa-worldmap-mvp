@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
-    const status = searchParams.get('status') || 'pending'; // pending, in_progress, completed, cancelled, all
+    const status = searchParams.get('status'); // pending, in_progress, completed, cancelled, all (null = all)
     const priority = searchParams.get('priority'); // critical, high, normal
 
     // Build query
@@ -46,8 +46,8 @@ export async function GET(request: NextRequest) {
       .order('priority', { ascending: false }) // critical > high > normal
       .order('order_index', { ascending: true });
 
-    // Filter by status
-    if (status !== 'all') {
+    // Filter by status (only if explicitly provided and not 'all')
+    if (status && status !== 'all') {
       query = query.eq('status', status);
     }
 
@@ -62,6 +62,11 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
+    // Get ALL items for accurate stats (even if filtered view)
+    const { data: allItems } = await supabase
+      .from('backlog_items')
+      .select('*');
+
     // Group by priority for frontend
     const grouped = {
       critical: items?.filter(item => item.priority === 'critical') || [],
@@ -69,21 +74,25 @@ export async function GET(request: NextRequest) {
       normal: items?.filter(item => item.priority === 'normal') || []
     };
 
-    // Calculate stats
+    // Calculate stats from ALL items (not just filtered view)
     const stats = {
-      total: items?.length || 0,
-      open: items?.filter(item => ['pending', 'in_progress'].includes(item.status)).length || 0,
-      resolved: items?.filter(item => ['completed', 'cancelled'].includes(item.status)).length || 0,
-      critical: items?.filter(item => item.priority === 'critical').length || 0,
-      high: items?.filter(item => item.priority === 'high').length || 0
+      total: allItems?.length || 0,
+      open: allItems?.filter(item => ['pending', 'in_progress'].includes(item.status)).length || 0,
+      resolved: allItems?.filter(item => ['completed', 'cancelled'].includes(item.status)).length || 0,
+      pending: allItems?.filter(item => item.status === 'pending').length || 0,
+      in_progress: allItems?.filter(item => item.status === 'in_progress').length || 0,
+      completed: allItems?.filter(item => item.status === 'completed').length || 0,
+      cancelled: allItems?.filter(item => item.status === 'cancelled').length || 0,
+      critical: allItems?.filter(item => item.priority === 'critical' && ['pending', 'in_progress'].includes(item.status)).length || 0,
+      high: allItems?.filter(item => item.priority === 'high' && ['pending', 'in_progress'].includes(item.status)).length || 0
     };
 
     return NextResponse.json({
       success: true,
-      items: items || [],
+      items: allItems || [], // Return ALL items for client-side filtering
       grouped,
       stats,
-      total: items?.length || 0
+      total: allItems?.length || 0
     });
 
   } catch (error: any) {
