@@ -75,8 +75,9 @@ export default function BacklogPage() {
     high: [],
     normal: []
   });
-  const [stats, setStats] = useState({ total: 0, open: 0, resolved: 0, critical: 0, high: 0 });
-  const [statusFilter, setStatusFilter] = useState<'open' | 'resolved' | 'all'>('open');
+  const [stats, setStats] = useState({ total: 0, open: 0, resolved: 0, critical: 0, high: 0, pending: 0, in_progress: 0, completed: 0, cancelled: 0 });
+  const [bucketFilter, setBucketFilter] = useState<'open' | 'resolved' | 'all'>('open');
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'in_progress' | 'completed' | 'cancelled' | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string | 'all'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -91,7 +92,7 @@ export default function BacklogPage() {
 
   useEffect(() => {
     fetchBacklog();
-  }, [statusFilter, categoryFilter]);
+  }, [bucketFilter, statusFilter, categoryFilter]);
 
   async function fetchBacklog() {
     setIsLoading(true);
@@ -102,15 +103,20 @@ export default function BacklogPage() {
       if (data.success) {
         let filteredItems = data.items;
         
-        // Filter by open/resolved status
-        if (statusFilter === 'open') {
+        // Filter by open/resolved bucket
+        if (bucketFilter === 'open') {
           filteredItems = filteredItems.filter((item: BacklogItem) => 
             item.status === 'pending' || item.status === 'in_progress'
           );
-        } else if (statusFilter === 'resolved') {
+        } else if (bucketFilter === 'resolved') {
           filteredItems = filteredItems.filter((item: BacklogItem) => 
             item.status === 'completed' || item.status === 'cancelled'
           );
+        }
+        
+        // Filter by specific status
+        if (statusFilter !== 'all') {
+          filteredItems = filteredItems.filter((item: BacklogItem) => item.status === statusFilter);
         }
         
         // Filter by category
@@ -125,13 +131,17 @@ export default function BacklogPage() {
           normal: filteredItems.filter((item: BacklogItem) => item.priority === 'normal').sort((a: BacklogItem, b: BacklogItem) => a.order_index - b.order_index)
         };
         
-        // Calculate stats
+        // Calculate all stats
         const openCount = data.items.filter((item: BacklogItem) => 
           item.status === 'pending' || item.status === 'in_progress'
         ).length;
         const resolvedCount = data.items.filter((item: BacklogItem) => 
           item.status === 'completed' || item.status === 'cancelled'
         ).length;
+        const pendingCount = data.items.filter((item: BacklogItem) => item.status === 'pending').length;
+        const inProgressCount = data.items.filter((item: BacklogItem) => item.status === 'in_progress').length;
+        const completedCount = data.items.filter((item: BacklogItem) => item.status === 'completed').length;
+        const cancelledCount = data.items.filter((item: BacklogItem) => item.status === 'cancelled').length;
         
         setItems(filteredItems);
         setGrouped(newGrouped);
@@ -139,6 +149,10 @@ export default function BacklogPage() {
           total: data.items.length,
           open: openCount,
           resolved: resolvedCount,
+          pending: pendingCount,
+          in_progress: inProgressCount,
+          completed: completedCount,
+          cancelled: cancelledCount,
           critical: newGrouped.critical.length,
           high: newGrouped.high.length
         });
@@ -502,8 +516,9 @@ export default function BacklogPage() {
             </button>
           </div>
 
-          {/* Status Filter */}
+          {/* Filters */}
           <div className="space-y-3">
+            {/* Bucket Filter (Open/Resolved) */}
             <div className="flex gap-2">
               {[
                 { value: 'open', label: 'Open', count: stats.open },
@@ -512,9 +527,9 @@ export default function BacklogPage() {
               ].map(({ value, label, count }) => (
                 <button
                   key={value}
-                  onClick={() => setStatusFilter(value as any)}
+                  onClick={() => setBucketFilter(value as any)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    statusFilter === value
+                    bucketFilter === value
                       ? 'bg-lexa-navy text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
@@ -524,8 +539,31 @@ export default function BacklogPage() {
               ))}
             </div>
             
-            {/* Category Filter */}
+            {/* Status Filter (Pending/In Progress/etc) */}
             <div className="flex gap-2">
+              {[
+                { value: 'all', label: 'All Status', count: bucketFilter === 'open' ? stats.open : bucketFilter === 'resolved' ? stats.resolved : stats.total },
+                { value: 'pending', label: 'Pending', count: stats.pending },
+                { value: 'in_progress', label: 'In Progress', count: stats.in_progress },
+                { value: 'completed', label: 'Completed', count: stats.completed },
+                { value: 'cancelled', label: 'Cancelled', count: stats.cancelled }
+              ].map(({ value, label, count }) => (
+                <button
+                  key={value}
+                  onClick={() => setStatusFilter(value as any)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    statusFilter === value
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                  }`}
+                >
+                  {label} ({count})
+                </button>
+              ))}
+            </div>
+            
+            {/* Category Filter */}
+            <div className="flex gap-2 flex-wrap">
               {[
                 { value: 'all', label: 'All Categories', emoji: '📋' },
                 { value: 'feature', label: 'Feature', emoji: '✨' },
