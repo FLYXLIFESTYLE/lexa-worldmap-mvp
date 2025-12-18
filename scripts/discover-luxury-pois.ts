@@ -9,7 +9,9 @@ import dotenv from 'dotenv';
 import neo4j from 'neo4j-driver';
 import { v4 as uuidv4 } from 'uuid';
 
+// Load from .env.local first, then .env
 dotenv.config({ path: '.env.local' });
+dotenv.config(); // Loads .env without overriding existing vars
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 const NEO4J_URI = process.env.NEO4J_URI || '';
@@ -249,9 +251,9 @@ async function addPOIToDatabase(driver: any, place: DiscoveredPlace, destination
         enriched_source: 'google_places_discovery'
       })
       
-      // Create destination relationship
+      // Create destination relationship (use MERGE to prevent duplicates)
       MERGE (d:destination {name: $destination_name})
-      MERGE (p)-[:located_in]->(d)
+      MERGE (p)-[:LOCATED_IN]->(d)
       
       RETURN p
       `,
@@ -312,11 +314,21 @@ async function discoverLuxuryPOIs() {
         console.log(`    Found ${places.length} places`);
 
         for (const place of places) {
+          // Calculate luxury score first
+          const scoring = calculateLuxuryScore(place);
+          
+          // Only process POIs with luxury score >= 6
+          if (scoring.luxury_score < 6) {
+            console.log(`      ⏭️  SKIP: ${place.name} | Score: ${scoring.luxury_score}/10 (below 6 threshold)`);
+            totalSkipped++;
+            totalDiscovered++;
+            continue;
+          }
+          
           const exists = await checkPOIExists(driver, place.name, place.lat, place.lon);
 
           if (!exists) {
             await addPOIToDatabase(driver, place, destination.name);
-            const scoring = calculateLuxuryScore(place);
             console.log(`      ✅ ADDED: ${place.name} | Score: ${scoring.luxury_score}/10 | ${place.rating}★`);
             totalAdded++;
           } else {

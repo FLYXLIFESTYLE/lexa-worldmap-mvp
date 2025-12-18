@@ -1,0 +1,5 @@
+name,type,city,country,address,website,phone,description,award,source,lat,lon
+"Ritz Paris","hotel","Paris","France","15 Place Vendôme","https://ritzparis.com","+33 1 43 16 30 30","Iconic 5-star luxury hotel in Place Vendôme","5-star","forbes_2024",48.8686,2.3282
+"Le Jules Verne","restaurant","Paris","France","Avenue Gustave Eiffel","https://www.restaurants-toureiffel.com","+33 1 45 55 61 44","Michelin-starred restaurant in Eiffel Tower","1-michelin-star","michelin_2024",48.8584,2.2945
+"Club 55","beach_club","St. Tropez","France","43 Bd Patch, Ramatuelle","https://club55.fr","+33 4 94 55 55 55","Legendary beach club on Pampelonne Beach","","manual",43.2247,6.6821
+

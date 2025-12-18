@@ -8,6 +8,85 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
 
 ## 🔴 High Priority (Do First)
 
+### **STRATEGIC PIVOT** 🎯 NEW - Dec 18, 2025
+- [ ] **Activity-First Discovery Strategy** (Complexity: Medium, HIGH VALUE) ⭐ GAME CHANGER
+  - [ ] Pivot from enriching existing low-quality POIs to discovering experience-enabling POIs
+  - [ ] Collect ALL activity-related POIs (beaches, viewpoints, trails, etc.) not just luxury
+  - [ ] Target: 500K experience-enabling POIs worldwide
+  - [ ] Philosophy: LEXA makes experiences luxury through design, not just venue selection
+  - [ ] Cost: $12,500 for 500K POIs (vs. $4,670 for 28K from mass enrichment)
+  - [ ] See: `docs/ACTIVITY_FIRST_DISCOVERY_STRATEGY.md`
+- [ ] **Multi-Source Premium Discovery** (Complexity: High, CRITICAL) ⭐ NEW
+  - [ ] Google Places: 30K luxury POIs ($750)
+  - [ ] Forbes Travel Guide: 5K ultra-luxury (FREE - web scraping)
+  - [ ] ~~TripAdvisor~~ EXCLUDED (their terms prohibit AI/ML use of API data) ❌
+  - [ ] Michelin Guide: 3K dining elite (FREE - web scraping)
+  - [ ] Condé Nast Traveler: 3K curated (FREE - web scraping)
+  - [ ] World's 50 Best: 500 top (FREE - web scraping)
+  - [ ] Relais & Châteaux: 600 properties (FREE - web scraping)
+  - [ ] Result: 44K unique luxury POIs after deduplication
+  - [ ] See: `docs/STRATEGIC_PIVOT_DISCOVERY_VS_ENRICHMENT.md`
+- [ ] **Master Data Intake Pipeline** (Complexity: High, CRITICAL) ⭐ NEW - Dec 18
+  - [ ] Automated process: Get properties → Scrape websites → Score → Emotions → Relationships
+  - [ ] Duplicate detection & merging (within 100m radius)
+  - [ ] Creates ALL relationships: LOCATED_IN, SUPPORTS_ACTIVITY, EVOKES, AMPLIFIES_DESIRE, MITIGATES_FEAR, OFFERS_EXPERIENCE
+  - [ ] Geographic relationships: city, region, area, continent
+  - [ ] Script: `scripts/master-data-intake-pipeline.ts`
+  - [ ] Philosophy: "LEXA doesn't just list what's there - it shows what's relevant to excite and move you"
+  - [ ] See: `docs/LEXA_DIFFERENTIATION.md`
+- [ ] **Manual POI Import System** (Complexity: Low, READY) ⭐ NEW - Dec 18
+  - [ ] Import Forbes PDFs converted to CSV
+  - [ ] Import government tourism lists
+  - [ ] Import any POI list (CSV/JSON format)
+  - [ ] Automatic enrichment through Master Pipeline
+  - [ ] Script: `scripts/import-manual-poi-list.ts`
+  - [ ] Template: `data/templates/poi_import_template.csv`
+  - [ ] See: `MANUAL_IMPORT_GUIDE.md`
+- [ ] **Government Tourism Partnerships** (Complexity: Medium, HIGH VALUE) ⭐ NEW - Dec 18
+  - [ ] Target: 5 partnerships by Month 3
+  - [ ] Priority: Monaco, Côte d'Azur, Amalfi Coast, Maldives, Dubai
+  - [ ] Expected: 50,000+ government-verified POIs
+  - [ ] Template: `docs/GOVERNMENT_DATA_REQUEST_TEMPLATE.md`
+  - [ ] Email 5 tourism boards this week
+- [ ] **GetYourGuide API Integration** (Complexity: Medium, REVENUE) ⭐ NEW - Dec 18
+  - [ ] World's largest activities marketplace (50K+ experiences)
+  - [ ] Sign up: https://partner.getyourguide.com
+  - [ ] Verify AI/ML usage allowed in terms
+  - [ ] Revenue: 20-30% commission per booking
+  - [ ] Perfect for "things to do" recommendations
+  - [ ] See: `docs/TRIPADVISOR_ALTERNATIVES_ANALYSIS.md`
+- [ ] **Komoot API Integration** (Complexity: Low, UNIQUE NICHE) - Dec 18
+  - [ ] Outdoor activities (hiking, cycling, running routes)
+  - [ ] Sign up: https://www.komoot.com/api
+  - [ ] Strong in Europe, 30M+ users
+  - [ ] Unique differentiator for outdoor luxury experiences
+- [ ] **Immediate Data Quality Fixes** (Complexity: Low, DO TODAY) ⭐ URGENT
+  - [ ] Run: `npx ts-node scripts/fix-duplicate-relationships.ts` (remove ~108 duplicates)
+  - [ ] Run: `npx ts-node scripts/create-experience-nodes-from-highlights.ts` (convert highlights)
+  - [ ] Re-enrich Arabian Gulf (10K POIs have suspicious 10.1 scores from OSM import)
+  - [ ] Re-enrich Amalfi Coast (5K POIs have placeholder scores)
+  - [ ] Mark low-quality POIs with `skip_enrichment = true` (save $3,200)
+
+### **Data Enrichment & Quality**
+- [ ] **Selective Enrichment** (Complexity: Low, REVISED STRATEGY)
+  - [ ] Only enrich POIs with: names, types, in luxury destinations
+  - [ ] Skip: unnamed, no type, suspicious scores
+  - [ ] Target: ~15K good existing POIs (not 186K all)
+  - [ ] Cost: $375 (vs. $4,670 for all)
+- [ ] **French Riviera Completion** (Complexity: Low)
+  - [ ] Continue with 100 POI batches (increased from 50)
+  - [ ] Target: Complete remaining ~10K POIs
+  - [ ] Cost: ~$250
+  - [ ] Timeline: 1-2 weeks with automation
+- [ ] **Emotional Intelligence Implementation** (Complexity: High, CRITICAL) ⭐ THE MOAT
+  - [ ] THIS IS LEXA'S BILLION-DOLLAR DIFFERENTIATOR
+  - [ ] Build signal detection system (keyword → emotion mapping)
+  - [ ] Create emotional profile generator
+  - [ ] Enhance Neo4j queries with emotional filters
+  - [ ] Implement conversational probing ("What does 'special' mean to you?")
+  - [ ] Timeline: 2 weeks
+  - [ ] See: `docs/LEXA_EMOTIONAL_INTELLIGENCE_SYSTEM.md`
+
 ### **Security & Compliance**
 - [ ] **LEXA Compliance & Safety Rules** (Complexity: High, CRITICAL)
   - [ ] Non-racist, non-discriminatory responses
@@ -30,13 +109,34 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
 - [ ] **Knowledge Approval Workflow** - Review/approve Captain submissions before publishing (Complexity: Medium)
 - [ ] **Bulk Import Status Page** - Track progress of large ChatGPT imports (Complexity: Low)
 
-### **Improvements**
+### **LEXA Chat Improvements**
+- [ ] **Optimize Chat Process with LEXA** (Complexity: High, CRITICAL) ⭐
+  - [ ] Implement 3-question intake: When, Where, What theme
+  - [ ] Quick-reply buttons (months, destinations, themes from Neo4j)
+  - [ ] Interactive world map for destination selection
+  - [ ] Professional luxury-focused tone
+  - [ ] Mirror stage, disarm stage, etc.
+  - [ ] See: Initial user request in chat
+- [ ] **Enhance Voice Integration** (Complexity: High, USER FEEDBACK: "TERRIBLE") ⭐
+  - [ ] Current TTS/STT is terrible per user
+  - [ ] Need better voice quality
+  - [ ] Consider ElevenLabs, Play.ht, or similar
+  - [ ] **HIGH PRIORITY** - user specifically mentioned this multiple times
+- [ ] **Implement Emotional Intelligence in Chat** (Complexity: High, CRITICAL)
+  - [ ] Read between the lines (detect hidden emotions/desires)
+  - [ ] Conversational probing ("What does 'special' mean to you?")
+  - [ ] Map user language to emotions
+  - [ ] See: `docs/LEXA_EMOTIONAL_INTELLIGENCE_SYSTEM.md`
+
+### **UI/UX Improvements**
 - [x] **POI Search & Edit Feature** - Allow Captains to search and edit existing POIs (Complexity: Medium) ✅ **COMPLETED Dec 17, 2024**
-- [ ] **Enhance Voice Integration** - Current voice is "terrible" per user, need better TTS/STT (Complexity: High)
 - [ ] **Add Search to Knowledge Browser** - Full-text search across all knowledge (Complexity: Medium)
 - [ ] **POI Deduplication in UI** - Show when POIs are duplicates before merge (Complexity: Medium)
 - [ ] **Mobile Responsive Maps** - Map doesn't work well on mobile (Complexity: Medium)
 - [ ] **Error Recovery in Upload** - Resume failed uploads, retry logic (Complexity: Medium)
+- [ ] **Optimize Landing Page** (Complexity: Medium)
+  - [ ] User mentioned in priority list
+  - [ ] Better showcase of LEXA's value proposition
 
 ### **Bugs/Issues**
 - [ ] **Fix Port Conflict Handling** - Better detection/resolution when port 3000 is in use (Complexity: Low)
@@ -45,25 +145,122 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
 
 ---
 
+### **Quick Wins** ⚡ (< 2 hours each, HIGH IMPACT)
+- [ ] **Toast Notifications** (1 hour)
+  - [ ] npm install react-hot-toast
+  - [ ] Add success/error toasts to all async actions
+  - [ ] Huge UX improvement
+- [ ] **Autosave to Knowledge Editor** (2 hours)
+  - [ ] Debounced autosave every 3 seconds
+  - [ ] Prevent data loss
+  - [ ] Toast: "Draft saved"
+- [ ] **Dashboard Stats Cards** (2 hours)
+  - [ ] Total POIs, Luxury POIs, Emotional Coverage, Today's Enrichment
+  - [ ] Quick visibility into data quality
+- [ ] **Add Timestamps** (30 min)
+  - [ ] "Last updated: X minutes ago" everywhere
+  - [ ] Shows activity, builds trust
+- [ ] **Captain Leaderboard** (1 day)
+  - [ ] Gamify knowledge contributions
+  - [ ] 🥇 Top contributor badge
+  - [ ] 📈 Contribution graph
+  - [ ] 🎯 Monthly challenges
+- [ ] **Personality Quiz** (3 days) ⭐ HIGH VALUE
+  - [ ] 10-15 questions to determine travel personality
+  - [ ] Maps to emotional preferences
+  - [ ] Saves to user profile for personalization
+  - [ ] Gamifies onboarding
+  - [ ] See: `docs/HIGH_VALUE_QUICK_WINS.md`
+
 ## 🟡 Medium Priority (Do Next)
 
-### **Real-time Data & Integrations**
-- [ ] **Weather Integration** - Real-time weather data via Tavily or dedicated API (Complexity: Medium)
-- [ ] **Best Time to Travel Table** - Seasonal recommendations per destination with weather, events, pricing (Complexity: Medium)
-- [ ] **Visa Requirements Integration** - IATA Travel Centre, embassy APIs for visa info (Complexity: Medium)
-- [ ] **Travel Warnings & Restrictions** - State Dept, WHO, CDC advisories integration (Complexity: Medium)
-- [ ] **Codebreaker AI Integration** - Enhanced conversation analysis and insights (Complexity: High)
+### **Knowledge Ingestion & Captain Portal**
+- [ ] **ChatGPT Conversation Import** (Complexity: High, HIGH VALUE)
+  - [ ] User has thousands of ChatGPT conversations about LEXA development
+  - [ ] Need to parse JSON exports, extract knowledge with AI
+  - [ ] Ingest into Neo4j as knowledge nodes
+  - [ ] Timeline: 1 week
+  - [ ] See: Original request in chat
+- [ ] **Captain Knowledge Portal Enhancements** (Complexity: Medium)
+  - [ ] Multi-format uploads (Zoom transcripts, PDFs, URLs)
+  - [ ] Rich text editor
+  - [ ] URL scraping with subpage detection
+  - [ ] Knowledge browser
+  - [ ] Manual user creation (no self-registration)
+  - [ ] Future: Commission model for external contributors
 
-### **Features**
-- [ ] **Budget-Aware Recommendations** - Filter by daily/total budget (Complexity: Medium, Enhancement doc ready!)
-- [ ] **Multi-Destination Itinerary Builder** - Day-by-day scheduling across destinations (Complexity: High)
-- [ ] **Collaborative Filtering** - "Users like you also loved..." (Complexity: High)
-- [ ] **Event Calendar Integration** - Boost POIs during local events (Complexity: Medium)
-- [ ] **POI Photo Gallery** - Display photos from enrichment APIs (Complexity: Low)
-- [ ] **Export Itinerary to PDF** - Generate beautiful PDF itineraries (Complexity: Medium)
-- [ ] **Share Itinerary Link** - Shareable URLs for created itineraries (Complexity: Low)
-- [ ] **Captain Leaderboard** - Gamify knowledge contributions (Complexity: Low)
-- [ ] **Knowledge Versioning** - Track changes to knowledge over time (Complexity: Medium)
+### **Real-time Data & Integrations** ⭐ READY TO IMPLEMENT
+- [ ] **Events Web Scraping** (Complexity: Low, 1 day) ⭐ NEXT - READY
+  - [ ] Use Tavily (already integrated!) to search for events
+  - [ ] Create Event nodes in Neo4j with AFFECTS_DESTINATION relationships
+  - [ ] Add to user dashboard: "Events at your saved destinations"
+  - [ ] Cost: $0.15 per run, ~$1.80/year
+  - [ ] See: `docs/EVENTS_WEB_SCRAPING_IMPLEMENTATION.md`
+- [ ] **Weather Integration** (Complexity: Low, 2 hours) ⭐ READY
+  - [ ] Use Tavily (already have!) for real-time weather
+  - [ ] Create WeatherWidget component
+  - [ ] Add to destination pages
+  - [ ] Cost: $0 (using existing Tavily)
+  - [ ] See: `docs/WEATHER_AND_BEST_TIME_IMPLEMENTATION.md`
+- [ ] **Best Time to Travel** (Complexity: Low, 4 hours) ⭐ READY
+  - [ ] Add seasonal_data to destination nodes (manual data entry)
+  - [ ] Create BestTimeCalendar component with month grid
+  - [ ] Show peak/shoulder/low seasons with pricing impact
+  - [ ] Cost: $0 (static data)
+  - [ ] See: `docs/WEATHER_AND_BEST_TIME_IMPLEMENTATION.md`
+- [ ] **Opening Hours Integration** (Complexity: Low, 2 hours)
+  - [ ] Already fetching from Google Places, just need to store
+  - [ ] Add `opening_hours` and `currently_open` to POI properties
+  - [ ] Show "Open now" / "Opens at X" in UI
+  - [ ] Cost: $0 (already fetching)
+- [ ] **Visa Requirements Integration** (Complexity: Medium) → BACKLOG
+  - [ ] Sherpa° API: Free tier (100 requests/month)
+  - [ ] See: `docs/EVENTS_AND_TRAVEL_RESTRICTIONS_INTEGRATION.md`
+- [ ] **Travel Warnings & Restrictions** (Complexity: Medium) → BACKLOG
+  - [ ] US State Dept API (FREE)
+  - [ ] See: `docs/EVENTS_AND_TRAVEL_RESTRICTIONS_INTEGRATION.md`
+
+### **User Features & Monetization**
+- [ ] **User Account Area** (Complexity: High)
+  - [ ] Save favorite destinations
+  - [ ] Track planned trips
+  - [ ] View past recommendations
+  - [ ] Event notifications for saved destinations
+  - [ ] See: User mentioned in early chat
+- [ ] **Operations Agent** (Complexity: Very High)
+  - [ ] Connect user preferences with experiences
+  - [ ] Understand "why they buy"
+  - [ ] Generate experience scripts automatically
+  - [ ] See: User priority list in chat
+- [ ] **Monetization Features** (Complexity: High)
+  - [ ] Upsell premium experiences
+  - [ ] Subscription tiers
+  - [ ] Marketplace for Captains
+  - [ ] Commission tracking for external contributors
+  - [ ] See: User mentioned commission model for external Captains
+- [ ] **Budget-Aware Recommendations** (Complexity: Medium, Enhancement doc ready!)
+  - [ ] Filter by daily/total budget
+  - [ ] Budget tier: moderate, upscale, luxury, ultra-luxury
+  - [ ] Map to luxury score ranges
+  - [ ] See: `docs/HIGH_VALUE_QUICK_WINS.md`
+- [ ] **Multi-Destination Itinerary Builder** (Complexity: High)
+  - [ ] Day-by-day scheduling across destinations
+  - [ ] Route optimization
+  - [ ] Activity timing recommendations
+- [ ] **Collaborative Filtering** (Complexity: High)
+  - [ ] "Users like you also loved..."
+  - [ ] Personality-based recommendations
+- [ ] **POI Photo Gallery** (Complexity: Low)
+  - [ ] Display photos from enrichment APIs
+  - [ ] User-uploaded photos
+- [ ] **Export Itinerary to PDF** (Complexity: Medium)
+  - [ ] Generate beautiful PDF itineraries
+  - [ ] Include maps, photos, details
+- [ ] **Share Itinerary Link** (Complexity: Low)
+  - [ ] Shareable URLs for created itineraries
+- [ ] **Knowledge Versioning** (Complexity: Medium)
+  - [ ] Track changes to knowledge over time
+  - [ ] Captain edit history
 
 ### **Improvements**
 - [ ] **Lazy Load Map Markers** - Performance improvement for many destinations (Complexity: Medium)
@@ -169,9 +366,9 @@ Currently being worked on:
 
 ---
 
-## ✅ Completed
+## ✅ Completed (December 2025)
 
-Recently completed items:
+### **Week of Dec 16-18:**
 - ✅ Luxury scoring system
 - ✅ Confidence scoring for relationships
 - ✅ Data quality agent with merge logic
@@ -184,12 +381,35 @@ Recently completed items:
 - ✅ Test scripts for scoring validation
 - ✅ Comprehensive documentation
 - ✅ All 14 relationship types managed
+- ✅ POI Search & Edit feature (Dec 17)
+- ✅ ChatNeo4j natural language interface (Dec 17)
+- ✅ Manual POI creation form (Dec 17)
+- ✅ Destination browser with statistics (Dec 17)
+- ✅ Fix repeated enrichment attempts (Dec 17)
+- ✅ Propagate 1M+ emotional relationships (Dec 17) ⭐
+- ✅ Fix 100% LOCATED_IN relationships (Dec 17) ⭐
+- ✅ Batch size increased 50→100 (Dec 18)
+- ✅ Discovery script filters score 6-10 only (Dec 18)
+- ✅ Cost estimation tool (Dec 18)
+- ✅ Strategic pivot documentation (Dec 18) ⭐
+- ✅ Activity-first discovery strategy (Dec 18) ⭐ GAME CHANGER
 
 ---
 
 ## 💡 Ideas Parking Lot
 
 Future exploration (not prioritized yet):
+
+### **Marketing & Growth** (From User Priority List)
+- [ ] **Social Media Outreach Engine/Agent** (Complexity: Very High)
+  - [ ] Automated content generation
+  - [ ] Post scheduling
+  - [ ] Engagement tracking
+  - [ ] User mentioned in priority #7
+- [ ] **Win First Paying Users** (Priority #8 from user)
+  - [ ] Launch strategy
+  - [ ] Beta program
+  - [ ] Pricing tiers
 
 ### **Advanced AI Features**
 - Vector embeddings for semantic search
@@ -198,6 +418,7 @@ Future exploration (not prioritized yet):
 - Automatic itinerary video generation
 - AR previews of destinations
 - AI-generated travel photography tips
+- **Codebreaker AI Integration** - Enhanced conversation analysis (mentioned by user)
 
 ### **Gamification**
 - Travel achievement badges
@@ -232,13 +453,15 @@ Future exploration (not prioritized yet):
 
 ## 📊 Backlog Statistics
 
-- **Total Items**: 92+
-- **High Priority**: 13
-- **Medium Priority**: 26
-- **Low Priority**: 27
-- **Quick Wins**: 24
-- **In Progress**: 0
-- **Completed**: 16
+- **Total Items**: 120+
+- **High Priority**: 25+ (includes strategic pivot items)
+- **Quick Wins**: 6 (ready to implement)
+- **Medium Priority**: 35+
+- **Low Priority**: 30+
+- **Ideas Parking Lot**: 25+
+- **Completed (Dec 2025)**: 24
+- **Critical Path**: Multi-source discovery → Emotional intelligence → User features
+- **Last Major Update**: Dec 18, 2025 (Strategic Pivot to Activity-First Discovery)
 
 ---
 

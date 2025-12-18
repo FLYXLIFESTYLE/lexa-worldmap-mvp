@@ -134,13 +134,18 @@ Nodes:
 - Fear: name, severity
 
 Relationships:
-- (poi)-[:located_in]->(destination)
-- (poi)-[:has_theme]->(theme)
-- (poi)-[:supports_activity]->(activity_type)
-- (poi)-[:evokes]->(Emotion)
-- (destination)-[:in_region]->(region)
-- (destination)-[:in_country]->(country)
-- (theme)-[:available_in]->(destination)
+- (poi)-[:LOCATED_IN]->(destination)
+- (poi)-[:HAS_THEME]->(theme)
+- (poi)-[:SUPPORTS_ACTIVITY]->(activity_type)
+- (poi)-[:EVOKES]->(Emotion)
+- (poi)-[:AMPLIFIES_DESIRE]->(Desire)
+- (poi)-[:MITIGATES_FEAR]->(Fear)
+- (activity_type)-[:EVOKES]->(Emotion)
+- (activity_type)-[:AMPLIFIES_DESIRE]->(Desire)
+- (activity_type)-[:MITIGATES_FEAR]->(Fear)
+- (destination)-[:IN_REGION]->(region)
+- (destination)-[:IN_COUNTRY]->(country)
+- (theme)-[:AVAILABLE_IN]->(destination)
 
 IMPORTANT RULES:
 1. Generate ONLY the Cypher query, no explanations
@@ -150,13 +155,14 @@ IMPORTANT RULES:
 5. Use proper WHERE clauses for filtering
 6. Case-insensitive matching: toLower(n.property) CONTAINS toLower($param)
 7. Return useful properties, not just node IDs
-8. Handle null values with COALESCE or IS NOT NULL
+8. Handle null values with COALESCE or IS NOT NULL (Neo4j does NOT support NULLS LAST/FIRST syntax)
 9. Use descriptive aliases for clarity
+10. All relationship names MUST be UPPERCASE (e.g., EVOKES, LOCATED_IN, SUPPORTS_ACTIVITY)
 
 EXAMPLES:
 
 Q: "Show me luxury POIs in St. Tropez"
-A: MATCH (p:poi) WHERE toLower(p.destination_name) CONTAINS 'st. tropez' OR toLower(p.destination_name) CONTAINS 'st tropez' OR toLower(p.destination_name) CONTAINS 'saint tropez' RETURN p.name, p.type, p.luxury_score, p.destination_name, p.lat, p.lon ORDER BY p.luxury_score DESC NULLS LAST LIMIT 50
+A: MATCH (p:poi) WHERE (toLower(p.destination_name) CONTAINS 'st. tropez' OR toLower(p.destination_name) CONTAINS 'st tropez' OR toLower(p.destination_name) CONTAINS 'saint tropez') AND p.luxury_score IS NOT NULL RETURN p.name, p.type, p.luxury_score, p.destination_name, p.lat, p.lon ORDER BY p.luxury_score DESC LIMIT 50
 
 Q: "How many POIs do we have worldwide?"
 A: MATCH (p:poi) RETURN count(p) as total_pois
@@ -165,13 +171,19 @@ Q: "Show me beach clubs with luxury score above 8"
 A: MATCH (p:poi) WHERE (toLower(p.type) CONTAINS 'beach' OR toLower(p.name) CONTAINS 'beach club') AND p.luxury_score > 8 RETURN p.name, p.destination_name, p.luxury_score, p.luxury_confidence ORDER BY p.luxury_score DESC LIMIT 50
 
 Q: "Show me 10 POIs in Croatia"
-A: MATCH (p:poi) WHERE toLower(p.destination_name) CONTAINS 'croatia' OR toLower(p.destination_name) CONTAINS 'dubrovnik' OR toLower(p.destination_name) CONTAINS 'split' OR toLower(p.destination_name) CONTAINS 'hvar' RETURN p.name, p.type, p.destination_name, p.luxury_score ORDER BY p.luxury_score DESC NULLS LAST LIMIT 10
+A: MATCH (p:poi) WHERE toLower(p.destination_name) CONTAINS 'croatia' OR toLower(p.destination_name) CONTAINS 'dubrovnik' OR toLower(p.destination_name) CONTAINS 'split' OR toLower(p.destination_name) CONTAINS 'hvar' RETURN p.name, p.type, p.destination_name, COALESCE(p.luxury_score, 0) as luxury_score ORDER BY luxury_score DESC LIMIT 10
 
 Q: "What destinations have the most POIs?"
 A: MATCH (p:poi) WHERE p.destination_name IS NOT NULL WITH p.destination_name as destination, count(p) as poi_count ORDER BY poi_count DESC LIMIT 20 RETURN destination, poi_count
 
 Q: "Find snorkeling spots worldwide"
-A: MATCH (p:poi)-[:supports_activity]->(a:activity_type) WHERE toLower(a.name) CONTAINS 'snorkel' RETURN p.name, p.destination_name, p.luxury_score, p.lat, p.lon ORDER BY p.luxury_score DESC NULLS LAST LIMIT 100
+A: MATCH (p:poi)-[:SUPPORTS_ACTIVITY]->(a:activity_type) WHERE toLower(a.name) CONTAINS 'snorkel' RETURN p.name, p.destination_name, COALESCE(p.luxury_score, 0) as luxury_score, p.lat, p.lon ORDER BY luxury_score DESC LIMIT 100
+
+Q: "Show me POIs that evoke joy"
+A: MATCH (p:poi)-[:EVOKES]->(e:Emotion) WHERE toLower(e.name) CONTAINS 'joy' RETURN p.name, p.type, p.destination_name, COALESCE(p.luxury_score, 0) as luxury_score, e.name as emotion ORDER BY luxury_score DESC LIMIT 50
+
+Q: "Find POIs that amplify desire for luxury"
+A: MATCH (p:poi)-[:AMPLIFIES_DESIRE]->(d:Desire) WHERE toLower(d.name) CONTAINS 'luxury' RETURN p.name, p.type, p.destination_name, COALESCE(p.luxury_score, 0) as luxury_score, d.name as desire ORDER BY luxury_score DESC LIMIT 50
 
 Now generate a Cypher query for the user's question. Return ONLY the Cypher query, nothing else.`;
 

@@ -14,7 +14,9 @@
 import dotenv from 'dotenv';
 import neo4j from 'neo4j-driver';
 
+// Load from .env.local first, then .env
 dotenv.config({ path: '.env.local' });
+dotenv.config(); // Loads .env without overriding existing vars
 
 // Configuration
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';

@@ -8,7 +8,9 @@
 import dotenv from 'dotenv';
 import neo4j from 'neo4j-driver';
 
+// Load from .env.local first, then .env
 dotenv.config({ path: '.env.local' });
+dotenv.config(); // Loads .env without overriding existing vars
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 const NEO4J_URI = process.env.NEO4J_URI || '';
@@ -34,11 +36,10 @@ const FRENCH_RIVIERA_DESTINATIONS = [
   'Beaulieu-sur-Mer',
   'Èze',
   'Eze',
-  'Cap d\'Ail',
+  'Cap d Ail',
   'Roquebrune-Cap-Martin',
   'French Riviera',
-  'Côte d\'Azur',
-  'Cote d\'Azur',
+  'Cote d Azur',
 ];
 
 const BATCH_SIZE = 50; // Smaller batches for focused enrichment
@@ -124,7 +125,7 @@ async function fetchGooglePlace(lat: number, lon: number, name: string) {
     }
 
     const place_id = searchData.results[0].place_id;
-    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place_id}&fields=name,rating,user_ratings_total,price_level,types,formatted_address,website,formatted_phone_number&key=${GOOGLE_PLACES_API_KEY}`;
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place_id}&fields=place_id,name,rating,user_ratings_total,price_level,types,formatted_address,website,formatted_phone_number,opening_hours,business_status&key=${GOOGLE_PLACES_API_KEY}`;
     
     const detailsResponse = await fetch(detailsUrl);
     const detailsData = await detailsResponse.json();
@@ -218,6 +219,8 @@ async function enrichFrenchRiviera() {
               p.luxury_evidence = $luxury_evidence,
               p.google_website = $website,
               p.google_phone = $phone,
+              p.google_address = $address,
+              p.google_business_status = $business_status,
               p.enriched_at = datetime(),
               p.enriched_source = 'google_places'
           `,
@@ -232,6 +235,8 @@ async function enrichFrenchRiviera() {
             luxury_evidence: scoring.luxury_evidence,
             website: googleData.website || null,
             phone: googleData.formatted_phone_number || null,
+            address: googleData.formatted_address || null,
+            business_status: googleData.business_status || null,
           }
         );
         await updateSession.close();
