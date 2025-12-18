@@ -11,6 +11,7 @@ import { InfoTooltip } from '@/components/knowledge/info-tooltip';
 import { POISearch } from '@/components/admin/poi-search';
 import { POIEditModal } from '@/components/admin/poi-edit-modal';
 import { CreatePOIForm } from '@/components/admin/create-poi-form';
+import AdminNav from '@/components/admin/admin-nav';
 
 interface KnowledgeEntry {
   title: string;
@@ -254,18 +255,35 @@ export default function KnowledgeEditorPage() {
       <div className="max-w-5xl mx-auto p-8">
         {/* Header */}
         <div className="mb-8">
-          <button
-            onClick={() => router.push('/admin/knowledge')}
-            className="text-lexa-navy hover:text-lexa-gold mb-4 flex items-center gap-2"
-          >
-            ← Back to Portal
-          </button>
+          <div className="flex items-start justify-between mb-4">
+            <button
+              onClick={() => router.push('/admin/knowledge')}
+              className="text-lexa-navy hover:text-lexa-gold flex items-center gap-2"
+            >
+              ← Back to Portal
+            </button>
+            <AdminNav />
+          </div>
+          
           <h1 className="text-4xl font-bold text-lexa-navy mb-2">
             Share Your Knowledge
           </h1>
-          <p className="text-zinc-600">
+          <p className="text-zinc-600 mb-4">
             Add your expertise to help LEXA create extraordinary experiences
           </p>
+          
+          {/* Why - What - How */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
+            <div className="text-sm">
+              <strong className="text-green-900">WHY:</strong> <span className="text-gray-700">Your insider knowledge makes LEXA recommendations authentic and valuable</span>
+            </div>
+            <div className="text-sm">
+              <strong className="text-green-900">WHAT:</strong> <span className="text-gray-700">Search & edit POIs, create new locations, or write general travel insights</span>
+            </div>
+            <div className="text-sm">
+              <strong className="text-green-900">HOW:</strong> <span className="text-gray-700">Use POI Search to edit existing places, or scroll down to create new content</span>
+            </div>
+          </div>
         </div>
 
         {/* POI Search & Edit Section */}

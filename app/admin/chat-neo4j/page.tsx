@@ -9,6 +9,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import AdminNav from '@/components/admin/admin-nav';
 
 interface Message {
   id: string;
@@ -139,22 +140,39 @@ export default function ChatNeo4jPage() {
       <div className="max-w-6xl mx-auto p-8">
         {/* Header */}
         <div className="mb-8">
-          <button
-            onClick={() => router.push('/admin/knowledge')}
-            className="text-lexa-navy hover:text-lexa-gold mb-4 flex items-center gap-2"
-          >
-            ← Back to Portal
-          </button>
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-start justify-between mb-4">
+            <button
+              onClick={() => router.push('/admin/knowledge')}
+              className="text-lexa-navy hover:text-lexa-gold flex items-center gap-2"
+            >
+              ← Back to Portal
+            </button>
+            <AdminNav />
+          </div>
+          
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
               <h1 className="text-4xl font-bold text-lexa-navy mb-2">
                 💬 ChatNeo4j
               </h1>
-              <p className="text-zinc-600">
+              <p className="text-zinc-600 mb-4">
                 Ask questions in plain English about your travel database
               </p>
+              
+              {/* Why - What - How */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-2 max-w-2xl">
+                <div className="text-sm">
+                  <strong className="text-yellow-900">WHY:</strong> <span className="text-gray-700">Instant data insights without writing complex Cypher queries</span>
+                </div>
+                <div className="text-sm">
+                  <strong className="text-yellow-900">WHAT:</strong> <span className="text-gray-700">AI-powered natural language queries to explore POIs, destinations, and data quality</span>
+                </div>
+                <div className="text-sm">
+                  <strong className="text-yellow-900">HOW:</strong> <span className="text-gray-700">Type questions like "Show luxury POIs in Monaco" or click example questions below</span>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 ml-4">
               <button
                 onClick={() => setShowCypher(!showCypher)}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${

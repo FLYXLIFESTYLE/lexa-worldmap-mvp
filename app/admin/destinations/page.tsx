@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import AdminNav from '@/components/admin/admin-nav';
 
 interface DestinationStats {
   destination: string;
@@ -103,18 +104,35 @@ export default function DestinationBrowserPage() {
       <div className="max-w-7xl mx-auto p-8">
         {/* Header */}
         <div className="mb-8">
-          <button
-            onClick={() => router.push('/admin/knowledge')}
-            className="text-lexa-navy hover:text-lexa-gold mb-4 flex items-center gap-2"
-          >
-            ← Back to Portal
-          </button>
+          <div className="flex items-start justify-between mb-4">
+            <button
+              onClick={() => router.push('/admin/knowledge')}
+              className="text-lexa-navy hover:text-lexa-gold flex items-center gap-2"
+            >
+              ← Back to Portal
+            </button>
+            <AdminNav />
+          </div>
+          
           <h1 className="text-4xl font-bold text-lexa-navy mb-2">
             🌍 Destination Browser
           </h1>
-          <p className="text-zinc-600">
+          <p className="text-zinc-600 mb-4">
             Explore POI coverage and quality across all destinations
           </p>
+          
+          {/* Why - What - How */}
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-2">
+            <div className="text-sm">
+              <strong className="text-orange-900">WHY:</strong> <span className="text-gray-700">Assess data coverage and quality to prioritize enrichment efforts</span>
+            </div>
+            <div className="text-sm">
+              <strong className="text-orange-900">WHAT:</strong> <span className="text-gray-700">View POI statistics by destination including luxury counts, scores, and data gaps</span>
+            </div>
+            <div className="text-sm">
+              <strong className="text-orange-900">HOW:</strong> <span className="text-gray-700">Click column headers to sort, analyze quality indicators, and identify destinations needing work</span>
+            </div>
+          </div>
         </div>
 
         {/* Overall Statistics */}

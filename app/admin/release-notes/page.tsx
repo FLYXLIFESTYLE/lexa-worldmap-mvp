@@ -89,13 +89,26 @@ export default function ReleaseNotesPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
-          <div>
+          <div className="flex-1">
             <h1 className="text-4xl font-bold text-gray-900 mb-2">
               Release Notes
             </h1>
-            <p className="text-lg text-gray-600">
+            <p className="text-lg text-gray-600 mb-4">
               Daily changelog and feature updates
             </p>
+            
+            {/* Why - What - How */}
+            <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 space-y-2 max-w-2xl">
+              <div className="text-sm">
+                <strong className="text-teal-900">WHY:</strong> <span className="text-gray-700">Track LEXA's evolution and stay informed about new features and improvements</span>
+              </div>
+              <div className="text-sm">
+                <strong className="text-teal-900">WHAT:</strong> <span className="text-gray-700">Chronological log of features, enhancements, bug fixes, and system changes</span>
+              </div>
+              <div className="text-sm">
+                <strong className="text-teal-900">HOW:</strong> <span className="text-gray-700">Sort by date, filter by scope (internal/published), and expand days to see details</span>
+              </div>
+            </div>
           </div>
           <AdminNav />
         </div>

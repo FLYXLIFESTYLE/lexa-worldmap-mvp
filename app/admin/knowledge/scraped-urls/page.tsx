@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import AdminNav from '@/components/admin/admin-nav';
 
 interface ScrapedURL {
   url: string;
@@ -83,19 +84,36 @@ export default function ScrapedURLsPage() {
     <div className="min-h-screen bg-gradient-to-br from-lexa-navy via-zinc-900 to-black p-8">
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Scraped URLs</h1>
-            <p className="text-zinc-400">
-              {total} URLs tracked • Page {page}
-            </p>
-          </div>
+        <div className="flex items-start justify-between mb-4">
           <Link
             href="/admin/knowledge"
             className="px-6 py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors"
           >
             ← Back to Portal
           </Link>
+          <AdminNav />
+        </div>
+        
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-white mb-2">Scraped URLs</h1>
+            <p className="text-zinc-400 mb-4">
+              {total} URLs tracked • Page {page}
+            </p>
+            
+            {/* Why - What - How */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 space-y-2 max-w-2xl">
+              <div className="text-sm text-white">
+                <strong className="text-lexa-gold">WHY:</strong> Track all URL scraping activity and prevent duplicate processing
+              </div>
+              <div className="text-sm text-white">
+                <strong className="text-lexa-gold">WHAT:</strong> View scrape history, success rates, subpages found, and knowledge extracted
+              </div>
+              <div className="text-sm text-white">
+                <strong className="text-lexa-gold">HOW:</strong> Review status, re-scrape failed URLs, or delete old records
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
