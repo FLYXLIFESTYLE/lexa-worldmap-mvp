@@ -1,67 +1,142 @@
-{
-  "date": "2025-12-19",
-  "version": "1.2.0",
-  "notes": [
-    {
-      "category": "feature",
-      "title": "Upload Tracking System",
-      "description": "Complete file upload tracking with history, statistics, and management. Track POIs, relationships, and wisdom extracted from each upload. View detailed extraction results including destinations, activities, and themes.",
-      "impact": "high"
-    },
-    {
-      "category": "feature",
-      "title": "Upload History Page",
-      "description": "New admin page showing all file uploads with extraction statistics. Filter by status (completed, failed), expand for details, download original files (if kept), and delete uploads.",
-      "impact": "high"
-    },
-    {
-      "category": "feature",
-      "title": "Keep/Delete File Option",
-      "description": "Users can now choose to keep original files after extraction or delete them automatically. Toggle added to upload form with visual indicator. Files are stored in Supabase Storage when kept.",
-      "impact": "medium"
-    },
-    {
-      "category": "feature",
-      "title": "Manual File Deletion",
-      "description": "Delete button added to each upload record. Soft delete preserves audit trail while removing file from storage. Extracted knowledge remains in Neo4j database.",
-      "impact": "medium"
-    },
-    {
-      "category": "enhancement",
-      "title": "Upload API Enhanced",
-      "description": "Upload API now tracks all uploads in database, records extraction statistics, stores files optionally, and logs errors. Provides detailed feedback on extraction results.",
-      "impact": "high"
-    },
-    {
-      "category": "enhancement",
-      "title": "Admin Menu Updates",
-      "description": "Added 'Upload History' to admin dropdown menu and Captain's Knowledge Portal. Easy access to upload management from anywhere in the system.",
-      "impact": "low"
-    },
-    {
-      "category": "database",
-      "title": "Upload Tracking Table",
-      "description": "New upload_tracking table with comprehensive schema for tracking uploads, extraction results, file storage, and processing status. Includes RLS policies for privacy and access control.",
-      "impact": "high"
-    },
-    {
-      "category": "bugfix",
-      "title": "Fixed TypeScript Build Error",
-      "description": "Fixed type error in upload route where ExtractedKnowledge interface properties were incorrectly accessed. Now correctly extracts destinations, activities, and themes from POIs and relationships.",
-      "impact": "critical"
-    },
-    {
-      "category": "documentation",
-      "title": "Comprehensive Upload System Documentation",
-      "description": "Created detailed documentation including UPLOAD_TRACKING_COMPLETE.md, UPLOAD_TRACKING_ANSWERS.md, PAUL_UPLOAD_STATUS.md, and RUN_MIGRATION_INSTRUCTIONS.md. Includes usage guides, troubleshooting, and feature explanations.",
-      "impact": "medium"
-    },
-    {
-      "category": "infrastructure",
-      "title": "Supabase Storage Integration",
-      "description": "Integrated Supabase Storage for optional file retention. Created knowledge-uploads bucket with proper access policies. Supports file download and deletion.",
-      "impact": "medium"
-    }
-  ]
-}
-
+[
+  {
+    "id": "2025-12-19-1734606000-upload-tracking",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:00:00.000Z",
+    "category": "feature",
+    "title": "Upload Tracking System",
+    "description": "Complete file upload tracking with history, statistics, and management. Track POIs, relationships, and wisdom extracted from each upload.",
+    "details": "New upload_tracking table stores all upload metadata, extraction results, and file storage information. Tracks POIs extracted, relationships created, wisdom captured, and lists of destinations, activities, and themes identified in each upload.",
+    "author": "System",
+    "isPublic": true,
+    "tags": ["upload", "tracking", "knowledge", "database"],
+    "relatedFiles": ["supabase/migrations/create_upload_tracking.sql", "app/api/knowledge/upload/route.ts"],
+    "githubCommit": "3fab124"
+  },
+  {
+    "id": "2025-12-19-1734606001-upload-history",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:00:01.000Z",
+    "category": "feature",
+    "title": "Upload History Page",
+    "description": "New admin page showing all file uploads with extraction statistics, filtering, and management options.",
+    "details": "Comprehensive UI at /admin/knowledge/history displays all uploads with detailed extraction results. Filter by status (completed, failed), expand for entity details (destinations, activities, themes), download original files if kept, and delete upload records. Shows aggregate statistics across all uploads.",
+    "author": "System",
+    "isPublic": true,
+    "tags": ["admin", "upload", "history", "ui"],
+    "relatedFiles": ["app/admin/knowledge/history/page.tsx", "app/api/admin/uploads/route.ts"],
+    "githubCommit": "3fab124"
+  },
+  {
+    "id": "2025-12-19-1734606002-keep-delete-toggle",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:00:02.000Z",
+    "category": "feature",
+    "title": "Keep/Delete File Option",
+    "description": "Users can now choose to keep original files after extraction or delete them automatically.",
+    "details": "Toggle added to upload form with visual indicator. When 'Keep file' is selected, original files are stored in Supabase Storage and available for download later. Default is to delete files after extraction to save storage costs and maintain privacy. Extracted knowledge remains in Neo4j regardless of file storage choice.",
+    "author": "System",
+    "isPublic": true,
+    "tags": ["upload", "storage", "privacy"],
+    "relatedFiles": ["app/admin/knowledge/upload/page.tsx"],
+    "githubCommit": "3fab124"
+  },
+  {
+    "id": "2025-12-19-1734606003-manual-deletion",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:00:03.000Z",
+    "category": "feature",
+    "title": "Manual File Deletion",
+    "description": "Delete button added to each upload record with soft delete functionality.",
+    "details": "Upload records can be manually deleted from the history page. Uses soft delete (sets deleted_at timestamp) to preserve audit trail while removing file from storage. Extracted knowledge in Neo4j database is preserved when upload records are deleted. Includes confirmation dialog to prevent accidental deletion.",
+    "author": "System",
+    "isPublic": true,
+    "tags": ["upload", "deletion", "management"],
+    "relatedFiles": ["app/api/admin/uploads/[id]/route.ts", "app/admin/knowledge/history/page.tsx"],
+    "githubCommit": "3fab124"
+  },
+  {
+    "id": "2025-12-19-1734606004-enhanced-upload-api",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:00:04.000Z",
+    "category": "enhancement",
+    "title": "Enhanced Upload API",
+    "description": "Upload API now tracks all uploads in database, records extraction statistics, and logs errors comprehensively.",
+    "details": "The /api/knowledge/upload endpoint now creates upload_tracking records, stores files in Supabase Storage when requested, captures detailed extraction results (destinations, activities, themes), and provides comprehensive error logging. Returns uploadId for tracking and detailed statistics including entity counts.",
+    "author": "System",
+    "isPublic": false,
+    "tags": ["api", "upload", "tracking"],
+    "relatedFiles": ["app/api/knowledge/upload/route.ts"],
+    "githubCommit": "3fab124"
+  },
+  {
+    "id": "2025-12-19-1734606005-supabase-storage",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:00:05.000Z",
+    "category": "infrastructure",
+    "title": "Supabase Storage Integration",
+    "description": "Integrated Supabase Storage for optional file retention with proper access policies.",
+    "details": "Created knowledge-uploads storage bucket with Row Level Security policies. Authenticated users can upload files to their own folders, users can view their own files, Captains/Admins can view all files, and users can delete their own files. Files are organized by user ID and timestamped to prevent naming conflicts.",
+    "author": "System",
+    "isPublic": false,
+    "tags": ["storage", "supabase", "infrastructure"],
+    "relatedFiles": ["supabase/migrations/create_upload_tracking.sql"],
+    "githubCommit": "3fab124"
+  },
+  {
+    "id": "2025-12-19-1734606006-admin-menu-update",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:00:06.000Z",
+    "category": "enhancement",
+    "title": "Admin Menu Updates",
+    "description": "Added 'Upload History' to admin dropdown menu and Captain's Knowledge Portal.",
+    "details": "Upload History is now accessible from the admin navigation dropdown and as a card in the Captain's Knowledge Portal. Provides easy access to upload management from anywhere in the system.",
+    "author": "System",
+    "isPublic": false,
+    "tags": ["admin", "ui", "navigation"],
+    "relatedFiles": ["components/admin/admin-nav.tsx", "app/admin/knowledge/page.tsx"],
+    "githubCommit": "3fab124"
+  },
+  {
+    "id": "2025-12-19-1734606007-upload-docs",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:00:07.000Z",
+    "category": "documentation",
+    "title": "Comprehensive Upload System Documentation",
+    "description": "Created detailed documentation for the complete upload tracking system.",
+    "details": "Documentation includes UPLOAD_TRACKING_COMPLETE.md (comprehensive system guide), UPLOAD_TRACKING_ANSWERS.md (FAQ), PAUL_UPLOAD_STATUS.md (investigation report), RUN_MIGRATION_INSTRUCTIONS.md (migration guide), and check-paul-uploads.ts utility script. Covers usage, troubleshooting, privacy, and access control.",
+    "author": "System",
+    "isPublic": true,
+    "tags": ["documentation", "upload", "guide"],
+    "relatedFiles": ["UPLOAD_TRACKING_COMPLETE.md", "UPLOAD_TRACKING_ANSWERS.md", "PAUL_UPLOAD_STATUS.md"],
+    "githubCommit": "fd987f2"
+  },
+  {
+    "id": "2025-12-19-1734606008-build-fix",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:00:08.000Z",
+    "category": "bugfix",
+    "title": "Fixed TypeScript Build Error in Upload Route",
+    "description": "Resolved type error where ExtractedKnowledge interface properties were incorrectly accessed.",
+    "details": "Fixed 'Property destinations does not exist on type ExtractedKnowledge' error by correctly extracting destinations, activities, and themes from the pois and relationships arrays instead of trying to access non-existent top-level properties. Upload tracking now correctly captures entity information.",
+    "author": "System",
+    "isPublic": false,
+    "tags": ["bugfix", "typescript", "build"],
+    "relatedFiles": ["app/api/knowledge/upload/route.ts"],
+    "githubCommit": "a2c5faa"
+  },
+  {
+    "id": "2025-12-19-1734606009-release-notes-update",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:00:09.000Z",
+    "category": "documentation",
+    "title": "December 19 Release Notes",
+    "description": "Created release notes for December 19, 2025 covering upload tracking system implementation.",
+    "details": "Documented all features, enhancements, and fixes from December 19 including upload tracking system, history page, file storage options, API enhancements, and bug fixes. Release notes now show complete history of recent development work.",
+    "author": "System",
+    "isPublic": true,
+    "tags": ["release-notes", "documentation"],
+    "relatedFiles": ["docs/release-notes/2025-12-19.json"],
+    "githubCommit": "5b7f2ed"
+  }
+]
