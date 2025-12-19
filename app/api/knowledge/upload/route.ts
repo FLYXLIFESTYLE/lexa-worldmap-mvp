@@ -11,12 +11,21 @@ import {
   type ParsedConversation 
 } from '@/lib/knowledge';
 import { getCurrentUserAttribution } from '@/lib/knowledge/track-contribution';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: Request) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  let uploadRecordId: string | null = null;
+
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     const type = formData.get('type') as string;
+    const keepFile = formData.get('keep_file') === 'true';
 
     if (!file) {
       return NextResponse.json(
@@ -35,8 +44,51 @@ export async function POST(req: Request) {
       );
     }
 
-    // Read file into memory (not saved to disk)
+    // Create upload tracking record
+    const { data: uploadRecord, error: createError } = await supabase
+      .from('upload_tracking')
+      .insert({
+        filename: file.name,
+        file_type: type,
+        file_size: file.size,
+        uploaded_by: attribution.contributedBy,
+        processing_status: 'processing',
+        keep_file: keepFile,
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('Failed to create upload record:', createError);
+    } else {
+      uploadRecordId = uploadRecord.id;
+    }
+
+    // Read file into memory
     const text = await file.text();
+    
+    // Optionally save file to storage
+    let filePath: string | null = null;
+    let fileUrl: string | null = null;
+    
+    if (keepFile && attribution.contributedBy) {
+      const storageKey = `${attribution.contributedBy}/${Date.now()}_${file.name}`;
+      const { data: storageData, error: storageError } = await supabase.storage
+        .from('knowledge-uploads')
+        .upload(storageKey, file);
+
+      if (!storageError && storageData) {
+        filePath = storageData.path;
+        
+        const { data: urlData } = supabase.storage
+          .from('knowledge-uploads')
+          .getPublicUrl(storageData.path);
+        
+        fileUrl = urlData.publicUrl;
+      } else {
+        console.error('Storage upload failed:', storageError);
+      }
+    }
     
     let conversations: ParsedConversation[] = [];
 
@@ -66,10 +118,18 @@ export async function POST(req: Request) {
     let totalPOIs = 0;
     let totalRelationships = 0;
     let totalWisdom = 0;
+    const extractedDestinations = new Set<string>();
+    const extractedActivities = new Set<string>();
+    const extractedThemes = new Set<string>();
 
     // Process each conversation
     for (const conv of toProcess) {
       const extracted = await processConversation(conv);
+      
+      // Collect extracted entities
+      extracted.destinations?.forEach(d => extractedDestinations.add(d.name));
+      extracted.activities?.forEach(a => extractedActivities.add(a.name));
+      extracted.themes?.forEach(t => extractedThemes.add(t.name));
       
       // Ingest to Neo4j with attribution
       const stats = await ingestKnowledge(extracted, {
@@ -87,21 +147,53 @@ export async function POST(req: Request) {
       totalRelationships += stats.relationshipsCreated;
       totalWisdom += stats.wisdomCreated;
     }
-    
-    // File is automatically garbage collected from memory
-    // No storage, no cleanup needed
+
+    // Update upload record with results
+    if (uploadRecordId) {
+      await supabase
+        .from('upload_tracking')
+        .update({
+          pois_extracted: totalPOIs,
+          relationships_created: totalRelationships,
+          wisdom_created: totalWisdom,
+          extracted_destinations: Array.from(extractedDestinations),
+          extracted_activities: Array.from(extractedActivities),
+          extracted_themes: Array.from(extractedThemes),
+          processing_status: 'completed',
+          file_path: filePath,
+          file_url: fileUrl,
+        })
+        .eq('id', uploadRecordId);
+    }
 
     return NextResponse.json({
       success: true,
+      uploadId: uploadRecordId,
       stats: {
         poisExtracted: totalPOIs,
         relationshipsCreated: totalRelationships,
         wisdomCreated: totalWisdom,
+        destinations: Array.from(extractedDestinations),
+        activities: Array.from(extractedActivities),
+        themes: Array.from(extractedThemes),
       },
+      fileStored: keepFile && !!filePath,
       message: `Processed ${toProcess.length} conversation(s)`,
     });
   } catch (error) {
     console.error('Upload processing error:', error);
+    
+    // Update upload record with error
+    if (uploadRecordId) {
+      await supabase
+        .from('upload_tracking')
+        .update({
+          processing_status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+        })
+        .eq('id', uploadRecordId);
+    }
+    
     return NextResponse.json(
       { 
         error: 'Failed to process upload',

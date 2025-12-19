@@ -27,6 +27,7 @@ export default function KnowledgeUploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [urlInput, setUrlInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [keepFiles, setKeepFiles] = useState(false);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles: UploadedFile[] = acceptedFiles.map((file) => ({
@@ -69,6 +70,7 @@ export default function KnowledgeUploadPage() {
         const formData = new FormData();
         formData.append('file', uploadedFile.file);
         formData.append('type', detectFileType(uploadedFile.file.name));
+        formData.append('keep_file', String(keepFiles));
 
         // Upload
         const uploadResponse = await fetch('/api/knowledge/upload', {
@@ -246,6 +248,32 @@ export default function KnowledgeUploadPage() {
                 </div>
               </>
             )}
+          </div>
+
+          {/* Keep/Delete File Option */}
+          <div className="mt-6 mb-6 p-4 bg-zinc-50 rounded-lg border border-zinc-200">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={keepFiles}
+                onChange={(e) => setKeepFiles(e.target.checked)}
+                className="w-5 h-5 rounded border-zinc-300 text-lexa-navy focus:ring-lexa-gold"
+              />
+              <div className="flex-1">
+                <p className="font-semibold text-lexa-navy">Keep original files after extraction</p>
+                <p className="text-sm text-zinc-600 mt-1">
+                  {keepFiles ? (
+                    <>
+                      <span className="text-green-600 font-medium">✓ Files will be stored</span> - You can download them later
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-orange-600 font-medium">Files will be deleted</span> - Only extracted data is saved (recommended for privacy)
+                    </>
+                  )}
+                </p>
+              </div>
+            </label>
           </div>
 
           <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">

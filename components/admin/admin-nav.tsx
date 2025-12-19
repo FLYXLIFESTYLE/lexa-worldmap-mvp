@@ -72,6 +72,12 @@ const adminPages = [
     href: '/admin/knowledge/scraped-urls',
     icon: '🌐',
     description: 'Manage scraped content'
+  },
+  {
+    name: 'Upload History',
+    href: '/admin/knowledge/history',
+    icon: '📊',
+    description: 'Track file uploads'
   }
 ];
 

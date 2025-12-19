@@ -40,6 +40,13 @@ export default function KnowledgePortalPage() {
     },
     // Second Row
     {
+      icon: '📊',
+      title: 'Upload History',
+      description: 'Track all file uploads with extraction statistics and manage files',
+      action: () => router.push('/admin/knowledge/history'),
+      color: 'from-indigo-500 to-indigo-600',
+    },
+    {
       icon: '💬',
       title: 'ChatNeo4j',
       description: 'Ask questions in plain English about your travel database - AI insights',
