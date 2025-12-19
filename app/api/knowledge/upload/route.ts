@@ -126,10 +126,22 @@ export async function POST(req: Request) {
     for (const conv of toProcess) {
       const extracted = await processConversation(conv);
       
-      // Collect extracted entities
-      extracted.destinations?.forEach(d => extractedDestinations.add(d.name));
-      extracted.activities?.forEach(a => extractedActivities.add(a.name));
-      extracted.themes?.forEach(t => extractedThemes.add(t.name));
+      // Collect extracted entities from POIs and relationships
+      extracted.pois?.forEach(poi => {
+        if (poi.destination) extractedDestinations.add(poi.destination);
+      });
+      
+      extracted.relationships?.forEach(rel => {
+        if (rel.relationType === 'SUPPORTS_ACTIVITY' && rel.toType === 'activity') {
+          extractedActivities.add(rel.to);
+        }
+        if (rel.relationType === 'HAS_THEME' && rel.toType === 'theme') {
+          extractedThemes.add(rel.to);
+        }
+        if (rel.toType === 'destination') {
+          extractedDestinations.add(rel.to);
+        }
+      });
       
       // Ingest to Neo4j with attribution
       const stats = await ingestKnowledge(extracted, {
