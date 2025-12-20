@@ -316,11 +316,11 @@ export const lexaAPI = new LexaAPIClient();
  */
 export function extractContextFromBuilder(builderState: any) {
   return {
-    destination: builderState.destination?.name || null,
-    theme: builderState.theme?.name || null,
+    destination: builderState.destination?.name || undefined,
+    theme: builderState.theme?.name || undefined,
     time: builderState.time?.month
       ? `${builderState.time.month} ${builderState.time.year}`
-      : null,
+      : undefined,
   };
 }
 
