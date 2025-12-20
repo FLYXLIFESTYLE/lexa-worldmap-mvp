@@ -93,8 +93,8 @@ export default function ExperienceBuilderPage() {
       checkSeasonalCompatibility(month, builderState.destination.name);
     }
     
-    // Return to main builder page to see selections
-    setCurrentStep('main_builder');
+    // Return to review page to see selections
+    setCurrentStep('review');
   };
 
   // Handle destination selection
@@ -109,8 +109,8 @@ export default function ExperienceBuilderPage() {
       checkSeasonalCompatibility(builderState.time.month, destination);
     }
     
-    // Return to main builder page to see selections
-    setCurrentStep('main_builder');
+    // Return to review page to see selections
+    setCurrentStep('review');
   };
 
   // Handle theme selection
@@ -120,8 +120,8 @@ export default function ExperienceBuilderPage() {
       theme: { name: theme, defined: true },
     });
     
-    // Return to main builder page to see selections
-    setCurrentStep('main_builder');
+    // Return to review page to see selections
+    setCurrentStep('review');
   };
 
   // Check seasonal compatibility
@@ -335,15 +335,37 @@ export default function ExperienceBuilderPage() {
   // Render destination selection
   if (currentStep === 'destination') {
     const destinations = [
-      { name: 'French Riviera', region: 'France', description: 'Glamour & sophistication', image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400&h=300&fit=crop' },
-      { name: 'Amalfi Coast', region: 'Italy', description: 'Dramatic beauty & dolce vita', image: 'https://images.unsplash.com/photo-1534113414509-0b167ead4f7c?w=400&h=300&fit=crop' },
-      { name: 'Monaco', region: 'Monaco', description: 'Ultimate luxury & prestige', image: 'https://images.unsplash.com/photo-1605559911160-a3d95d213904?w=400&h=300&fit=crop' },
-      { name: 'St. Tropez', region: 'France', description: 'Chic Mediterranean escape', image: 'https://images.unsplash.com/photo-1590073844006-33379778ae09?w=400&h=300&fit=crop' },
-      { name: 'Cannes', region: 'France', description: 'Film festival elegance', image: 'https://images.unsplash.com/photo-1583037189850-1921ae7c6c22?w=400&h=300&fit=crop' },
-      { name: 'Nice', region: 'France', description: 'Culture & Riviera charm', image: 'https://images.unsplash.com/photo-1541364983171-a8ba01e95cfc?w=400&h=300&fit=crop' },
-      { name: 'Adriatic Coast', region: 'Croatia', description: 'Hidden gems & crystal waters', image: 'https://images.unsplash.com/photo-1555990538-c3157b799ea4?w=400&h=300&fit=crop' },
-      { name: 'Cyclades', region: 'Greece', description: 'Iconic islands & azure seas', image: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=400&h=300&fit=crop' },
-      { name: 'Balearics', region: 'Spain', description: 'Mediterranean paradise', image: 'https://images.unsplash.com/photo-1562059392-096320bccc7e?w=400&h=300&fit=crop' },
+      // Mediterranean - French Riviera
+      { name: 'Monaco', region: 'French Riviera', country: 'Monaco', description: 'Ultimate luxury & prestige', image: 'https://images.unsplash.com/photo-1605559911160-a3d95d213904?w=400&h=300&fit=crop' },
+      { name: 'Cannes', region: 'French Riviera', country: 'France', description: 'Film festival elegance', image: 'https://images.unsplash.com/photo-1583037189850-1921ae7c6c22?w=400&h=300&fit=crop' },
+      { name: 'Nice', region: 'French Riviera', country: 'France', description: 'Culture & Riviera charm', image: 'https://images.unsplash.com/photo-1541364983171-a8ba01e95cfc?w=400&h=300&fit=crop' },
+      { name: 'St. Tropez', region: 'French Riviera', country: 'France', description: 'Chic Mediterranean escape', image: 'https://images.unsplash.com/photo-1590073844006-33379778ae09?w=400&h=300&fit=crop' },
+      
+      // Mediterranean - Italy
+      { name: 'Amalfi Coast', region: 'Southern Italy', country: 'Italy', description: 'Dramatic beauty & dolce vita', image: 'https://images.unsplash.com/photo-1534113414509-0b167ead4f7c?w=400&h=300&fit=crop' },
+      { name: 'Lake Como', region: 'Northern Italy', country: 'Italy', description: 'Alpine lakes & Italian elegance', image: 'https://images.unsplash.com/photo-1520711651678-77360f8d95bb?w=400&h=300&fit=crop' },
+      { name: 'Tuscany', region: 'Central Italy', country: 'Italy', description: 'Rolling hills & wine estates', image: 'https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?w=400&h=300&fit=crop' },
+      
+      // Mediterranean - Greece
+      { name: 'Santorini', region: 'Cyclades', country: 'Greece', description: 'Iconic sunsets & white villages', image: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=400&h=300&fit=crop' },
+      { name: 'Mykonos', region: 'Cyclades', country: 'Greece', description: 'Cosmopolitan island energy', image: 'https://images.unsplash.com/photo-1601581987809-a874a81309c9?w=400&h=300&fit=crop' },
+      
+      // Mediterranean - Spain
+      { name: 'Ibiza', region: 'Balearics', country: 'Spain', description: 'Beach clubs & Mediterranean magic', image: 'https://images.unsplash.com/photo-1562059392-096320bccc7e?w=400&h=300&fit=crop' },
+      { name: 'Mallorca', region: 'Balearics', country: 'Spain', description: 'Secluded coves & mountain charm', image: 'https://images.unsplash.com/photo-1610640278600-67ec2c2c4a25?w=400&h=300&fit=crop' },
+      
+      // Mediterranean - Croatia
+      { name: 'Dubrovnik', region: 'Adriatic Coast', country: 'Croatia', description: 'Medieval walls & azure seas', image: 'https://images.unsplash.com/photo-1555990538-c3157b799ea4?w=400&h=300&fit=crop' },
+      
+      // Middle East
+      { name: 'Dubai', region: 'Arabian Gulf', country: 'UAE', description: 'Ultra-modern luxury', image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400&h=300&fit=crop' },
+      { name: 'Abu Dhabi', region: 'Arabian Gulf', country: 'UAE', description: 'Cultural sophistication', image: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?w=400&h=300&fit=crop' },
+      
+      // Caribbean
+      { name: 'St. Barts', region: 'Caribbean', country: 'France', description: 'French Caribbean elegance', image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=300&fit=crop' },
+      
+      // Indian Ocean
+      { name: 'Maldives', region: 'Indian Ocean', country: 'Maldives', description: 'Overwater paradise', image: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=400&h=300&fit=crop' },
     ];
 
     return (
@@ -399,7 +421,7 @@ export default function ExperienceBuilderPage() {
                 {/* Content */}
                 <div className="absolute inset-0 p-6 flex flex-col justify-end text-left">
                   <h3 className="text-2xl font-bold text-white mb-1">{dest.name}</h3>
-                  <p className="text-sm text-lexa-gold mb-2">{dest.region}</p>
+                  <p className="text-sm text-lexa-gold mb-2">{dest.region} • {dest.country}</p>
                   <p className="text-sm text-zinc-300">{dest.description}</p>
                 </div>
                 
