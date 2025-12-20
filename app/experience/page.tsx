@@ -93,8 +93,8 @@ export default function ExperienceBuilderPage() {
       checkSeasonalCompatibility(month, builderState.destination.name);
     }
     
-    // Return to main selection page
-    setCurrentStep('choose_entry');
+    // Return to main builder page to see selections
+    setCurrentStep('main_builder');
   };
 
   // Handle destination selection
@@ -109,8 +109,8 @@ export default function ExperienceBuilderPage() {
       checkSeasonalCompatibility(builderState.time.month, destination);
     }
     
-    // Return to main selection page
-    setCurrentStep('choose_entry');
+    // Return to main builder page to see selections
+    setCurrentStep('main_builder');
   };
 
   // Handle theme selection
@@ -120,8 +120,8 @@ export default function ExperienceBuilderPage() {
       theme: { name: theme, defined: true },
     });
     
-    // Return to main selection page
-    setCurrentStep('choose_entry');
+    // Return to main builder page to see selections
+    setCurrentStep('main_builder');
   };
 
   // Check seasonal compatibility
@@ -422,6 +422,12 @@ export default function ExperienceBuilderPage() {
       { name: 'Adventure Quest', icon: '⛰️', description: 'Thrills & exploration' },
       { name: 'Cultural Immersion', icon: '🎨', description: 'Art, history & heritage' },
       { name: 'Pure Indulgence', icon: '💎', description: 'Ultimate luxury & pampering' },
+      { name: 'Yacht & Sailing', icon: '⛵', description: 'Private cruising & coastal luxury' },
+      { name: 'Beach & Sun', icon: '🏖️', description: 'Pristine shores & azure waters' },
+      { name: 'Alpine Retreat', icon: '🏔️', description: 'Mountain luxury & winter sports' },
+      { name: 'City Sophistication', icon: '🌆', description: 'Urban elegance & nightlife' },
+      { name: 'Island Paradise', icon: '🏝️', description: 'Tropical seclusion & serenity' },
+      { name: 'Wine & Vineyard', icon: '🍷', description: 'Oenophile experiences & estates' },
     ];
 
     return (
