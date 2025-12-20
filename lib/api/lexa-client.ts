@@ -148,10 +148,48 @@ class LexaAPIClient {
    * Create a new client account
    */
   async createAccount(data: AccountCreateRequest): Promise<AccountResponse> {
-    return this.request<AccountResponse>('/api/ailessia/account/create', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await this.request<AccountResponse>('/api/ailessia/account/create', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      
+      // Store the real account info
+      saveToLocalStorage('lexa_account', {
+        account_id: response.account_id,
+        session_id: response.session_id,
+        email: response.email,
+        name: response.name,
+      });
+      
+      return response;
+    } catch (error) {
+      console.error('Backend account creation failed, creating offline fallback:', error);
+      
+      // Generate a valid UUID v4 for offline mode
+      const uuid = crypto.randomUUID();
+      const offlineAccount = {
+        account_id: uuid,
+        session_id: `session-${uuid}`,
+        email: data.email,
+        name: data.name || data.email.split('@')[0],
+        personality_archetype: null,
+        vip_status: 'General',
+        total_scripts_created: 0,
+        ailessia_greeting: null,
+      };
+      
+      // Store offline account
+      saveToLocalStorage('lexa_account', {
+        account_id: offlineAccount.account_id,
+        session_id: offlineAccount.session_id,
+        email: offlineAccount.email,
+        name: offlineAccount.name,
+        offline: true, // Mark as offline
+      });
+      
+      return offlineAccount as AccountResponse;
+    }
   }
 
   /**

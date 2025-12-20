@@ -37,42 +37,17 @@ export default function SignUpPage() {
 
       if (authError) throw authError;
 
-      // 2. Create LEXA account in backend
-      try {
-        const lexaAccount = await lexaAPI.createAccount({
-          email,
-          name: email.split('@')[0], // Use email prefix as name for now
-        });
+      // 2. Create LEXA account in backend (with automatic fallback to UUID if offline)
+      const lexaAccount = await lexaAPI.createAccount({
+        email,
+        name: email.split('@')[0], // Use email prefix as name for now
+      });
 
-        // 3. Save account info to localStorage
-        saveToLocalStorage('lexa_account', {
-          account_id: lexaAccount.account_id,
-          session_id: lexaAccount.session_id,
-          email: lexaAccount.email,
-          name: lexaAccount.name,
-        });
-
-        console.log('✅ LEXA account created successfully:', {
-          account_id: lexaAccount.account_id,
-          session_id: lexaAccount.session_id
-        });
-      } catch (apiError: any) {
-        console.warn('⚠️ Backend API unavailable, creating offline account:', apiError.message);
-        
-        // Fallback: Create temporary account in localStorage
-        // This will be synced when backend becomes available
-        const tempAccount = {
-          account_id: `temp-${Date.now()}`,
-          session_id: `session-${Date.now()}`,
-          email: email,
-          name: email.split('@')[0],
-          is_temp: true
-        };
-        
-        saveToLocalStorage('lexa_account', tempAccount);
-        
-        console.log('✅ Temporary account created (will sync later):', tempAccount);
-      }
+      console.log('✅ LEXA account created:', {
+        account_id: lexaAccount.account_id,
+        session_id: lexaAccount.session_id,
+        offline: (lexaAccount as any).offline || false
+      });
 
       setSuccess(true);
       
