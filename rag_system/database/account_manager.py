@@ -115,7 +115,8 @@ class AccountManager:
         personality_archetype: Optional[str] = None,
         emotional_profile: Optional[Dict] = None,
         communication_preferences: Optional[Dict] = None,
-        buying_patterns: Optional[Dict] = None
+        buying_patterns: Optional[Dict] = None,
+        archetype_weights: Optional[Dict] = None
     ) -> Dict:
         """
         Update client's emotional profile (AIlessia's learning).
@@ -126,6 +127,7 @@ class AccountManager:
             emotional_profile: Emotional patterns learned
             communication_preferences: Communication preferences
             buying_patterns: Purchase behavior patterns
+            archetype_weights: Multi-dimensional archetype weights (6D personality vector)
         
         Returns:
             Updated account data
@@ -141,6 +143,8 @@ class AccountManager:
                 update_data["communication_preferences"] = communication_preferences
             if buying_patterns:
                 update_data["buying_patterns"] = buying_patterns
+            if archetype_weights:
+                update_data["archetype_weights"] = archetype_weights
             
             result = self.supabase.table("client_accounts").update(update_data).eq("id", account_id).execute()
             
