@@ -1,7 +1,22 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AdminNav from '@/components/admin/admin-nav';
+
+interface Stat {
+  value: number;
+  formatted: string;
+  label: string;
+  percentage?: number;
+}
+
+interface DashboardStats {
+  totalPOIs: Stat;
+  luxuryPOIs: Stat;
+  totalRelations: Stat;
+  totalClients: Stat;
+}
 
 const adminTools = [
   {
@@ -116,14 +131,73 @@ const adminTools = [
   }
 ];
 
-const quickStats = [
-  { label: 'Total POIs', value: '203,000+', icon: '📍', link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb' },
-  { label: 'Luxury POIs', value: '50,000+', icon: '💎', link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb' },
-  { label: 'Destinations', value: '256', icon: '🏙️', link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb' },
-  { label: 'Activities', value: '384K+', icon: '🎯', link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb' }
-];
-
 export default function AdminDashboard() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch stats on mount
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch('/api/admin/stats');
+      const data = await response.json();
+      
+      if (data.success) {
+        setStats(data.stats);
+      } else {
+        setError(data.error || 'Failed to fetch statistics');
+      }
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+      setError('Failed to connect to API');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const quickStats = [
+    { 
+      label: 'Total POIs', 
+      value: stats?.totalPOIs.formatted || '...',
+      rawValue: stats?.totalPOIs.value || 0,
+      icon: '📍', 
+      link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb',
+      color: 'blue'
+    },
+    { 
+      label: 'Luxury POIs', 
+      value: stats?.luxuryPOIs.formatted || '...',
+      rawValue: stats?.luxuryPOIs.value || 0,
+      percentage: stats?.luxuryPOIs.percentage,
+      icon: '💎', 
+      link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb',
+      color: 'purple'
+    },
+    { 
+      label: 'Total Relations', 
+      value: stats?.totalRelations.formatted || '...',
+      rawValue: stats?.totalRelations.value || 0,
+      icon: '🔗', 
+      link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb',
+      color: 'green'
+    },
+    { 
+      label: 'Total Clients', 
+      value: stats?.totalClients.formatted || '...',
+      rawValue: stats?.totalClients.value || 0,
+      icon: '👥', 
+      link: 'https://console-preview.neo4j.io/tools/dashboards/2e6AFJReMaPttnBcT3YW?page=z69tCEIMTxsyG3FrnAwb',
+      color: 'orange'
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -155,25 +229,77 @@ export default function AdminDashboard() {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          {quickStats.map((stat) => (
-            <a 
-              key={stat.label} 
-              href={stat.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                  <p className="text-xs text-blue-600 mt-1">View in Neo4j →</p>
+          {loading ? (
+            // Loading skeletons
+            [1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                    <div className="h-8 bg-gray-200 rounded w-16"></div>
+                  </div>
+                  <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
                 </div>
-                <div className="text-4xl">{stat.icon}</div>
               </div>
-            </a>
-          ))}
+            ))
+          ) : error ? (
+            // Error state
+            <div className="col-span-4 bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+              <p className="text-red-800 mb-2">⚠️ Failed to load statistics</p>
+              <p className="text-sm text-red-600 mb-4">{error}</p>
+              <button
+                onClick={fetchStats}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            // Live stats
+            quickStats.map((stat) => (
+              <a 
+                key={stat.label} 
+                href={stat.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
+                    <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                    {stat.percentage !== undefined && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {stat.percentage}% of total
+                      </p>
+                    )}
+                    <p className="text-xs text-blue-600 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      View in Neo4j →
+                    </p>
+                  </div>
+                  <div className="text-4xl">{stat.icon}</div>
+                </div>
+                {/* Placeholder for day-over-day change (coming soon) */}
+                {/* <div className="mt-3 pt-3 border-t border-gray-100">
+                  <span className="text-xs text-green-600">↑ +5.2% from yesterday</span>
+                </div> */}
+              </a>
+            ))
+          )}
         </div>
+
+        {/* Refresh Button */}
+        {!loading && stats && (
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={fetchStats}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <span>🔄</span>
+              <span>Refresh Stats</span>
+            </button>
+          </div>
+        )}
 
         {/* Quick Actions - MOVED ABOVE TOOLS */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
