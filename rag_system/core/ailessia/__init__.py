@@ -1,0 +1,2 @@
+# AIlessia - Emotional Intelligence Core
+
