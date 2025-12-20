@@ -8,6 +8,8 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Sparkles } from 'lucide-react';
+import { lexaAPI, saveToLocalStorage } from '@/lib/api/lexa-client';
 
 export default function SignUpPage() {
   const [email, setEmail] = useState('');
@@ -24,7 +26,8 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      // 1. Create Supabase auth account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -32,13 +35,50 @@ export default function SignUpPage() {
         },
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
+
+      // 2. Create LEXA account in backend
+      try {
+        const lexaAccount = await lexaAPI.createAccount({
+          email,
+          name: email.split('@')[0], // Use email prefix as name for now
+        });
+
+        // 3. Save account info to localStorage
+        saveToLocalStorage('lexa_account', {
+          account_id: lexaAccount.account_id,
+          session_id: lexaAccount.session_id,
+          email: lexaAccount.email,
+          name: lexaAccount.name,
+        });
+
+        console.log('✅ LEXA account created successfully:', {
+          account_id: lexaAccount.account_id,
+          session_id: lexaAccount.session_id
+        });
+      } catch (apiError: any) {
+        console.warn('⚠️ Backend API unavailable, creating offline account:', apiError.message);
+        
+        // Fallback: Create temporary account in localStorage
+        // This will be synced when backend becomes available
+        const tempAccount = {
+          account_id: `temp-${Date.now()}`,
+          session_id: `session-${Date.now()}`,
+          email: email,
+          name: email.split('@')[0],
+          is_temp: true
+        };
+        
+        saveToLocalStorage('lexa_account', tempAccount);
+        
+        console.log('✅ Temporary account created (will sync later):', tempAccount);
+      }
 
       setSuccess(true);
       
-      // Auto sign in after signup
+      // Auto sign in and redirect to experience builder
       setTimeout(() => {
-        router.push('/app');
+        router.push('/experience');
         router.refresh();
       }, 1500);
     } catch (error: any) {
@@ -91,6 +131,28 @@ export default function SignUpPage() {
           </Link>
           <h2 className="mb-2 text-3xl font-bold text-white">Begin Your Journey</h2>
           <p className="text-zinc-400">Create your personal experience account</p>
+        </div>
+
+        {/* Why Account Explanation */}
+        <div className="mb-6 rounded-2xl bg-white/5 backdrop-blur-lg border border-white/10 p-6">
+          <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-lexa-gold" />
+            Why do I need an account?
+          </h3>
+          <ul className="space-y-2 text-sm text-zinc-300">
+            <li className="flex items-start gap-2">
+              <span className="text-lexa-gold mt-0.5">•</span>
+              <span><strong>Highly individualized conversations:</strong> LEXA learns your unique emotional profile to design experiences that truly resonate with you.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-lexa-gold mt-0.5">•</span>
+              <span><strong>No mixed archetypes:</strong> For brokers and agents, keeping client profiles separate ensures each person gets recommendations tailored to *their* desires—not someone else's.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-lexa-gold mt-0.5">•</span>
+              <span><strong>Lifetime tracking:</strong> When you book through LEXA, your assigned broker earns commission for life—fair recognition for the relationship.</span>
+            </li>
+          </ul>
         </div>
 
         {/* Form Card */}
