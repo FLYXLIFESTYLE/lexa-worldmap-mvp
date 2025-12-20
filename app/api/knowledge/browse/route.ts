@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
 
+export const runtime = 'nodejs';
+
 export async function GET() {
   try {
     const supabase = await createClient();

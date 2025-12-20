@@ -13,6 +13,24 @@ import {
 import { getCurrentUserAttribution } from '@/lib/knowledge/track-contribution';
 import { createClient } from '@supabase/supabase-js';
 
+export const runtime = 'nodejs';
+
+const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25MB limit to protect server
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'text/plain',
+  'application/json',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword'
+]);
+const ALLOWED_EXTENSIONS = new Set(['pdf', 'txt', 'json', 'docx', 'doc']);
+
+function isAllowedFile(file: File): boolean {
+  const name = file.name || '';
+  const ext = name.split('.').pop()?.toLowerCase() || '';
+  return ALLOWED_MIME_TYPES.has(file.type) || ALLOWED_EXTENSIONS.has(ext);
+}
+
 export async function POST(req: Request) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,6 +48,20 @@ export async function POST(req: Request) {
     if (!file) {
       return NextResponse.json(
         { error: 'No file provided' },
+        { status: 400 }
+      );
+    }
+
+    if (!isAllowedFile(file)) {
+      return NextResponse.json(
+        { error: 'Unsupported file type', details: 'Allowed: pdf, docx, doc, txt, json' },
+        { status: 400 }
+      );
+    }
+
+    if (file.size > MAX_FILE_BYTES) {
+      return NextResponse.json(
+        { error: 'File too large', details: 'Max size is 25MB' },
         { status: 400 }
       );
     }

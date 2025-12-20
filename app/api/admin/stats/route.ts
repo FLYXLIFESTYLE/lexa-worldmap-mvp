@@ -7,6 +7,8 @@ import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
 import { createClient } from '@/lib/supabase/server';
 
+export const runtime = 'nodejs';
+
 export async function GET() {
   try {
     // Authentication (keeps stats private to logged-in admins/captains)

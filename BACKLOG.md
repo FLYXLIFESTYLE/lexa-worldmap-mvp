@@ -101,6 +101,7 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
 - [ ] **Input Validation & Sanitization** - Prevent injection attacks (Complexity: Medium)
 - [ ] **Rate Limiting** - Prevent abuse and API overuse (Complexity: Medium)
 - [ ] **Audit Logging** - Track all admin actions (Complexity: Low)
+- [ ] **Upload Hardening** - Enforce AV/PII scan + strict mimetypes/size, auto-delete when `keep_file=false` using `delete_after` (Complexity: Medium)
 
 ### **Features**
 - [ ] **User Profile Management** - Store user preferences, past searches, favorites (Complexity: Medium)
@@ -357,9 +358,15 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
 - [ ] **Batch Edit Knowledge Entries** - Edit multiple entries at once (Complexity: Medium)
 - [ ] **Add Undo/Redo to Knowledge Editor** - Prevent accidental loss (Complexity: Low)
 
+### **Observability & QA** ⭐ NEW
+- [ ] **Dashboard Day-over-Day KPIs** - Add `stats_history` table + nightly snapshot + API delta + UI arrows (Complexity: Medium)
+- [ ] **RAG Regression Harness** - Golden Q/A set hitting Neo4j+embeddings; alert on quality drops (Complexity: Medium)
+- [ ] **Ingestion Telemetry** - Track chunk counts, token sizes, and failure rates per upload to spot bad ingestions (Complexity: Medium)
+
 ### **Data Quality**
 - [ ] **Add POI Images** - Scrape/store representative images (Complexity: Medium)
 - [ ] **Validate Coordinates** - Check if lat/lon are in correct region (Complexity: Low)
+- [ ] **Geo Validation Guardrails** - Reject out-of-range lat/lon on create/update; normalize country/ISO where available (Complexity: Low)
 - [ ] **Add Opening Hours** - Enrich POIs with operating hours (Complexity: Medium)
 - [ ] **Price Level Validation** - Ensure price_level consistency (Complexity: Low)
 - [ ] **Phone Number Standardization** - Format phone numbers consistently (Complexity: Low)

@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
 import { createClient } from '@/lib/supabase/server';
 
+export const runtime = 'nodejs';
+
 interface POIDetail {
   poi_uid: string;
   name: string;

@@ -10,6 +10,8 @@ import { getNeo4jDriver } from '@/lib/neo4j/client';
 import { createClient } from '@/lib/supabase/server';
 import * as neo4j from 'neo4j-driver';
 
+export const runtime = 'nodejs';
+
 interface DestinationStats {
   destination: string;
   total_pois: number;

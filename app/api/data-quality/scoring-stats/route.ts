@@ -5,8 +5,19 @@
 
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
+import { createClient } from '@/lib/supabase/server';
+
+export const runtime = 'nodejs';
 
 export async function GET() {
+  // Authentication gate: admin/captain only
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const driver = getNeo4jDriver();
   const session = driver.session();
 

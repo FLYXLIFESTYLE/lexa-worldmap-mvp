@@ -10,6 +10,8 @@ import { getNeo4jDriver } from '@/lib/neo4j/client';
 import { createClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 
+export const runtime = 'nodejs';
+
 interface CreatePOIRequest {
   name: string;
   type: string;
@@ -52,10 +54,20 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    if (!poiData.lat || !poiData.lon) {
+    const lat = Number(poiData.lat);
+    const lon = Number(poiData.lon);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
       return NextResponse.json({
-        error: 'Missing coordinates',
-        message: 'lat and lon are required'
+        error: 'Invalid coordinates',
+        message: 'lat and lon must be valid numbers'
+      }, { status: 400 });
+    }
+
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      return NextResponse.json({
+        error: 'Coordinates out of range',
+        message: 'lat must be between -90 and 90, lon between -180 and 180'
       }, { status: 400 });
     }
 
