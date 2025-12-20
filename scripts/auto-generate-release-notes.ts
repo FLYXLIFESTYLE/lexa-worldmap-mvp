@@ -15,6 +15,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import * as dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -319,7 +320,19 @@ async function main() {
 }
 
 // Run if called directly
-if (require.main === module) {
+const isCalledDirectly = (() => {
+  try {
+    if (!process.argv[1]) return false;
+    const invokedPath = path.resolve(process.argv[1]);
+    const thisFilePath = path.resolve(fileURLToPath(import.meta.url));
+    return invokedPath === thisFilePath;
+  } catch {
+    // If we can't reliably detect, default to running (safe for scheduled usage)
+    return true;
+  }
+})();
+
+if (isCalledDirectly) {
   main();
 }
 

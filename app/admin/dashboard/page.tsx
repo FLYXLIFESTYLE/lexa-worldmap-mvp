@@ -66,7 +66,7 @@ const adminTools = [
   },
   {
     id: 'documentation',
-    name: 'LEXA Architecture',
+    name: 'Platform Architecture',
     description: 'Complete system architecture, features, and technical documentation',
     icon: '📖',
     href: '/admin/documentation',
@@ -147,12 +147,22 @@ export default function AdminDashboard() {
       setError(null);
       
       const response = await fetch('/api/admin/stats');
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
       
-      if (data.success) {
-        setStats(data.stats);
+      if (!response.ok) {
+        const message =
+          data?.details ||
+          data?.error ||
+          `HTTP ${response.status}: Failed to fetch statistics`;
+        setError(message);
+        return;
+      }
+
+      if (data?.success) {
+        setStats(data.stats as DashboardStats);
       } else {
-        setError(data.error || 'Failed to fetch statistics');
+        const message = data?.details || data?.error || 'Failed to fetch statistics';
+        setError(message);
       }
     } catch (err) {
       console.error('Error fetching stats:', err);
@@ -247,6 +257,16 @@ export default function AdminDashboard() {
             <div className="col-span-4 bg-red-50 border border-red-200 rounded-lg p-6 text-center">
               <p className="text-red-800 mb-2">⚠️ Failed to load statistics</p>
               <p className="text-sm text-red-600 mb-4">{error}</p>
+              {error.toLowerCase().includes('unauthorized') && (
+                <div className="mb-4">
+                  <Link
+                    href="/auth/signin"
+                    className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition-colors"
+                  >
+                    Sign in to view stats
+                  </Link>
+                </div>
+              )}
               <button
                 onClick={fetchStats}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
