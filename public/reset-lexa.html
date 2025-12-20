@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset LEXA Account</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 3rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            max-width: 500px;
+        }
+        h1 {
+            color: #d4af37;
+            margin-bottom: 1rem;
+        }
+        button {
+            background: linear-gradient(135deg, #d4af37 0%, #f4c430 100%);
+            color: #1a1a2e;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 1rem;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        .info {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+        .success {
+            color: #4ade80;
+            font-weight: bold;
+        }
+        .warning {
+            color: #fbbf24;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+        .accounts {
+            margin-top: 1rem;
+            text-align: left;
+            background: rgba(0,0,0,0.3);
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Reset LEXA Account</h1>
+        
+        <div class="info">
+            <p>This will clear all stored account data and allow you to start fresh.</p>
+        </div>
+
+        <div id="current-data"></div>
+
+        <button onclick="resetAll()">🗑️ Clear All Data & Start Fresh</button>
+        
+        <button onclick="checkData()">🔍 Check Current Data</button>
+        
+        <button onclick="goHome()">🏠 Go to Home</button>
+
+        <div class="warning">
+            ⚠️ This will delete: localStorage data, sessionStorage, and cookies
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function checkData() {
+            const data = {
+                localStorage: {},
+                sessionStorage: {},
+            };
+
+            // Get all localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                try {
+                    data.localStorage[key] = JSON.parse(localStorage.getItem(key));
+                } catch {
+                    data.localStorage[key] = localStorage.getItem(key);
+                }
+            }
+
+            // Get all sessionStorage
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                try {
+                    data.sessionStorage[key] = JSON.parse(sessionStorage.getItem(key));
+                } catch {
+                    data.sessionStorage[key] = sessionStorage.getItem(key);
+                }
+            }
+
+            document.getElementById('current-data').innerHTML = `
+                <div class="accounts">
+                    <strong>Current Data:</strong><br><br>
+                    <strong>localStorage:</strong><br>
+                    ${JSON.stringify(data.localStorage, null, 2)}<br><br>
+                    <strong>sessionStorage:</strong><br>
+                    ${JSON.stringify(data.sessionStorage, null, 2)}
+                </div>
+            `;
+        }
+
+        function resetAll() {
+            // Clear all storage
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            // Clear all cookies
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+
+            document.getElementById('result').innerHTML = `
+                <div class="info success">
+                    ✅ All data cleared successfully!<br><br>
+                    You can now sign up with a fresh account.
+                </div>
+            `;
+
+            document.getElementById('current-data').innerHTML = '';
+
+            // Auto redirect after 2 seconds
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+        }
+
+        function goHome() {
+            window.location.href = '/';
+        }
+
+        // Check data on load
+        checkData();
+    </script>
+</body>
+</html>
+
