@@ -1,264 +1,100 @@
 [
   {
-    "id": "2025-12-20-01-25-release-notes-automation-docs",
+    "id": "2025-12-20-1734710400-landing-page-improvements",
     "date": "2025-12-20",
-    "timestamp": "2025-12-20T01:25:20.000Z",
-    "category": "documentation",
-    "title": "Comprehensive Release Notes Automation Documentation",
-    "description": "Added complete guide for automated release notes generation system implementation",
-    "details": "Created comprehensive documentation covering the complete solution for automated release notes generation, including setup instructions, configuration options, and integration guidelines for the AI-powered system.",
-    "author": "Christian Haack",
-    "isPublic": false,
-    "tags": [
-      "documentation",
-      "automation",
-      "release-notes",
-      "guide"
-    ],
-    "relatedFiles": [
-      "RELEASE_NOTES_COMPLETE_SOLUTION.md"
-    ],
-    "githubCommit": "9376043"
-  },
-  {
-    "id": "2025-12-20-01-23-auto-release-notes-system",
-    "date": "2025-12-20",
-    "timestamp": "2025-12-20T01:23:51.000Z",
-    "category": "feature",
-    "title": "Automated Release Notes Generation System",
-    "description": "Introduced AI-powered system for automatic generation and scheduling of release notes",
-    "details": "Implemented a complete automated release notes generation system featuring AI-powered analysis of git commits, TypeScript-based generation scripts, and PowerShell scheduling automation. The system can automatically analyze commit history, categorize changes, and generate properly formatted release notes.",
-    "author": "Christian Haack",
-    "isPublic": false,
-    "tags": [
-      "automation",
-      "ai",
-      "release-notes",
-      "scheduling",
-      "typescript"
-    ],
-    "relatedFiles": [
-      "AUTO_RELEASE_NOTES_GUIDE.md",
-      "scripts/auto-generate-release-notes.ts",
-      "scripts/schedule-auto-release-notes.ps1"
-    ],
-    "githubCommit": "25c282f"
-  },
-  {
-    "id": "2025-12-19-10-37-release-notes-format-fix",
-    "date": "2025-12-19",
-    "timestamp": "2025-12-19T10:37:38.000Z",
-    "category": "bugfix",
-    "title": "Release Notes Schema Format Correction",
-    "description": "Fixed release notes format to match expected JSON schema structure",
-    "details": "Corrected the release notes format for December 19th to ensure compliance with the expected schema structure, addressing formatting inconsistencies that could cause parsing errors.",
-    "author": "Christian Haack",
-    "isPublic": false,
-    "tags": [
-      "bugfix",
-      "schema",
-      "format",
-      "release-notes"
-    ],
-    "relatedFiles": [
-      "docs/release-notes/2025-12-19.json"
-    ],
-    "githubCommit": "d54fd1a"
-  },
-  {
-    "id": "2025-12-19-10-13-build-documentation",
-    "date": "2025-12-19",
-    "timestamp": "2025-12-19T10:13:39.000Z",
-    "category": "documentation",
-    "title": "Build Fix and Release Notes Documentation",
-    "description": "Added documentation explaining recent build fixes and release notes process",
-    "details": "Created comprehensive documentation covering recent TypeScript build error resolutions and detailed explanation of the release notes generation and management process.",
-    "author": "Christian Haack",
-    "isPublic": false,
-    "tags": [
-      "documentation",
-      "build",
-      "release-notes",
-      "typescript"
-    ],
-    "relatedFiles": [
-      "BUILD_FIX_AND_RELEASE_NOTES.md"
-    ],
-    "githubCommit": "5b7f2ed"
-  },
-  {
-    "id": "2025-12-19-10-12-upload-route-typescript-fix",
-    "date": "2025-12-19",
-    "timestamp": "2025-12-19T10:12:08.000Z",
-    "category": "bugfix",
-    "title": "TypeScript Build Error Resolution",
-    "description": "Fixed TypeScript compilation error in knowledge upload API route",
-    "details": "Resolved TypeScript build error in the knowledge upload route that was preventing successful compilation. The fix addresses type safety issues and ensures proper error handling in the upload functionality.",
-    "author": "Christian Haack",
-    "isPublic": false,
-    "tags": [
-      "bugfix",
-      "typescript",
-      "api",
-      "upload"
-    ],
-    "relatedFiles": [
-      "app/api/knowledge/upload/route.ts",
-      "docs/release-notes/2025-12-19.json"
-    ],
-    "githubCommit": "a2c5faa"
-  },
-  {
-    "id": "2025-12-19-10-03-upload-tracking-documentation",
-    "date": "2025-12-19",
-    "timestamp": "2025-12-19T10:03:57.000Z",
-    "category": "documentation",
-    "title": "Complete Upload Tracking System Documentation",
-    "description": "Finalized comprehensive documentation for the upload tracking system",
-    "details": "Completed detailed documentation covering the entire upload tracking system implementation, including architecture overview, API endpoints, database schema, and usage instructions.",
-    "author": "Christian Haack",
-    "isPublic": false,
-    "tags": [
-      "documentation",
-      "upload",
-      "tracking",
-      "system"
-    ],
-    "relatedFiles": [
-      "UPLOAD_TRACKING_COMPLETE.md"
-    ],
-    "githubCommit": "cca8509"
-  },
-  {
-    "id": "2025-12-19-10-02-upload-tracking-system",
-    "date": "2025-12-19",
-    "timestamp": "2025-12-19T10:02:02.000Z",
-    "category": "feature",
-    "title": "Complete Upload Tracking System with History Management",
-    "description": "Implemented comprehensive file upload tracking with history, deletion, and storage management",
-    "details": "Built a complete upload tracking system featuring upload history management, file deletion capabilities, and flexible storage options. The system includes admin interfaces for managing uploads, API endpoints for tracking operations, database migration support, and enhanced navigation. Users can now view upload history, manage stored files, and administrators have full control over the upload lifecycle.",
-    "author": "Christian Haack",
+    "timestamp": "2025-12-20T12:00:00.000Z",
+    "category": "enhancement",
+    "title": "Landing Page Branding & Messaging Improvements",
+    "description": "Updated LEXA landing page with improved branding, clearer value proposition, and user benefits.",
+    "details": "Redesigned the landing page to better communicate LEXA's value:\n- Added BETA badge to LEXA logo (rotated 12°)\n- Updated main tagline: 'Luxury Experience Assistant - Emotional Intelligence for Luxury Travel'\n- Enhanced user benefit descriptions\n- Revised feature grid: Perceptive, Anticipatory, Precise\n- Added placeholders for Latest Experience Scripts, Blog Posts, and Theme Categories\n- Improved overall messaging to be more inviting and explanatory",
+    "author": "Frontend Team",
     "isPublic": true,
-    "tags": [
-      "feature",
-      "upload",
-      "tracking",
-      "history",
-      "admin",
-      "storage"
-    ],
-    "relatedFiles": [
-      "RUN_MIGRATION_INSTRUCTIONS.md",
-      "app/admin/knowledge/history/page.tsx",
-      "app/admin/knowledge/page.tsx",
-      "app/admin/knowledge/upload/page.tsx",
-      "app/api/admin/uploads/[id]/route.ts",
-      "app/api/admin/uploads/route.ts",
-      "app/api/knowledge/upload/route.ts",
-      "components/admin/admin-nav.tsx",
-      "scripts/run-migration-upload-tracking.ts"
-    ],
-    "githubCommit": "3fab124"
+    "tags": ["landing-page", "branding", "ux", "messaging"],
+    "relatedFiles": ["app/page.tsx"],
+    "githubCommit": "c4eaec1"
   },
   {
-    "id": "2025-12-20-013908-complete-rag-system-ailessia",
+    "id": "2025-12-20-1734710460-account-creation-explanation",
     "date": "2025-12-20",
-    "timestamp": "2025-12-20T01:39:08.000Z",
+    "timestamp": "2025-12-20T12:01:00.000Z",
     "category": "feature",
-    "title": "Complete RAG System with AILESSIA Emotional AI",
-    "description": "Comprehensive travel recommendation engine with emotional AI, anti-hallucination features, and personalized travel planning capabilities",
-    "details": "Added a complete Retrieval-Augmented Generation (RAG) system featuring AILESSIA emotional AI engine with personality mirroring, weighted archetype calculations, and comprehensive travel recommendations. Includes Neo4j graph database integration, Supabase vector storage, anti-hallucination safety measures, confidence scoring, and PDF script generation. The system provides personalized travel experiences based on emotional intelligence and user personality analysis.",
-    "author": "System",
+    "title": "Account Creation Explanation Panel",
+    "description": "Added clear explanation of why accounts are necessary during signup.",
+    "details": "New explanation panel on signup page answers 'Why do I need an account?' with three key reasons:\n1. Highly individualized conversations and experience script design\n2. Prevents mixed archetype results (separate accounts for brokers/agents)\n3. Assigns clients to brokers for life for commission tracking\n\nIncludes backend account sync upon successful Supabase signup with graceful error handling.",
+    "author": "Frontend Team",
     "isPublic": true,
-    "tags": [
-      "ai",
-      "travel",
-      "recommendations",
-      "emotional-ai",
-      "rag",
-      "personalization",
-      "neo4j",
-      "supabase"
-    ],
-    "relatedFiles": [
-      "rag_system/core/ailessia/emotion_interpreter.py",
-      "rag_system/core/ailessia/personality_mirror.py",
-      "rag_system/core/recommendations/poi_recommendation_service.py",
-      "rag_system/database/neo4j_client.py",
-      "rag_system/database/supabase_vector_client.py"
-    ],
-    "githubCommit": "b82648c"
+    "tags": ["signup", "onboarding", "ux", "transparency"],
+    "relatedFiles": ["app/auth/signup/page.tsx", "lib/api/lexa-client.ts"],
+    "githubCommit": "c4eaec1"
   },
   {
-    "id": "2025-12-20-012520-auto-release-notes-system",
+    "id": "2025-12-20-1734710520-experience-builder-redesign",
     "date": "2025-12-20",
-    "timestamp": "2025-12-20T01:25:20.000Z",
+    "timestamp": "2025-12-20T12:02:00.000Z",
+    "category": "feature",
+    "title": "Experience Builder Major UX Overhaul",
+    "description": "Completely redesigned the 3-step experience builder with year selection, seasonal warnings, back navigation, and visual improvements.",
+    "details": "Major improvements to the When/Where/What experience builder:\n\n**Year Selection & Validation:**\n- Added year dropdown to 'When' step (current year + next 5 years)\n- Validates against past dates (prevents booking in the past)\n- Clear date validation error messages\n\n**Seasonal Intelligence:**\n- Warnings for unsuitable destination/season combinations\n- Example: 'UAE in July can be extremely hot (45°C+). Consider October-April for more comfortable weather.'\n- Suggestions without blocking user choice\n\n**Navigation Improvements:**\n- Back buttons on all selection sub-pages\n- Persistent main page shows all selections\n- Easy navigation between When/Where/What choices\n- 'Suggest best option' buttons for AI recommendations\n\n**Visual Enhancements:**\n- Replaced emojis with high-quality Unsplash images\n- Improved destination cards with hover effects\n- Added more destinations (Adriatic Coast, Cyclades, Balearics)\n- Consistent card design across all steps\n\n**Approval Screen:**\n- Updated copy to set clear expectations for next step\n- Fixed redirect path to /experience/chat",
+    "author": "Frontend Team",
+    "isPublic": true,
+    "tags": ["experience-builder", "ux", "navigation", "validation", "seasonal-intelligence"],
+    "relatedFiles": ["app/experience/page.tsx"],
+    "githubCommit": "c4eaec1"
+  },
+  {
+    "id": "2025-12-20-1734710580-chat-interface-improvements",
+    "date": "2025-12-20",
+    "timestamp": "2025-12-20T12:03:00.000Z",
+    "category": "enhancement",
+    "title": "LEXA Chat Interface Redesign",
+    "description": "Improved chat interface with consistent LEXA branding, light/dark mode, and better quick reply explanations.",
+    "details": "Enhanced the LEXA conversation interface:\n\n**Branding Consistency:**\n- Replaced all 'AIlessia' references with 'LEXA'\n- Updated header, message badges, loading text, footer\n- Consistent branding throughout the chat experience\n\n**User Experience:**\n- Added explanation above quick reply buttons: '💡 Most frequent answers (or write your own below):'\n- Clarifies that quick replies are suggestions, not the only option\n- Light/Dark mode toggle for luxury appeal\n- Context-aware initial greeting based on builder selections\n\n**Backend Integration:**\n- Real-time conversation with AIfred backend via lexaAPI.converse\n- Session management and conversation history\n- Error handling with user-friendly messages",
+    "author": "Frontend Team",
+    "isPublic": true,
+    "tags": ["chat", "branding", "ux", "dark-mode", "lexa"],
+    "relatedFiles": ["app/experience/chat/page.tsx"],
+    "githubCommit": "c4eaec1"
+  },
+  {
+    "id": "2025-12-20-1734710640-frontend-backend-integration",
+    "date": "2025-12-20",
+    "timestamp": "2025-12-20T12:04:00.000Z",
     "category": "infrastructure",
-    "title": "Automatic Release Notes Generation System",
-    "description": "AI-powered automatic release notes generation with scheduling and comprehensive documentation",
-    "details": "Implemented an automated system for generating release notes using AI analysis of git commits. Features include TypeScript-based note generation, PowerShell scheduling scripts, and comprehensive documentation guides. The system analyzes commit messages, categorizes changes, and produces structured release notes automatically.",
-    "author": "System",
+    "title": "Frontend-Backend API Integration",
+    "description": "Created unified API client for frontend to communicate with AIfred backend.",
+    "details": "New API client library (lib/api/lexa-client.ts) provides:\n\n**Core Methods:**\n- createAccount: Syncs Supabase signup with backend\n- converse: Real-time conversation with LEXA\n- composeScript: Generates experience scripts\n- getRecommendations: POI recommendations based on preferences\n- downloadPdf: Experience script PDF export\n\n**Features:**\n- Automatic session management (stores account_id and session_id in localStorage)\n- Comprehensive error handling\n- Graceful offline fallbacks\n- User-friendly error messages\n- Environment-based API URL configuration (NEXT_PUBLIC_API_URL)\n\n**Documentation:**\n- Created FRONTEND_BACKEND_INTEGRATION.md with API endpoints, data flow, and debugging tips\n- Created TESTING_CHECKLIST.md with step-by-step test scenarios",
+    "author": "Full Stack Team",
     "isPublic": false,
-    "tags": [
-      "automation",
-      "release-notes",
-      "ai",
-      "typescript",
-      "powershell",
-      "documentation"
-    ],
-    "relatedFiles": [
-      "scripts/auto-generate-release-notes.ts",
-      "scripts/schedule-auto-release-notes.ps1",
-      "AUTO_RELEASE_NOTES_GUIDE.md",
-      "RELEASE_NOTES_COMPLETE_SOLUTION.md"
-    ],
-    "githubCommit": "25c282f"
+    "tags": ["api", "integration", "backend", "infrastructure"],
+    "relatedFiles": ["lib/api/lexa-client.ts", "FRONTEND_BACKEND_INTEGRATION.md", "TESTING_CHECKLIST.md"],
+    "githubCommit": "c4eaec1"
   },
   {
-    "id": "2025-12-19-101208-upload-tracking-system",
-    "date": "2025-12-19",
-    "timestamp": "2025-12-19T10:12:08.000Z",
-    "category": "feature",
-    "title": "Complete Upload Tracking System",
-    "description": "Full upload history tracking with file management, deletion capabilities, and admin interface",
-    "details": "Added comprehensive upload tracking system with history page, file deletion functionality, and enhanced admin interface. Includes API endpoints for upload management, database migration scripts, and complete documentation. Fixed TypeScript build errors in upload routes and improved file storage handling.",
-    "author": "System",
-    "isPublic": true,
-    "tags": [
-      "uploads",
-      "admin",
-      "tracking",
-      "file-management",
-      "history"
-    ],
-    "relatedFiles": [
-      "app/admin/knowledge/history/page.tsx",
-      "app/api/admin/uploads/route.ts",
-      "app/api/knowledge/upload/route.ts",
-      "scripts/run-migration-upload-tracking.ts"
-    ],
-    "githubCommit": "3fab124"
+    "id": "2025-12-20-1734710700-documentation-updates",
+    "date": "2025-12-20",
+    "timestamp": "2025-12-20T12:05:00.000Z",
+    "category": "documentation",
+    "title": "Comprehensive Documentation Updates",
+    "description": "Updated README, backlog, and created new documentation files for Captain presentation.",
+    "details": "Major documentation improvements:\n\n**README.md:**\n- Updated feature descriptions to reflect new experience builder flow\n- Added backend setup instructions (FastAPI, Neo4j)\n- Updated environment variables for both frontend and backend\n- Revised tech stack section\n- Updated API documentation with new endpoints\n- Improved project structure overview\n\n**BACKLOG.md:**\n- Added all completed items from Dec 19-20 sprint\n- Marked major UX improvements (experience builder redesign)\n- Updated statistics (now 30+ completed items)\n\n**New Documentation Files:**\n- FRONTEND_BACKEND_INTEGRATION.md: How frontend connects to backend\n- TESTING_CHECKLIST.md: Step-by-step test scenarios\n- EXPERIENCE_BUILDER_REDESIGN.md: Complete redesign documentation\n- CHAT_REDESIGN_SUMMARY.md: Chat interface improvements\n- EMERGENCY_DEPLOYMENT_GUIDE.md: Quick deployment to Vercel\n- LANDING_PAGE_FUTURE_SECTIONS.md: Future landing page enhancements\n\n**Release Notes:**\n- Created 2025-12-20.json with all changes from this sprint",
+    "author": "Documentation Team",
+    "isPublic": false,
+    "tags": ["documentation", "readme", "backlog", "release-notes"],
+    "relatedFiles": ["README.md", "BACKLOG.md", "docs/release-notes/2025-12-20.json"],
+    "githubCommit": "c4eaec1"
   },
   {
-    "id": "2025-12-19-101239-build-fix-typescript",
-    "date": "2025-12-19",
-    "timestamp": "2025-12-19T10:12:39.000Z",
-    "category": "bugfix",
-    "title": "TypeScript Build Error Resolution",
-    "description": "Fixed critical TypeScript compilation errors in upload route handlers",
-    "details": "Resolved TypeScript build errors in the knowledge upload route that were preventing successful compilation. Updated type definitions and improved error handling to ensure stable build process.",
-    "author": "System",
+    "id": "2025-12-20-1734710760-deployment-automation",
+    "date": "2025-12-20",
+    "timestamp": "2025-12-20T12:06:00.000Z",
+    "category": "infrastructure",
+    "title": "Automated GitHub + Vercel Deployment Pipeline",
+    "description": "Confirmed and utilized existing automated deployment pipeline for rapid Captain presentation deployment.",
+    "details": "Leveraged existing deployment automation:\n\n**Deployment Flow:**\n1. Code changes committed to git\n2. Pushed to GitHub main branch\n3. GitHub webhook triggers Vercel\n4. Vercel builds and deploys automatically\n5. Live in 2-5 minutes\n\n**Benefits:**\n- No manual Vercel CLI needed\n- Consistent deployment process\n- Automatic build verification\n- Instant rollback capability\n- Full deployment history in Vercel dashboard\n\n**This Sprint:**\n- 16 files changed, 3,554 insertions\n- All changes deployed for Captain presentation\n- Zero deployment errors",
+    "author": "DevOps",
     "isPublic": false,
-    "tags": [
-      "typescript",
-      "build-fix",
-      "compilation",
-      "error-handling"
-    ],
-    "relatedFiles": [
-      "app/api/knowledge/upload/route.ts"
-    ],
-    "githubCommit": "a2c5faa"
+    "tags": ["deployment", "vercel", "github", "automation", "ci-cd"],
+    "relatedFiles": [".github/workflows", "vercel.json"],
+    "githubCommit": "c4eaec1"
   }
 ]
