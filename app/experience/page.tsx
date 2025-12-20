@@ -317,7 +317,7 @@ export default function ExperienceBuilderPage() {
             {months.map((month) => (
               <button
                 key={month}
-                onClick={() => handleMonthSelect(month)}
+                onClick={() => handleMonthSelect(month, selectedYear)}
                 className="calendar-month-button"
               >
                 <div className="calendar-month-header"></div>
