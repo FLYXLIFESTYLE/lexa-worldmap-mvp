@@ -1,0 +1,163 @@
+[
+  {
+    "id": "2025-12-20-01-25-release-notes-automation-docs",
+    "date": "2025-12-20",
+    "timestamp": "2025-12-20T01:25:20.000Z",
+    "category": "documentation",
+    "title": "Comprehensive Release Notes Automation Documentation",
+    "description": "Added complete guide for automated release notes generation system implementation",
+    "details": "Created comprehensive documentation covering the complete solution for automated release notes generation, including setup instructions, configuration options, and integration guidelines for the AI-powered system.",
+    "author": "Christian Haack",
+    "isPublic": false,
+    "tags": [
+      "documentation",
+      "automation",
+      "release-notes",
+      "guide"
+    ],
+    "relatedFiles": [
+      "RELEASE_NOTES_COMPLETE_SOLUTION.md"
+    ],
+    "githubCommit": "9376043"
+  },
+  {
+    "id": "2025-12-20-01-23-auto-release-notes-system",
+    "date": "2025-12-20",
+    "timestamp": "2025-12-20T01:23:51.000Z",
+    "category": "feature",
+    "title": "Automated Release Notes Generation System",
+    "description": "Introduced AI-powered system for automatic generation and scheduling of release notes",
+    "details": "Implemented a complete automated release notes generation system featuring AI-powered analysis of git commits, TypeScript-based generation scripts, and PowerShell scheduling automation. The system can automatically analyze commit history, categorize changes, and generate properly formatted release notes.",
+    "author": "Christian Haack",
+    "isPublic": false,
+    "tags": [
+      "automation",
+      "ai",
+      "release-notes",
+      "scheduling",
+      "typescript"
+    ],
+    "relatedFiles": [
+      "AUTO_RELEASE_NOTES_GUIDE.md",
+      "scripts/auto-generate-release-notes.ts",
+      "scripts/schedule-auto-release-notes.ps1"
+    ],
+    "githubCommit": "25c282f"
+  },
+  {
+    "id": "2025-12-19-10-37-release-notes-format-fix",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:37:38.000Z",
+    "category": "bugfix",
+    "title": "Release Notes Schema Format Correction",
+    "description": "Fixed release notes format to match expected JSON schema structure",
+    "details": "Corrected the release notes format for December 19th to ensure compliance with the expected schema structure, addressing formatting inconsistencies that could cause parsing errors.",
+    "author": "Christian Haack",
+    "isPublic": false,
+    "tags": [
+      "bugfix",
+      "schema",
+      "format",
+      "release-notes"
+    ],
+    "relatedFiles": [
+      "docs/release-notes/2025-12-19.json"
+    ],
+    "githubCommit": "d54fd1a"
+  },
+  {
+    "id": "2025-12-19-10-13-build-documentation",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:13:39.000Z",
+    "category": "documentation",
+    "title": "Build Fix and Release Notes Documentation",
+    "description": "Added documentation explaining recent build fixes and release notes process",
+    "details": "Created comprehensive documentation covering recent TypeScript build error resolutions and detailed explanation of the release notes generation and management process.",
+    "author": "Christian Haack",
+    "isPublic": false,
+    "tags": [
+      "documentation",
+      "build",
+      "release-notes",
+      "typescript"
+    ],
+    "relatedFiles": [
+      "BUILD_FIX_AND_RELEASE_NOTES.md"
+    ],
+    "githubCommit": "5b7f2ed"
+  },
+  {
+    "id": "2025-12-19-10-12-upload-route-typescript-fix",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:12:08.000Z",
+    "category": "bugfix",
+    "title": "TypeScript Build Error Resolution",
+    "description": "Fixed TypeScript compilation error in knowledge upload API route",
+    "details": "Resolved TypeScript build error in the knowledge upload route that was preventing successful compilation. The fix addresses type safety issues and ensures proper error handling in the upload functionality.",
+    "author": "Christian Haack",
+    "isPublic": false,
+    "tags": [
+      "bugfix",
+      "typescript",
+      "api",
+      "upload"
+    ],
+    "relatedFiles": [
+      "app/api/knowledge/upload/route.ts",
+      "docs/release-notes/2025-12-19.json"
+    ],
+    "githubCommit": "a2c5faa"
+  },
+  {
+    "id": "2025-12-19-10-03-upload-tracking-documentation",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:03:57.000Z",
+    "category": "documentation",
+    "title": "Complete Upload Tracking System Documentation",
+    "description": "Finalized comprehensive documentation for the upload tracking system",
+    "details": "Completed detailed documentation covering the entire upload tracking system implementation, including architecture overview, API endpoints, database schema, and usage instructions.",
+    "author": "Christian Haack",
+    "isPublic": false,
+    "tags": [
+      "documentation",
+      "upload",
+      "tracking",
+      "system"
+    ],
+    "relatedFiles": [
+      "UPLOAD_TRACKING_COMPLETE.md"
+    ],
+    "githubCommit": "cca8509"
+  },
+  {
+    "id": "2025-12-19-10-02-upload-tracking-system",
+    "date": "2025-12-19",
+    "timestamp": "2025-12-19T10:02:02.000Z",
+    "category": "feature",
+    "title": "Complete Upload Tracking System with History Management",
+    "description": "Implemented comprehensive file upload tracking with history, deletion, and storage management",
+    "details": "Built a complete upload tracking system featuring upload history management, file deletion capabilities, and flexible storage options. The system includes admin interfaces for managing uploads, API endpoints for tracking operations, database migration support, and enhanced navigation. Users can now view upload history, manage stored files, and administrators have full control over the upload lifecycle.",
+    "author": "Christian Haack",
+    "isPublic": true,
+    "tags": [
+      "feature",
+      "upload",
+      "tracking",
+      "history",
+      "admin",
+      "storage"
+    ],
+    "relatedFiles": [
+      "RUN_MIGRATION_INSTRUCTIONS.md",
+      "app/admin/knowledge/history/page.tsx",
+      "app/admin/knowledge/page.tsx",
+      "app/admin/knowledge/upload/page.tsx",
+      "app/api/admin/uploads/[id]/route.ts",
+      "app/api/admin/uploads/route.ts",
+      "app/api/knowledge/upload/route.ts",
+      "components/admin/admin-nav.tsx",
+      "scripts/run-migration-upload-tracking.ts"
+    ],
+    "githubCommit": "3fab124"
+  }
+]
