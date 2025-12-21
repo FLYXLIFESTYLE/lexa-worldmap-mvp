@@ -10,10 +10,13 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from datetime import datetime
 import structlog
+from config.settings import settings
 
 from core.ailessia.emotion_interpreter import emotion_interpreter, EmotionalReading
 from core.ailessia.personality_mirror import personality_mirror
 from core.ailessia.weighted_archetype_calculator import weighted_archetype_calculator, ArchetypeWeights
+from core.ailessia.context_extractor import get_or_create_context_extractor
+from core.ailessia.conversation_os import next_intake_question, is_intake_complete, build_question_with_examples
 import core.ailessia.script_composer as script_composer_module
 import core.aibert.desire_anticipator as desire_anticipator_module
 import database.account_manager as account_manager_module
@@ -99,6 +102,7 @@ class ConverseResponse(BaseModel):
     emotional_reading: Optional[Dict] = None
     proactive_suggestions: Optional[List[Dict]] = None
     key_insight: Optional[str] = None
+    rag_payload: Optional[Dict] = None
 
 
 class ComposeScriptRequest(BaseModel):
@@ -222,6 +226,20 @@ async def converse_with_ailessia(request: ConverseRequest):
         account = await get_account_manager().get_account(request.account_id)
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
+
+        # Load session (we use key_moments to persist intake state without schema changes)
+        session_result = (
+            get_account_manager()
+            .supabase.table("conversation_sessions")
+            .select("id,key_moments,conversation_stage")
+            .eq("id", request.session_id)
+            .execute()
+        )
+        if not session_result.data:
+            raise HTTPException(status_code=404, detail="Session not found")
+        session = session_result.data[0]
+        key_moments = session.get("key_moments") or []
+        intake_state, last_q_key = _load_intake_state_from_key_moments(key_moments)
         
         # Prepare conversation history
         conversation_history = [
@@ -238,14 +256,129 @@ async def converse_with_ailessia(request: ConverseRequest):
             message=request.message,
             conversation_history=conversation_history
         )
+
+        # 1b. Update intake state from message (constraints + small behavioral signals)
+        extractor = get_or_create_context_extractor()
+        extraction = await extractor.extract(
+            message=request.message,
+            conversation_history=conversation_history,
+            intake_state=intake_state,
+            last_question_key=last_q_key
+        )
+        intake_state = extraction.updated_intake or intake_state
+        extracted = extraction.extracted or {}
+
+        # If the user is answering the last asked intake question, store the raw answer.
+        if last_q_key:
+            intake_state = _capture_last_question_answer(
+                intake_state=intake_state,
+                last_question_key=last_q_key,
+                answer_text=request.message
+            )
         
-        # 2. AIbert anticipates desires
+        # 2. Build client profile
         client_profile = {
             "archetype": account.get("personality_archetype") or emotional_reading.detected_archetype,
             "emotional_profile": account.get("emotional_profile", {}),
             "name": account.get("name")
         }
+
+        # Decide whether we are still in intake or ready to generate a full WOW script.
+        # (We keep the promise: ≤6 questions, only what's needed to materially change the script.)
+        rag_payload: Optional[Dict] = None
+        if not is_intake_complete(intake_state):
+            nxt = next_intake_question(intake_state)
+            if nxt:
+                q_key, q_text = nxt
+                response_content = _build_intake_turn_response(
+                    user_message=request.message,
+                    emotional_reading=emotional_reading,
+                    question_text=build_question_with_examples(q_key, q_text)
+                )
+                current_stage = "intake"
+                last_q_key = q_key
+            else:
+                # Edge case: intake looks incomplete but we can't find a question; proceed anyway.
+                response_content, rag_payload = await _generate_wow_script_and_payload(
+                    account=account,
+                    client_profile=client_profile,
+                    emotional_reading=emotional_reading,
+                    intake=intake_state,
+                    extracted=extracted
+                )
+                current_stage = "composition"
+                last_q_key = None
+
+            # Tone selection still uses the emotional reading (keeps it "listening")
+            tone_name = personality_mirror.select_tone(
+                emotional_reading=emotional_reading,
+                conversation_stage="discovery",
+                client_archetype=emotional_reading.detected_archetype
+            )
+
+            ailessia_response = await personality_mirror.generate_response(
+                content=response_content,
+                tone_name=tone_name,
+                client_name=account.get("name"),
+                emotional_context={
+                    "primary_state": emotional_reading.primary_state.value,
+                    "energy_level": emotional_reading.energy_level,
+                    "vulnerability": emotional_reading.vulnerability_shown,
+                    "hidden_desires": emotional_reading.hidden_desires
+                },
+                conversation_stage="discovery"
+            )
+
+            # Persist intake state into key_moments
+            key_moments = _upsert_intake_state_key_moment(
+                key_moments=key_moments,
+                intake_state=intake_state,
+                last_question_key=last_q_key,
+                extracted=extracted
+            )
+
+            updated_messages = conversation_history + [{
+                "role": "ailessia",
+                "content": ailessia_response,
+                "tone": tone_name,
+                "timestamp": datetime.now().isoformat()
+            }]
+
+            progress = _calculate_intake_progress(intake_state)
+
+            await get_account_manager().update_conversation_session(
+                session_id=request.session_id,
+                messages=updated_messages,
+                detected_emotions=[{
+                    "state": emotional_reading.primary_state.value,
+                    "confidence": emotional_reading.confidence_score,
+                    "timestamp": datetime.now().isoformat()
+                }],
+                key_moments=key_moments,
+                conversation_stage=current_stage,
+                tone_used=tone_name
+            )
+
+            return ConverseResponse(
+                ailessia_response=ailessia_response,
+                tone_used=tone_name,
+                conversation_stage=current_stage,
+                progress=progress,
+                emotional_reading={
+                    "primary_state": emotional_reading.primary_state.value,
+                    "archetype": emotional_reading.detected_archetype,
+                    "energy_level": emotional_reading.energy_level,
+                    "hidden_desires": emotional_reading.hidden_desires[:3]
+                },
+                proactive_suggestions=[],
+                key_insight=None,
+                rag_payload=None
+            )
         
+        # Intake complete → proceed with full intelligence
+        last_q_key = None
+
+        # 3. AIbert anticipates desires
         anticipated_desires = await get_desire_anticipator().anticipate_desires(
             emotional_reading=emotional_reading,
             conversation_history=conversation_history,
@@ -324,6 +457,18 @@ async def converse_with_ailessia(request: ConverseRequest):
             client_profile=client_profile,
             conversation_history=conversation_history
         )
+
+        # If we have enough intake, we can generate the WOW script + payload immediately
+        # and present it as the response content.
+        if is_intake_complete(intake_state):
+            response_content, rag_payload = await _generate_wow_script_and_payload(
+                account=account,
+                client_profile=client_profile,
+                emotional_reading=emotional_reading,
+                intake=intake_state,
+                extracted=extracted
+            )
+            current_stage = "script_ready"
         
         # 8. Generate AIlessia's response in adapted tone
         ailessia_response = await personality_mirror.generate_response(
@@ -358,6 +503,12 @@ async def converse_with_ailessia(request: ConverseRequest):
                 "confidence": emotional_reading.confidence_score,
                 "timestamp": datetime.now().isoformat()
             }],
+            key_moments=_upsert_intake_state_key_moment(
+                key_moments=key_moments,
+                intake_state=intake_state,
+                last_question_key=last_q_key,
+                extracted=extracted
+            ),
             conversation_stage=current_stage,
             tone_used=tone_name
         )
@@ -409,11 +560,17 @@ async def converse_with_ailessia(request: ConverseRequest):
                 "hidden_desires": emotional_reading.hidden_desires[:3]
             },
             proactive_suggestions=proactive_suggestions,
-            key_insight=key_insight
+            key_insight=key_insight,
+            rag_payload=rag_payload
         )
         
     except Exception as e:
-        logger.error("Conversation failed", error=str(e), session_id=request.session_id)
+        import traceback
+        tb = traceback.format_exc()
+        logger.error("Conversation failed", error=str(e), session_id=request.session_id, traceback=tb)
+        # Developer-friendly error details (only in development)
+        if getattr(settings, "environment", "development") == "development":
+            raise HTTPException(status_code=500, detail=f"Conversation failed: {str(e)}\n\n{tb}")
         raise HTTPException(status_code=500, detail=f"Conversation failed: {str(e)}")
 
 
@@ -432,7 +589,7 @@ async def compose_experience_script(request: ComposeScriptRequest):
             raise HTTPException(status_code=404, detail="Account not found")
         
         # Get conversation session
-        session_result = await get_account_manager().supabase.table("conversation_sessions").select("*").eq("id", request.session_id).execute()
+        session_result = get_account_manager().supabase.table("conversation_sessions").select("*").eq("id", request.session_id).execute()
         if not session_result.data:
             raise HTTPException(status_code=404, detail="Session not found")
         
@@ -699,6 +856,326 @@ async def get_personalized_poi_recommendations(request: POIRecommendationRequest
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+def _load_intake_state_from_key_moments(key_moments: List[Dict]) -> (Dict, Optional[str]):
+    """
+    Persist intake without DB migrations by storing the latest snapshot in conversation_sessions.key_moments.
+
+    We store a single "intake_state_v1" entry and keep replacing it.
+    """
+    intake_state: Dict = {}
+    last_question_key: Optional[str] = None
+
+    if not isinstance(key_moments, list):
+        return intake_state, last_question_key
+
+    for km in reversed(key_moments):
+        if isinstance(km, dict) and km.get("type") == "intake_state_v1":
+            intake_state = km.get("intake_state") or {}
+            last_question_key = km.get("last_question_key")
+            return intake_state, last_question_key
+
+    return intake_state, last_question_key
+
+
+def _upsert_intake_state_key_moment(
+    key_moments: List[Dict],
+    intake_state: Dict,
+    last_question_key: Optional[str],
+    extracted: Optional[Dict] = None
+) -> List[Dict]:
+    """Insert or replace the latest intake snapshot key moment."""
+    km_list = list(key_moments or [])
+
+    snapshot = {
+        "type": "intake_state_v1",
+        "timestamp": datetime.now().isoformat(),
+        "intake_state": intake_state,
+        "last_question_key": last_question_key,
+        "latest_extracted": extracted or {}
+    }
+
+    for i in range(len(km_list) - 1, -1, -1):
+        if isinstance(km_list[i], dict) and km_list[i].get("type") == "intake_state_v1":
+            km_list[i] = snapshot
+            return km_list
+
+    km_list.append(snapshot)
+    return km_list
+
+
+def _capture_last_question_answer(intake_state: Dict, last_question_key: str, answer_text: str) -> Dict:
+    """
+    Store a raw answer for the last asked intake key (minimal, non-hallucinating).
+    """
+    s = dict(intake_state or {})
+    ans = (answer_text or "").strip()
+    if not ans:
+        return s
+
+    if last_question_key == "red_lines":
+        s.setdefault("red_lines", [])
+        if isinstance(s.get("red_lines"), list):
+            s["red_lines"].append(ans)
+        else:
+            s["red_lines"] = [str(s.get("red_lines")), ans]
+        return s
+
+    if last_question_key == "energy_rhythm":
+        # store as dict to keep room for structured fields later
+        if not s.get("energy_rhythm"):
+            s["energy_rhythm"] = {"raw": ans}
+        return s
+
+    if last_question_key == "constraints":
+        s.setdefault("constraints", {})
+        if isinstance(s.get("constraints"), dict):
+            s["constraints"].setdefault("raw", ans)
+        else:
+            s["constraints"] = {"raw": ans}
+        return s
+
+    # default string keys
+    if not s.get(last_question_key):
+        s[last_question_key] = ans
+    return s
+
+
+def _calculate_intake_progress(intake_state: Dict) -> float:
+    """Map intake completeness to a progress number for the UI (0..1)."""
+    s = intake_state or {}
+    answered = 0
+    total = 6
+
+    if s.get("primary_emotion_goal"):
+        answered += 1
+    if s.get("social_appetite"):
+        answered += 1
+    if s.get("meaning_anchor"):
+        answered += 1
+
+    red = s.get("red_lines")
+    if (isinstance(red, list) and len(red) > 0) or (isinstance(red, str) and red.strip()):
+        answered += 1
+
+    er = s.get("energy_rhythm")
+    if (isinstance(er, dict) and er.get("raw")) or (isinstance(er, str) and er.strip()):
+        answered += 1
+
+    c = s.get("constraints")
+    if (isinstance(c, dict) and len(c) > 0) or (isinstance(c, str) and c.strip()):
+        answered += 1
+
+    # Intake is the first ~60% of the journey.
+    return min(0.6, (answered / total) * 0.6)
+
+
+def _build_intake_turn_response(user_message: str, emotional_reading: EmotionalReading, question_text: str) -> str:
+    """
+    Gentle "I heard you" + exactly one question (with examples).
+    No markdown fences.
+    """
+    primary = (emotional_reading.primary_state.value or "present").replace("_", " ")
+
+    # Keep it short and confident—one reflection, one question.
+    return (
+        f"I hear you. Under the surface, this feels {primary}.\n\n"
+        f"One question — so I can design the feeling (not just the logistics):\n"
+        f"{question_text}"
+    )
+
+
+async def _generate_wow_script_and_payload(
+    account: Dict,
+    client_profile: Dict,
+    emotional_reading: EmotionalReading,
+    intake: Dict,
+    extracted: Optional[Dict] = None
+) -> (str, Dict):
+    """
+    Produce Stage 0–4 + strict rag_payload dict.
+
+    This is deterministic and does not rely on an LLM to return JSON correctly.
+    """
+
+    extracted = extracted or {}
+    constraints = (intake or {}).get("constraints") or (extracted.get("constraints") or {})
+
+    destination = (
+        constraints.get("destination")
+        or constraints.get("destination_hint")
+        or "French Riviera"
+    )
+    duration_days = constraints.get("duration_days") or 4
+    month = constraints.get("month")
+    budget = constraints.get("budget")
+
+    archetype = client_profile.get("archetype") or emotional_reading.detected_archetype or "The Explorer"
+
+    # Pull signature experiences
+    signature_experiences = await neo4j_client.find_experiences_for_archetype(
+        archetype=archetype,
+        destination=destination,
+        min_fit_score=0.75
+    )
+    if not signature_experiences:
+        signature_experiences = await neo4j_client.find_experiences_by_emotions(
+            desired_emotions=["Prestige", "Indulgence", "Romance"],
+            destination=destination,
+            min_exclusivity=0.7
+        )
+
+    selected_choices = {
+        "destination": destination,
+        "time": month,
+        "budget": budget.get("amount") if isinstance(budget, dict) else budget,
+        "duration": duration_days,
+    }
+
+    # Compose a base script (used for title/hook + experience list)
+    experience_script = await get_script_composer().compose_experience_script(
+        client_profile=client_profile,
+        emotional_reading=emotional_reading,
+        anticipated_desires=[],
+        selected_choices=selected_choices,
+        signature_experiences=signature_experiences
+    )
+
+    # Stage 0: Emotional profile (from intake)
+    primary_emotion_goal = intake.get("primary_emotion_goal") or "a feeling you can’t quite name yet"
+    social = intake.get("social_appetite") or "balanced"
+    meaning = intake.get("meaning_anchor") or "meaning"
+    red_lines = intake.get("red_lines") or []
+    energy = intake.get("energy_rhythm") or {}
+    signals = (intake.get("_signals") or {})
+
+    stage0 = (
+        "STAGE 0 — Emotional Profile\n"
+        f"Identity archetype (working): {archetype}\n"
+        f"Primary emotion goal: {primary_emotion_goal}\n"
+        f"Social appetite: {social}\n"
+        f"Energy rhythm: {energy.get('raw') if isinstance(energy, dict) else energy}\n"
+        f"Meaning anchor: {meaning}\n"
+        f"Red lines: {', '.join(red_lines) if isinstance(red_lines, list) else red_lines}\n"
+        f"Signals noticed: short answers={bool(signals.get('is_short_answer'))}, urgency={bool(signals.get('has_urgency'))}\n"
+        "\n"
+    )
+
+    # Stage 1: Concept Script 1.0
+    highlights = []
+    for exp in (experience_script.signature_experiences or [])[:8]:
+        name = exp.get("name") or exp.get("title") or "Signature moment"
+        feeling = exp.get("emotional_promise") or "a clean, quiet kind of luxury"
+        verify = exp.get("verification_needed") or "Verify availability, privacy, and timing."
+        highlights.append(f"- {name}: {feeling}. ({verify})")
+
+    if not highlights:
+        highlights = [
+            f"- A discreet arrival that makes you exhale: private transfer, no friction. (Verify best routing.)",
+            f"- One “money-can’t-buy” access moment: behind-the-scenes or after-hours. (Verify access.)",
+            f"- A signature sunset scene designed for your primary feeling. (Verify weather + location.)",
+            f"- A culinary peak chosen for atmosphere, not just ratings. (Verify chef/table.)",
+            f"- A final-night closing ritual that locks in the memory. (Verify setting.)",
+        ]
+
+    stage1 = (
+        "STAGE 1 — Concept Script 1.0\n"
+        f"Theme Title: {experience_script.title}\n"
+        f"One-line Hook: {experience_script.cinematic_hook}\n"
+        f"Emotional Description: This is a {destination} story built around {primary_emotion_goal} — with pacing that protects your energy and a finale that lands.\n"
+        "Signature Highlights:\n"
+        + "\n".join(highlights[: (8 if duration_days >= 5 else 5)])
+        + "\n\n"
+    )
+
+    # Stage 2: Day-by-day flow (cap long trips to a “pattern” to keep chat readable)
+    days_to_render = min(int(duration_days) if isinstance(duration_days, int) else 4, 7)
+    stage2_lines = ["STAGE 2 — Day-by-Day Flow 2.0"]
+    for d in range(1, days_to_render + 1):
+        stage2_lines.append(
+            f"Day {d}: Purpose — deepen {primary_emotion_goal}\n"
+            "Morning: Slow start, protected privacy.\n"
+            "Afternoon: A curated peak moment (designed, not crowded).\n"
+            "Evening: Elegant atmosphere; one sensory anchor.\n"
+            "Micro-surprise: A small detail that feels like it was waiting for you.\n"
+            "Sensory cue: Scent / sound / texture to lock the memory.\n"
+            "Plan B: A beautiful indoor alternative with the same feeling.\n"
+            "Concierge notes: Verify timing, access, privacy, and weather.\n"
+        )
+
+    if isinstance(duration_days, int) and duration_days > days_to_render:
+        stage2_lines.append(
+            f"(For {duration_days} days total: the remaining days follow the same rhythm, with 2–3 major peaks spaced for recovery.)"
+        )
+    stage2 = "\n".join(stage2_lines) + "\n\n"
+
+    # Stage 3: Storyline & emotional journey
+    stage3 = (
+        "STAGE 3 — Storyline & Emotional Journey 3.0\n"
+        f"BEFORE: A pre-trip message that gives you permission to slow down — and sets one symbol for {primary_emotion_goal}.\n"
+        "DURING: Opening scene → rising action → named peak moments → integration → finale designed as a clean ending.\n"
+        "AFTER: A memory artifact package (photos, notes, a small physical cue) + a future trigger to bring the feeling back.\n\n"
+    )
+
+    # Stage 4: Onboard concierge playbook
+    stage4 = (
+        "STAGE 4 — Onboard Concierge Playbook 4.0\n"
+        "Client in one minute: High standards, wants emotional precision, not generic luxury.\n"
+        "Language guide: Use calm certainty. Offer 2–3 options, never overwhelm.\n"
+        "Thought of the day: Protect energy first; peaks only when they matter.\n"
+        "Staging: Quiet excellence, discreet timing, no visible friction.\n"
+        "Surprise protocol: Small, personal, and plausible — always verifiable.\n"
+        "Recovery protocol: If energy dips, simplify instantly and restore comfort.\n"
+        "Endgame: A finale that feels inevitable — the story closes cleanly.\n"
+    )
+
+    script_text = stage0 + stage1 + stage2 + stage3 + stage4
+
+    rag_payload = {
+        "version": "rag_payload_v1",
+        "account_id": account.get("id"),
+        "session_hint": None,
+        "client_profile": {
+            "name": account.get("name"),
+            "email": account.get("email"),
+            "archetype": archetype,
+        },
+        "emotion_model": {
+            "primary_emotion_goal": primary_emotion_goal,
+            "secondary_emotion_goal": None,
+            "social_appetite": social,
+            "energy_rhythm": energy,
+            "meaning_anchor": meaning,
+            "red_lines": red_lines,
+            "signals": signals,
+        },
+        "constraints": {
+            "destination": destination,
+            "month": month,
+            "duration_days": duration_days,
+            "budget": budget,
+            "raw": constraints.get("raw"),
+        },
+        "script": {
+            "title": experience_script.title,
+            "cinematic_hook": experience_script.cinematic_hook,
+            "stages_included": ["0", "1", "2", "3", "4"],
+            "duration_days_rendered": days_to_render,
+        },
+        "retrieval_keys": {
+            "destination": destination,
+            "archetype": archetype,
+            "primary_state": emotional_reading.primary_state.value,
+            "keywords": [primary_emotion_goal, meaning, social],
+        },
+        "quality_checks": {
+            "no_availability_claims": True,
+            "verification_needed": True,
+            "max_intake_questions": 6,
+        },
+    }
+
+    return script_text, rag_payload
 
 async def _determine_conversation_stage(
     conversation_history: List[Dict],
@@ -987,10 +1464,12 @@ def _calculate_conversation_progress(
     """Calculate conversation progress (0-1)."""
     stage_progress = {
         "opening": 0.1,
+        "intake": 0.25,
         "discovery": 0.4,
         "recommendation": 0.7,
         "refinement": 0.85,
         "closing": 0.95,
+        "script_ready": 1.0,
         "composition_complete": 1.0
     }
     

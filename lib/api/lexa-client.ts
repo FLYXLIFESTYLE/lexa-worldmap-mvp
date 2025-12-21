@@ -47,6 +47,7 @@ export interface ConverseResponse {
   emotional_reading?: any;
   proactive_suggestions?: any[];
   key_insight?: string;
+  rag_payload?: any;
 }
 
 export interface ComposeScriptRequest {

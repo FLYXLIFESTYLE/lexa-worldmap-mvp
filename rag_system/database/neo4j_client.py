@@ -377,11 +377,13 @@ class Neo4jClient:
         
         cypher_query += """
         WITH e, 
-             size([emotion IN $desired_emotions WHERE emotion IN e.primary_emotions]) as emotion_match_count
+             size([emotion IN $desired_emotions WHERE emotion IN e.primary_emotions]) as emotion_match_count,
+             e.exclusivity_score as exclusivity_score
         OPTIONAL MATCH (e)-[:EVOKES_EMOTION]->(et:EmotionalTag)
         WHERE et.name IN $desired_emotions
         RETURN e.id as id, e.name as name,
                e.luxury_tier as luxury_tier,
+               exclusivity_score,
                e.cinematic_hook as cinematic_hook,
                e.primary_emotions as primary_emotions,
                e.emotional_arc as emotional_arc,
@@ -393,7 +395,7 @@ class Neo4jClient:
                e.price_point_eur as price_point,
                emotion_match_count,
                collect(et.name) as matched_emotional_tags
-        ORDER BY emotion_match_count DESC, e.exclusivity_score DESC
+        ORDER BY emotion_match_count DESC, exclusivity_score DESC
         LIMIT 15
         """
         
