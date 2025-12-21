@@ -1,8 +1,8 @@
 """
-AIlessia API Routes - Emotional Intelligence Conversation System.
+LEXA API Routes - Emotional Intelligence Conversation System.
 
-These endpoints enable the full AIlessia experience: emotional reading,
-adaptive conversation, experience composition, and script generation.
+Note: this module is still named `ailessia.py` for backwards compatibility.
+User-facing naming and aliases should be LEXA.
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -23,7 +23,11 @@ from core.recommendations.poi_recommendation_service import poi_recommendation_s
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/ailessia", tags=["ailessia"])
+# IMPORTANT:
+# Keep this router prefix-less so `api/main.py` can mount it under BOTH:
+# - /api/ailessia  (backwards compatible for the current frontend client)
+# - /api/lexa      (brand-correct alias)
+router = APIRouter()
 
 
 # Helper functions to get initialized instances

@@ -114,13 +114,16 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(chat.router, prefix="/api", tags=["Chat"])
 
-# Import AIlessia router
+# Import LEXA router (module name kept as `ailessia` for compatibility)
 try:
     from api.routes import ailessia
-    app.include_router(ailessia.router, prefix="/api", tags=["AIlessia"])
-    logger.info("AIlessia routes loaded")
+    # Backwards compatible path used by the current frontend client:
+    app.include_router(ailessia.router, prefix="/api/ailessia", tags=["LEXA"])
+    # Brand-correct alias:
+    app.include_router(ailessia.router, prefix="/api/lexa", tags=["LEXA"])
+    logger.info("LEXA routes loaded (aliases: /api/ailessia and /api/lexa)")
 except ImportError as e:
-    logger.warning("AIlessia routes not loaded", error=str(e))
+    logger.warning("LEXA routes not loaded", error=str(e))
 
 
 @app.get("/")
