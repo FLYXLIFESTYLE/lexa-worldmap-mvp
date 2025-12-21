@@ -1,0 +1,146 @@
+[
+  {
+    "id": "2025-12-21-signup-name-fields",
+    "date": "2025-12-21",
+    "timestamp": "2025-12-21T00:41:19.403Z",
+    "category": "feature",
+    "title": "Added Name Fields to Signup Form",
+    "description": "Users can now enter their first and last names during account creation for personalized experiences",
+    "details": "Added First Name and Last Name input fields to the signup form. Fields are side-by-side for better UX, both are required, and full names are passed to the backend as 'FirstName LastName'. This replaces the previous email prefix approach and enables proper personalization throughout LEXA.",
+    "author": "System",
+    "isPublic": true,
+    "tags": [
+      "signup",
+      "ux",
+      "personalization",
+      "names"
+    ],
+    "relatedFiles": [
+      "app/auth/signup/page.tsx"
+    ],
+    "githubCommit": "ef29272"
+  },
+  {
+    "id": "2025-12-21-conversation-rewrite",
+    "date": "2025-12-21",
+    "timestamp": "2025-12-21T00:41:19.404Z",
+    "category": "feature",
+    "title": "Complete Conversation Flow Rewrite - LEXA Now Truly Listens",
+    "description": "LEXA's conversation quality dramatically improved with empathetic responses that build on context",
+    "details": "Completely rewrote the conversation engine for natural, empathetic interactions. Key improvements: (1) Context-aware progression through stages: opening → deepening → discovery → recommendation, (2) Extracts and remembers locations, emotions from full conversation history, (3) No more repetitive questions - each response builds on previous answers, (4) Gentle, warm tone with examples in every response, (5) Helper functions track main emotions and desires across turns, (6) Detects user confirmations ('same feeling', 'similar') and adapts accordingly. This transforms LEXA from transactional Q&A into luxury concierge-quality conversation.",
+    "author": "System",
+    "isPublic": true,
+    "tags": [
+      "ai",
+      "conversation",
+      "emotional-intelligence",
+      "ux",
+      "lexa-core"
+    ],
+    "relatedFiles": [
+      "rag_system/api/routes/ailessia.py"
+    ],
+    "githubCommit": "ef29272"
+  },
+  {
+    "id": "2025-12-21-quick-reply-buttons",
+    "date": "2025-12-21",
+    "timestamp": "2025-12-21T00:41:19.404Z",
+    "category": "enhancement",
+    "title": "Quick Reply Buttons Now Appear in Initial Greeting",
+    "description": "Chat interface now shows 4 emotional quick replies from the start for easier conversation flow",
+    "details": "Added quick reply buttons to LEXA's initial greeting message: 'Peace and relaxation', 'Deeply connected to my partner', 'Proud of achieving something special', 'Free and spontaneous'. These appear immediately when the chat starts, making it easier for users to begin the conversation. Includes explanation: '💡 Most frequent answers (or write your own below)' to clarify they're optional.",
+    "author": "System",
+    "isPublic": true,
+    "tags": [
+      "chat",
+      "ux",
+      "quick-replies"
+    ],
+    "relatedFiles": [
+      "app/experience/chat/page.tsx"
+    ],
+    "githubCommit": "1e8d027"
+  },
+  {
+    "id": "2025-12-21-signup-error-handling",
+    "date": "2025-12-21",
+    "timestamp": "2025-12-21T00:41:19.404Z",
+    "category": "enhancement",
+    "title": "Improved Signup Error Messages",
+    "description": "Better error handling for duplicate emails, invalid formats, and weak passwords",
+    "details": "Enhanced signup error messages to be more user-friendly: (1) Duplicate email: 'This email is already registered. Please sign in instead.', (2) Invalid email: 'Please enter a valid email address.', (3) Weak password: 'Password must be at least 6 characters long.' Provides clearer guidance and reduces user confusion during account creation.",
+    "author": "System",
+    "isPublic": true,
+    "tags": [
+      "signup",
+      "error-handling",
+      "ux"
+    ],
+    "relatedFiles": [
+      "app/auth/signup/page.tsx"
+    ],
+    "githubCommit": "1e8d027"
+  },
+  {
+    "id": "2025-12-21-conversation-stage-fix",
+    "date": "2025-12-21",
+    "timestamp": "2025-12-21T00:41:19.404Z",
+    "category": "bugfix",
+    "title": "Fixed Conversation Stage Progression",
+    "description": "LEXA now properly progresses through conversation stages instead of repeating the opening",
+    "details": "Fixed conversation stage logic that was causing LEXA to stay in 'opening' stage and repeat the same greeting. Updated stage determination: turn 1 = opening, turn 2+ = deepening/discovery. Added contextual responses that acknowledge user's previous answers and ask new, relevant questions each turn.",
+    "author": "System",
+    "isPublic": false,
+    "tags": [
+      "bugfix",
+      "conversation",
+      "backend"
+    ],
+    "relatedFiles": [
+      "rag_system/api/routes/ailessia.py"
+    ],
+    "githubCommit": "854a190"
+  },
+  {
+    "id": "2025-12-21-backend-reload-issue",
+    "date": "2025-12-21",
+    "timestamp": "2025-12-21T00:41:19.404Z",
+    "category": "infrastructure",
+    "title": "Resolved Backend Auto-Reload Issues",
+    "description": "Fixed stuck backend reloads by implementing proper process management",
+    "details": "Backend uvicorn auto-reload was getting stuck when detecting file changes. Implemented proper process termination and restart procedures. Multiple port conflicts were identified and resolved. Backend now restarts cleanly when code changes are detected.",
+    "author": "System",
+    "isPublic": false,
+    "tags": [
+      "backend",
+      "infrastructure",
+      "devops"
+    ],
+    "relatedFiles": [
+      "rag_system/api/main.py"
+    ],
+    "githubCommit": "ef29272"
+  },
+  {
+    "id": "2025-12-21-backlog-update",
+    "date": "2025-12-21",
+    "timestamp": "2025-12-21T00:41:19.404Z",
+    "category": "documentation",
+    "title": "Comprehensive Backlog Update with Phase 3 Features",
+    "description": "Updated backlog with all unimplemented features and Phase 3 AIfred intelligence roadmap",
+    "details": "Completed comprehensive review of all user requests and documented unimplemented features in BACKLOG.md. Added new sections: (1) Frontend Refinements: theme category images, landing page dynamic sections, destination naming consistency, improved duplicate email handling, (2) AIfred/Backend Intelligence - Phase 3: behavioral trait detection, unstructured data ingestion, historical AI chat integration, Codebreaker AI integration. Updated statistics: 130+ total items, 30+ completed in December.",
+    "author": "System",
+    "isPublic": false,
+    "tags": [
+      "documentation",
+      "planning",
+      "roadmap",
+      "phase-3"
+    ],
+    "relatedFiles": [
+      "BACKLOG.md"
+    ],
+    "githubCommit": "cb37004"
+  }
+]
