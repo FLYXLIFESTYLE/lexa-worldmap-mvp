@@ -81,6 +81,12 @@ export default function LexaChatPage() {
           id: 'welcome',
           role: 'assistant',
           content: response.ailessia_response,
+          quickReplies: [
+            'Peace and relaxation',
+            'Deeply connected to my partner',
+            'Proud of achieving something special',
+            'Free and spontaneous',
+          ],
           timestamp: new Date().toISOString(),
         };
 

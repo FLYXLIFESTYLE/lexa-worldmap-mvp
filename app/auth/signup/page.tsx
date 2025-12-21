@@ -57,7 +57,16 @@ export default function SignUpPage() {
         router.refresh();
       }, 1500);
     } catch (error: any) {
-      setError(error.message || 'An error occurred during sign up');
+      // Handle specific error cases
+      if (error.message?.includes('already registered') || error.message?.includes('already exists')) {
+        setError('This email is already registered. Please sign in instead.');
+      } else if (error.message?.includes('invalid email')) {
+        setError('Please enter a valid email address.');
+      } else if (error.message?.includes('password')) {
+        setError('Password must be at least 6 characters long.');
+      } else {
+        setError(error.message || 'An error occurred during sign up');
+      }
     } finally {
       setLoading(false);
     }
