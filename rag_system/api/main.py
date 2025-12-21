@@ -16,6 +16,9 @@ from database.account_manager import initialize_account_manager
 from database.client_sync_service import initialize_client_sync_service
 from core.ailessia.script_composer import initialize_script_composer
 from core.aibert.desire_anticipator import initialize_desire_anticipator
+from core.ailessia.personality_mirror import initialize_personality_mirror
+from core.ailessia.emotion_interpreter import initialize_emotion_interpreter
+from core.ailessia.context_extractor import initialize_context_extractor
 from api.routes import chat, health
 
 # Configure structured logging
@@ -67,6 +70,16 @@ async def lifespan(app: FastAPI):
         
         initialize_script_composer(neo4j_client, claude_client)
         logger.info("Script Composer initialized")
+
+        # Initialize conversational intelligence modules with Claude (if available)
+        initialize_personality_mirror(claude_client)
+        logger.info("Personality Mirror initialized")
+
+        initialize_emotion_interpreter(claude_client)
+        logger.info("Emotion Interpreter initialized")
+
+        initialize_context_extractor(claude_client)
+        logger.info("Context Extractor initialized")
         
         # Initialize Client Sync Service (for marketing & tracking)
         from database.account_manager import account_manager
@@ -104,7 +117,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual origins
+    allow_origins=settings.cors_allow_origins_list,  # In production, set CORS_ALLOW_ORIGINS to your Vercel domain(s)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

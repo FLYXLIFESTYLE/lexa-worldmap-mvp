@@ -67,7 +67,7 @@ export default function LexaChatPage() {
       const state = JSON.parse(savedState);
       setBuilderState(state);
 
-      // Start conversation with AIlessia using real API
+      // Start conversation with LEXA using real API
       try {
         const context = extractContextFromBuilder(state);
         const response = await lexaAPI.startConversation(
@@ -76,7 +76,7 @@ export default function LexaChatPage() {
           context
         );
 
-        // Add AIlessia's greeting
+        // Add LEXA's greeting
         const welcomeMessage: Message = {
           id: 'welcome',
           role: 'assistant',
@@ -146,7 +146,7 @@ export default function LexaChatPage() {
         conversation_history: formatConversationHistory(messages),
       });
 
-      // Create AIlessia message
+      // Create LEXA message
       const ailessiaMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',

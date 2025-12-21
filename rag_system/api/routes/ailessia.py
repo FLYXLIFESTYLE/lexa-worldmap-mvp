@@ -17,6 +17,13 @@ from core.ailessia.personality_mirror import personality_mirror
 from core.ailessia.weighted_archetype_calculator import weighted_archetype_calculator, ArchetypeWeights
 from core.ailessia.context_extractor import get_or_create_context_extractor
 from core.ailessia.conversation_os import next_intake_question, is_intake_complete, build_question_with_examples
+from core.ailessia.emotional_profile_builder import (
+    build_profile_snapshot,
+    merge_account_json,
+    upsert_emotional_profile_key_moment,
+    apply_micro_feedback_to_communication_preferences,
+    upsert_micro_feedback_key_moment,
+)
 import core.ailessia.script_composer as script_composer_module
 import core.aibert.desire_anticipator as desire_anticipator_module
 import database.account_manager as account_manager_module
@@ -80,13 +87,13 @@ class AccountResponse(BaseModel):
 
 class ConversationMessage(BaseModel):
     """Single conversation message."""
-    role: str = Field(..., description="Message role: user or ailessia")
+    role: str = Field(..., description="Message role: user or lexa")
     content: str = Field(..., description="Message content")
     timestamp: Optional[datetime] = None
 
 
 class ConverseRequest(BaseModel):
-    """Request to converse with AIlessia."""
+    """Request to converse with LEXA."""
     account_id: str = Field(..., description="Client account ID")
     session_id: str = Field(..., description="Conversation session ID")
     message: str = Field(..., description="User message")
@@ -94,7 +101,7 @@ class ConverseRequest(BaseModel):
 
 
 class ConverseResponse(BaseModel):
-    """AIlessia's response."""
+    """LEXA's response."""
     ailessia_response: str
     tone_used: str
     conversation_stage: str
@@ -128,11 +135,14 @@ class ScriptResponse(BaseModel):
 class FeedbackRequest(BaseModel):
     """Client feedback request."""
     account_id: str
-    feedback_type: str = Field(..., description="script_quality, ailessia_interaction, etc.")
+    feedback_type: str = Field(..., description="script_quality, lexa_interaction, etc.")
     rating: int = Field(..., ge=1, le=5)
     feedback_text: Optional[str] = None
     script_id: Optional[str] = None
     session_id: Optional[str] = None
+    emotional_resonance_rating: Optional[int] = Field(None, ge=1, le=5)
+    personalization_rating: Optional[int] = Field(None, ge=1, le=5)
+    value_rating: Optional[int] = Field(None, ge=1, le=5)
 
 
 class POIRecommendationRequest(BaseModel):
@@ -154,16 +164,102 @@ class POIRecommendationResponse(BaseModel):
 
 
 # ============================================================================
+# UNSTRUCTURED INTAKE (MVP)
+# ============================================================================
+
+class UnstructuredUploadRequest(BaseModel):
+    """Upload raw unstructured text for later extraction and RAG usage."""
+    account_id: Optional[str] = Field(None, description="Client account ID (optional)")
+    session_id: Optional[str] = Field(None, description="Conversation session ID (optional)")
+    source_type: str = Field(default="text", description="text|zoom_transcript|menu|itinerary|email|note|other")
+    source_name: Optional[str] = None
+    title: Optional[str] = None
+    text: str = Field(..., min_length=1, description="Raw text content")
+    metadata: Optional[Dict] = None
+
+
+class UnstructuredUploadResponse(BaseModel):
+    document_id: str
+    extracted: Dict
+    message: str
+
+
+@router.post("/intake/upload-text", response_model=UnstructuredUploadResponse)
+async def upload_unstructured_text(request: UnstructuredUploadRequest):
+    """
+    Store raw unstructured text in Supabase for later use.
+
+    MVP extraction:
+    - Reuse ContextExtractor heuristics to pull budget/month/duration/destination hints.
+    """
+    try:
+        # Lightweight extraction (heuristics)
+        extractor = get_or_create_context_extractor()
+        extraction = await extractor.extract(
+            message=request.text,
+            conversation_history=[],
+            intake_state={},
+            last_question_key=None
+        )
+
+        extracted = extraction.extracted or {}
+
+        doc = {
+            "client_id": request.account_id,
+            "session_id": request.session_id,
+            "source_type": request.source_type or "text",
+            "source_name": request.source_name,
+            "title": request.title,
+            "raw_text": request.text,
+            "extracted": extracted,
+            "metadata": request.metadata or {},
+        }
+
+        result = get_account_manager().supabase.table("unstructured_documents").insert(doc).execute()
+        if not result.data:
+            raise Exception("Insert returned no data")
+
+        return UnstructuredUploadResponse(
+            document_id=result.data[0]["id"],
+            extracted=extracted,
+            message="Saved. LEXA will use this as background context for future scripts."
+        )
+
+    except Exception as e:
+        logger.error("Unstructured upload failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Unstructured upload failed: {str(e)}")
+
+
+@router.get("/intake/documents/{account_id}")
+async def list_unstructured_documents(account_id: str, limit: int = 20):
+    """List recent unstructured documents uploaded for an account."""
+    try:
+        limit = max(1, min(int(limit), 50))
+        result = (
+            get_account_manager()
+            .supabase.table("unstructured_documents")
+            .select("id,source_type,source_name,title,created_at,extracted,metadata")
+            .eq("client_id", account_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return {"documents": result.data or []}
+    except Exception as e:
+        logger.error("List unstructured documents failed", error=str(e), account_id=account_id)
+        raise HTTPException(status_code=500, detail=f"List documents failed: {str(e)}")
+
+# ============================================================================
 # ENDPOINTS
 # ============================================================================
 
 @router.post("/account/create", response_model=AccountResponse)
 async def create_account(request: AccountCreateRequest):
     """
-    Create a new client account and start AIlessia conversation.
+    Create a new client account and start LEXA conversation.
     
     This automatically creates the Personal Script Space and initiates
-    AIlessia's relationship with the client.
+    LEXA's relationship with the client.
     """
     try:
         # Create account
@@ -190,9 +286,11 @@ async def create_account(request: AccountCreateRequest):
         
         # Sync to Neo4j for marketing & tracking
         if client_sync_module.client_sync_service:
-            await client_sync_module.client_sync_service.sync_client_to_neo4j(account["id"])
-            logger.info("Client synced to Neo4j for marketing tracking",
-                       account_id=account["id"])
+            ok = await client_sync_module.client_sync_service.sync_client_to_neo4j(account["id"])
+            if ok:
+                logger.info("Client synced to Neo4j for marketing tracking", account_id=account["id"])
+            else:
+                logger.warning("Client sync to Neo4j failed (non-fatal)", account_id=account["id"])
         
         return AccountResponse(
             account_id=account["id"],
@@ -267,6 +365,7 @@ async def converse_with_ailessia(request: ConverseRequest):
         )
         intake_state = extraction.updated_intake or intake_state
         extracted = extraction.extracted or {}
+        signals = extraction.signals or {}
 
         # If the user is answering the last asked intake question, store the raw answer.
         if last_q_key:
@@ -275,6 +374,44 @@ async def converse_with_ailessia(request: ConverseRequest):
                 last_question_key=last_q_key,
                 answer_text=request.message
             )
+
+        # 1c. Build & persist a stable emotional profile snapshot (MVP memory)
+        profile_snapshot = build_profile_snapshot(
+            account_id=request.account_id,
+            session_id=request.session_id,
+            emotional_reading=emotional_reading,
+            intake_state=intake_state,
+            extracted=extracted,
+            signals=signals,
+        )
+
+        # Merge small stable signals into Supabase client_accounts JSONB blobs
+        merged_comm_prefs, merged_buying_patterns = merge_account_json(
+            existing_communication_preferences=account.get("communication_preferences") or {},
+            existing_buying_patterns=account.get("buying_patterns") or {},
+            snapshot=profile_snapshot,
+        )
+
+        # Persist to Supabase (safe: does not touch emotional_profile resonance map)
+        try:
+            await get_account_manager().update_account_profile(
+                account_id=request.account_id,
+                communication_preferences=merged_comm_prefs,
+                buying_patterns=merged_buying_patterns,
+            )
+        except Exception as _e:
+            # Non-fatal: we can still answer even if memory persistence fails.
+            logger.warning("Profile persistence to Supabase failed", error=str(_e), account_id=request.account_id)
+
+        # Optional: project durable signals into Neo4j properties for graph queries
+        if client_sync_module.client_sync_service:
+            try:
+                await client_sync_module.client_sync_service.sync_profile_signals(
+                    account_id=request.account_id,
+                    profile_snapshot=profile_snapshot
+                )
+            except Exception as _e:
+                logger.warning("Profile signal projection to Neo4j failed", error=str(_e), account_id=request.account_id)
         
         # 2. Build client profile
         client_profile = {
@@ -335,6 +472,10 @@ async def converse_with_ailessia(request: ConverseRequest):
                 intake_state=intake_state,
                 last_question_key=last_q_key,
                 extracted=extracted
+            )
+            key_moments = upsert_emotional_profile_key_moment(
+                key_moments=key_moments,
+                snapshot=profile_snapshot
             )
 
             updated_messages = conversation_history + [{
@@ -432,11 +573,20 @@ async def converse_with_ailessia(request: ConverseRequest):
         )
         
         # 5. Select appropriate tone
+        # If we learned a preferred tone earlier, respect it unless the current emotional reading
+        # suggests a stronger need (e.g., high vulnerability).
+        preferred_tone = None
+        comm = account.get("communication_preferences") or {}
+        if isinstance(comm, dict) and isinstance(comm.get("lexa"), dict):
+            preferred_tone = comm["lexa"].get("preferred_tone")
+
         tone_name = personality_mirror.select_tone(
             emotional_reading=emotional_reading,
             conversation_stage=current_stage,
             client_archetype=emotional_reading.detected_archetype
         )
+        if preferred_tone and tone_name in (None, "", "sophisticated_friend"):
+            tone_name = preferred_tone
         
         # 6. Generate proactive suggestions if appropriate
         proactive_suggestions = []
@@ -469,6 +619,48 @@ async def converse_with_ailessia(request: ConverseRequest):
                 extracted=extracted
             )
             current_stage = "script_ready"
+
+            # Persist artifacts for later reuse (optional; requires migration 005)
+            try:
+                if rag_payload:
+                    get_account_manager().supabase.table("conversation_artifacts").insert({
+                        "client_id": request.account_id,
+                        "session_id": request.session_id,
+                        "artifact_type": "rag_payload",
+                        "payload": rag_payload
+                    }).execute()
+                get_account_manager().supabase.table("conversation_artifacts").insert({
+                    "client_id": request.account_id,
+                    "session_id": request.session_id,
+                    "artifact_type": "wow_script",
+                    "payload": {"text": response_content}
+                }).execute()
+                if extracted:
+                    get_account_manager().supabase.table("conversation_artifacts").insert({
+                        "client_id": request.account_id,
+                        "session_id": request.session_id,
+                        "artifact_type": "context_extraction",
+                        "payload": extracted
+                    }).execute()
+            except Exception as _e:
+                logger.warning("Artifact persistence failed (migration may not be applied yet)", error=str(_e))
+
+            # Always include a tiny micro-feedback prompt after delivering the script.
+            proactive_suggestions = proactive_suggestions or []
+            proactive_suggestions.append({
+                "type": "micro_feedback_prompt",
+                "title": "One-minute refinement",
+                "description": "Rate this script (1–5) so I can refine it: emotional resonance, personalization, and value. Add one sentence on what to dial up/down.",
+                "endpoint": "/api/lexa/feedback",
+                "payload_example": {
+                    "feedback_type": "general",
+                    "rating": 5,
+                    "emotional_resonance_rating": 5,
+                    "personalization_rating": 5,
+                    "value_rating": 5,
+                    "feedback_text": "Dial up: romance. Dial down: nightlife."
+                }
+            })
         
         # 8. Generate AIlessia's response in adapted tone
         ailessia_response = await personality_mirror.generate_response(
@@ -503,11 +695,14 @@ async def converse_with_ailessia(request: ConverseRequest):
                 "confidence": emotional_reading.confidence_score,
                 "timestamp": datetime.now().isoformat()
             }],
-            key_moments=_upsert_intake_state_key_moment(
-                key_moments=key_moments,
-                intake_state=intake_state,
-                last_question_key=last_q_key,
-                extracted=extracted
+            key_moments=upsert_emotional_profile_key_moment(
+                key_moments=_upsert_intake_state_key_moment(
+                    key_moments=key_moments,
+                    intake_state=intake_state,
+                    last_question_key=last_q_key,
+                    extracted=extracted
+                ),
+                snapshot=profile_snapshot
             ),
             conversation_stage=current_stage,
             tone_used=tone_name
@@ -746,17 +941,77 @@ async def get_personal_script_space(account_id: str):
 @router.post("/feedback")
 async def submit_feedback(request: FeedbackRequest):
     """
-    Submit client feedback for AIlessia's learning loop.
+    Submit client feedback for LEXA's learning loop.
     """
     try:
+        allowed_feedback_types = {"script_quality", "ailessia_interaction", "experience_outcome", "general"}
+        feedback_type_db = request.feedback_type if request.feedback_type in allowed_feedback_types else "general"
+
         feedback = await get_account_manager().save_client_feedback(
             account_id=request.account_id,
-            feedback_type=request.feedback_type,
+            feedback_type=feedback_type_db,
             rating=request.rating,
             feedback_text=request.feedback_text,
             script_id=request.script_id,
-            session_id=request.session_id
+            session_id=request.session_id,
+            emotional_resonance_rating=request.emotional_resonance_rating,
+            personalization_rating=request.personalization_rating,
+            value_rating=request.value_rating
         )
+
+        # If this is micro-feedback, also update the account's comm prefs and session key_moments.
+        is_micro_feedback = (
+            request.feedback_type == "micro_feedback"
+            or request.emotional_resonance_rating is not None
+            or request.personalization_rating is not None
+            or request.value_rating is not None
+        )
+        if is_micro_feedback:
+            try:
+                account = await get_account_manager().get_account(request.account_id)
+                comm = apply_micro_feedback_to_communication_preferences(
+                    existing_communication_preferences=account.get("communication_preferences") if account else {},
+                    feedback_text=request.feedback_text,
+                    emotional_resonance_rating=request.emotional_resonance_rating,
+                    personalization_rating=request.personalization_rating,
+                    value_rating=request.value_rating,
+                )
+                await get_account_manager().update_account_profile(
+                    account_id=request.account_id,
+                    communication_preferences=comm
+                )
+            except Exception as _e:
+                logger.warning("Failed to apply micro-feedback to account profile", error=str(_e), account_id=request.account_id)
+
+            if request.session_id:
+                try:
+                    session_result = (
+                        get_account_manager()
+                        .supabase.table("conversation_sessions")
+                        .select("id,key_moments")
+                        .eq("id", request.session_id)
+                        .execute()
+                    )
+                    if session_result.data:
+                        session = session_result.data[0]
+                        key_moments = session.get("key_moments") or []
+                        key_moments = upsert_micro_feedback_key_moment(
+                            key_moments=key_moments,
+                            feedback={
+                                "feedback_id": feedback.get("id"),
+                                "rating": request.rating,
+                                "emotional_resonance_rating": request.emotional_resonance_rating,
+                                "personalization_rating": request.personalization_rating,
+                                "value_rating": request.value_rating,
+                                "feedback_text": request.feedback_text,
+                            }
+                        )
+                        await get_account_manager().update_conversation_session(
+                            session_id=request.session_id,
+                            key_moments=key_moments
+                        )
+                except Exception as _e:
+                    logger.warning("Failed to persist micro-feedback key moment", error=str(_e), session_id=request.session_id)
         
         logger.info("Feedback received",
                    feedback_id=feedback["id"],
@@ -764,7 +1019,7 @@ async def submit_feedback(request: FeedbackRequest):
         
         return {
             "feedback_id": feedback["id"],
-            "message": "Thank you for your feedback. AIlessia learns from every interaction."
+            "message": "Thank you for your feedback. LEXA learns from every interaction."
         }
         
     except Exception as e:
@@ -851,6 +1106,434 @@ async def get_personalized_poi_recommendations(request: POIRecommendationRequest
     except Exception as e:
         logger.error("Failed to get POI recommendations", error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to get recommendations: {str(e)}")
+
+
+@router.get("/admin/neo4j/quality-report")
+async def neo4j_quality_report(destination: str = "French Riviera", limit: int = 15):
+    """
+    Lightweight Neo4j data quality report for POIs.
+
+    Beginner-friendly purpose:
+    - Shows which destinations have enough data to demo (counts + coverage)
+    - Shows what's missing for a chosen destination (so we can fix/enrich next)
+    """
+    try:
+        limit = max(1, min(int(limit), 50))
+
+        # 1) Destination overview
+        destinations = await neo4j_client.execute_query(
+            """
+            MATCH (poi:poi)
+            WHERE poi.destination_name IS NOT NULL
+            RETURN poi.destination_name AS destination,
+                   count(poi) AS total_pois,
+                   sum(CASE WHEN poi.luxury_score >= 0.5 THEN 1 ELSE 0 END) AS luxury_pois,
+                   sum(CASE WHEN poi.google_place_id IS NOT NULL THEN 1 ELSE 0 END) AS google_enriched,
+                   sum(CASE WHEN poi.google_rating IS NOT NULL THEN 1 ELSE 0 END) AS with_ratings
+            ORDER BY luxury_pois DESC
+            LIMIT $limit
+            """,
+            {"limit": limit},
+        )
+
+        # 2) Missing/coverage metrics for a specific destination
+        coverage = await neo4j_client.execute_query(
+            """
+            MATCH (poi:poi)
+            WHERE poi.destination_name = $destination
+            WITH count(poi) AS total,
+                 sum(CASE WHEN poi.luxury_score >= 0.5 THEN 1 ELSE 0 END) AS luxury_pois,
+                 sum(CASE WHEN poi.google_place_id IS NULL THEN 1 ELSE 0 END) AS missing_google_place_id,
+                 sum(CASE WHEN poi.google_rating IS NULL THEN 1 ELSE 0 END) AS missing_google_rating,
+                 sum(CASE WHEN poi.personality_romantic IS NULL THEN 1 ELSE 0 END) AS missing_personality_scores
+            RETURN total,
+                   luxury_pois,
+                   missing_google_place_id,
+                   missing_google_rating,
+                   missing_personality_scores
+            """,
+            {"destination": destination},
+        )
+
+        # 3) Link coverage: activities/emotions/archetypes
+        link_coverage = await neo4j_client.execute_query(
+            """
+            MATCH (poi:poi)
+            WHERE poi.destination_name = $destination
+            OPTIONAL MATCH (poi)-[:OFFERS]->(a:activity_type)
+            OPTIONAL MATCH (a)-[:EVOKES]->(e:EmotionalTag)
+            OPTIONAL MATCH (a)-[:APPEALS_TO]->(ca:ClientArchetype)
+            WITH poi,
+                 count(DISTINCT a) AS activity_links,
+                 count(DISTINCT e) AS emotion_links,
+                 count(DISTINCT ca) AS archetype_links
+            RETURN
+              count(poi) AS pois_checked,
+              sum(CASE WHEN activity_links = 0 THEN 1 ELSE 0 END) AS pois_missing_activity_links,
+              sum(CASE WHEN emotion_links = 0 THEN 1 ELSE 0 END) AS pois_missing_emotion_links,
+              sum(CASE WHEN archetype_links = 0 THEN 1 ELSE 0 END) AS pois_missing_archetype_links
+            """,
+            {"destination": destination},
+        )
+
+        # 4) Simple duplicate-name scan (often indicates ingestion issues)
+        duplicates = await neo4j_client.execute_query(
+            """
+            MATCH (poi:poi)
+            WHERE poi.destination_name = $destination AND poi.name IS NOT NULL
+            WITH toLower(trim(poi.name)) AS norm_name, count(*) AS c
+            WHERE c > 1
+            RETURN norm_name AS name, c AS count
+            ORDER BY c DESC, name ASC
+            LIMIT 50
+            """,
+            {"destination": destination},
+        )
+
+        return {
+            "destination_overview": destinations or [],
+            "destination": destination,
+            "coverage": (coverage[0] if coverage else {}),
+            "link_coverage": (link_coverage[0] if link_coverage else {}),
+            "duplicate_names": duplicates or [],
+        }
+
+    except Exception as e:
+        logger.error("Neo4j quality report failed", error=str(e), destination=destination)
+        raise HTTPException(status_code=500, detail=f"Neo4j quality report failed: {str(e)}")
+
+
+@router.post("/admin/neo4j/fix-archetype-links")
+async def neo4j_fix_archetype_links(
+    destination: Optional[str] = None,
+    min_luxury_score: float = 0.5,
+    min_fit: float = 0.65,
+    max_links_per_activity: int = 2,
+):
+    """
+    Auto-create missing (activity_type)-[:APPEALS_TO]->(ClientArchetype) links.
+
+    Why this matters:
+    Many POIs have activities, but those activities don't connect to archetypes,
+    which breaks the chain: POI -> activity -> archetype.
+
+    Strategy (deterministic):
+    - For each activity_type with zero APPEALS_TO links:
+      compute average POI personality_* scores of POIs offering that activity
+      (optionally filtered to one destination and luxury_score >= min_luxury_score)
+    - Link the activity to the top archetypes above min_fit.
+    - If still none, link a safe default (Achiever + Hedonist) so the chain isn't broken.
+    """
+    try:
+        # Treat empty string as "all destinations"
+        if isinstance(destination, str) and destination.strip() == "":
+            destination = None
+
+        # Clamp inputs (safety)
+        min_luxury_score = float(max(0.0, min(min_luxury_score, 1.0)))
+        min_fit = float(max(0.0, min(min_fit, 1.0)))
+        max_links_per_activity = int(max(1, min(max_links_per_activity, 4)))
+
+        dest_filter = ""
+        params: Dict = {
+            "min_luxury_score": min_luxury_score,
+            "min_fit": min_fit,
+            "max_links": max_links_per_activity,
+        }
+        if destination:
+            dest_filter = "AND poi.destination_name = $destination"
+            params["destination"] = destination
+
+        # 0) Ensure the 6 archetype nodes exist
+        await neo4j_client.execute_query(
+            """
+            UNWIND [
+              'The Romantic',
+              'The Connoisseur',
+              'The Hedonist',
+              'The Contemplative',
+              'The Achiever',
+              'The Adventurer'
+            ] AS name
+            MERGE (:ClientArchetype {name: name})
+            """,
+            {},
+        )
+
+        # 1) How many activity types are currently missing APPEALS_TO?
+        missing_before = await neo4j_client.execute_query(
+            """
+            MATCH (a:activity_type)
+            OPTIONAL MATCH (a)-[:APPEALS_TO]->(ca:ClientArchetype)
+            WITH a, count(ca) AS c
+            WHERE c = 0
+            RETURN count(a) AS missing
+            """,
+            {},
+        )
+
+        # 2) Main fill: infer archetypes from POI personality score averages
+        created_rows = await neo4j_client.execute_query(
+            f"""
+            MATCH (a:activity_type)
+            OPTIONAL MATCH (a)-[:APPEALS_TO]->(ca0:ClientArchetype)
+            WITH a, count(ca0) AS c
+            WHERE c = 0
+
+            MATCH (poi:poi)-[:OFFERS]->(a)
+            WHERE poi.luxury_score >= $min_luxury_score
+              {dest_filter}
+
+            WITH a,
+                 avg(poi.personality_romantic) AS romantic,
+                 avg(poi.personality_connoisseur) AS connoisseur,
+                 avg(poi.personality_hedonist) AS hedonist,
+                 avg(poi.personality_contemplative) AS contemplative,
+                 avg(poi.personality_achiever) AS achiever,
+                 avg(poi.personality_adventurer) AS adventurer
+
+            WITH a, [
+              {{name:'The Romantic', score: romantic}},
+              {{name:'The Connoisseur', score: connoisseur}},
+              {{name:'The Hedonist', score: hedonist}},
+              {{name:'The Contemplative', score: contemplative}},
+              {{name:'The Achiever', score: achiever}},
+              {{name:'The Adventurer', score: adventurer}}
+            ] AS scores
+
+            UNWIND scores AS s
+            WITH a, s
+            WHERE s.score IS NOT NULL AND s.score >= $min_fit
+            ORDER BY a.name, s.score DESC
+
+            WITH a, collect(s) AS ranked
+            WITH a, ranked[0..$max_links] AS top
+            UNWIND top AS t
+            MATCH (ca:ClientArchetype {{name: t.name}})
+            MERGE (a)-[r:APPEALS_TO]->(ca)
+            ON CREATE SET
+              r.fit_score = t.score,
+              r.discovered_through = 'poi_personality_averages',
+              r.updated_at = datetime()
+            RETURN count(r) AS links_created
+            """,
+            params,
+        )
+
+        links_created = int((created_rows[0].get("links_created") if created_rows else 0) or 0)
+
+        # 3) Fallback: any remaining activity types get a safe default link
+        await neo4j_client.execute_query(
+            """
+            MATCH (a:activity_type)
+            OPTIONAL MATCH (a)-[:APPEALS_TO]->(ca0:ClientArchetype)
+            WITH a, count(ca0) AS c
+            WHERE c = 0
+            MATCH (ca:ClientArchetype)
+            WHERE ca.name IN ['The Achiever', 'The Hedonist']
+            MERGE (a)-[r:APPEALS_TO]->(ca)
+            ON CREATE SET r.fit_score = 0.60, r.discovered_through = 'fallback_default', r.updated_at = datetime()
+            RETURN count(r) AS fallback_links_created
+            """,
+            {},
+        )
+
+        missing_after = await neo4j_client.execute_query(
+            """
+            MATCH (a:activity_type)
+            OPTIONAL MATCH (a)-[:APPEALS_TO]->(ca:ClientArchetype)
+            WITH a, count(ca) AS c
+            WHERE c = 0
+            RETURN count(a) AS missing
+            """,
+            {},
+        )
+
+        return {
+            "destination": destination,
+            "min_luxury_score": min_luxury_score,
+            "min_fit": min_fit,
+            "max_links_per_activity": max_links_per_activity,
+            "missing_activities_before": int((missing_before[0].get("missing") if missing_before else 0) or 0),
+            "links_created": links_created,
+            "missing_activities_after": int((missing_after[0].get("missing") if missing_after else 0) or 0),
+            "next": "Call /api/lexa/admin/neo4j/quality-report again to see POI chain coverage improve.",
+        }
+
+    except Exception as e:
+        logger.error("Neo4j fix-archetype-links failed", error=str(e), destination=destination)
+        raise HTTPException(status_code=500, detail=f"Neo4j fix-archetype-links failed: {str(e)}")
+
+
+@router.post("/admin/neo4j/fix-emotion-links")
+async def neo4j_fix_emotion_links(
+    destination: Optional[str] = None,
+    min_luxury_score: float = 0.5,
+    min_fit: float = 0.65,
+    max_links_per_activity: int = 2,
+):
+    """
+    Auto-create missing (activity_type)-[:EVOKES]->(EmotionalTag) links.
+
+    This fixes the chain: POI -> activity -> emotion (which powers emotion-driven discovery).
+
+    Strategy (deterministic):
+    - For each activity_type with zero EVOKES links:
+      compute average POI personality_* scores of POIs offering that activity
+      (optional destination filter, luxury_score >= min_luxury_score)
+    - Map those personality averages into a ranked list of emotions.
+    - Link the activity to the top emotions above min_fit (up to max_links_per_activity).
+    - If still none, attach a safe default emotion (Discovery).
+    """
+    try:
+        # Treat empty string as "all destinations"
+        if isinstance(destination, str) and destination.strip() == "":
+            destination = None
+
+        # Clamp inputs (safety)
+        min_luxury_score = float(max(0.0, min(min_luxury_score, 1.0)))
+        min_fit = float(max(0.0, min(min_fit, 1.0)))
+        max_links_per_activity = int(max(1, min(max_links_per_activity, 4)))
+
+        dest_filter = ""
+        params: Dict = {
+            "min_luxury_score": min_luxury_score,
+            "min_fit": min_fit,
+            "max_links": max_links_per_activity,
+        }
+        if destination:
+            dest_filter = "AND poi.destination_name = $destination"
+            params["destination"] = destination
+
+        # 0) Ensure the core emotion tags exist
+        await neo4j_client.execute_query(
+            """
+            UNWIND [
+              'Romance',
+              'Intimacy',
+              'Prestige',
+              'Indulgence',
+              'Serenity',
+              'Renewal',
+              'Discovery',
+              'Freedom',
+              'Achievement',
+              'Sophistication'
+            ] AS name
+            MERGE (:EmotionalTag {name: name})
+            """,
+            {},
+        )
+
+        # 1) How many activity types are currently missing EVOKES?
+        missing_before = await neo4j_client.execute_query(
+            """
+            MATCH (a:activity_type)
+            OPTIONAL MATCH (a)-[:EVOKES]->(e:EmotionalTag)
+            WITH a, count(e) AS c
+            WHERE c = 0
+            RETURN count(a) AS missing
+            """,
+            {},
+        )
+
+        # 2) Main fill: infer emotions from POI personality score averages
+        created_rows = await neo4j_client.execute_query(
+            f"""
+            MATCH (a:activity_type)
+            OPTIONAL MATCH (a)-[:EVOKES]->(e0:EmotionalTag)
+            WITH a, count(e0) AS c
+            WHERE c = 0
+
+            MATCH (poi:poi)-[:OFFERS]->(a)
+            WHERE poi.luxury_score >= $min_luxury_score
+              {dest_filter}
+
+            WITH a,
+                 avg(poi.personality_romantic) AS romantic,
+                 avg(poi.personality_connoisseur) AS connoisseur,
+                 avg(poi.personality_hedonist) AS hedonist,
+                 avg(poi.personality_contemplative) AS contemplative,
+                 avg(poi.personality_achiever) AS achiever,
+                 avg(poi.personality_adventurer) AS adventurer
+
+            // Map personality -> emotions (simple, deterministic)
+            WITH a, [
+              {{name:'Romance', score: romantic}},
+              {{name:'Intimacy', score: romantic}},
+              {{name:'Sophistication', score: connoisseur}},
+              {{name:'Discovery', score: (coalesce(connoisseur,0) + coalesce(adventurer,0)) / 2.0}},
+              {{name:'Indulgence', score: hedonist}},
+              {{name:'Serenity', score: contemplative}},
+              {{name:'Renewal', score: contemplative}},
+              {{name:'Prestige', score: achiever}},
+              {{name:'Achievement', score: achiever}},
+              {{name:'Freedom', score: adventurer}}
+            ] AS scores
+
+            UNWIND scores AS s
+            WITH a, s
+            WHERE s.score IS NOT NULL AND s.score >= $min_fit
+            ORDER BY a.name, s.score DESC
+
+            WITH a, collect(s) AS ranked
+            WITH a, ranked[0..$max_links] AS top
+            UNWIND top AS t
+            MATCH (et:EmotionalTag {{name: t.name}})
+            MERGE (a)-[r:EVOKES]->(et)
+            ON CREATE SET
+              r.strength = t.score,
+              r.discovered_through = 'poi_personality_averages',
+              r.updated_at = datetime()
+            MERGE (et)-[:EVOKED_BY_ACTIVITY]->(a)
+            RETURN count(r) AS links_created
+            """,
+            params,
+        )
+
+        links_created = int((created_rows[0].get("links_created") if created_rows else 0) or 0)
+
+        # 3) Fallback: remaining activity types get Discovery
+        await neo4j_client.execute_query(
+            """
+            MATCH (a:activity_type)
+            OPTIONAL MATCH (a)-[:EVOKES]->(e0:EmotionalTag)
+            WITH a, count(e0) AS c
+            WHERE c = 0
+            MATCH (et:EmotionalTag {name: 'Discovery'})
+            MERGE (a)-[r:EVOKES]->(et)
+            ON CREATE SET r.strength = 0.55, r.discovered_through = 'fallback_default', r.updated_at = datetime()
+            MERGE (et)-[:EVOKED_BY_ACTIVITY]->(a)
+            RETURN count(r) AS fallback_links_created
+            """,
+            {},
+        )
+
+        missing_after = await neo4j_client.execute_query(
+            """
+            MATCH (a:activity_type)
+            OPTIONAL MATCH (a)-[:EVOKES]->(e:EmotionalTag)
+            WITH a, count(e) AS c
+            WHERE c = 0
+            RETURN count(a) AS missing
+            """,
+            {},
+        )
+
+        return {
+            "destination": destination,
+            "min_luxury_score": min_luxury_score,
+            "min_fit": min_fit,
+            "max_links_per_activity": max_links_per_activity,
+            "missing_activities_before": int((missing_before[0].get("missing") if missing_before else 0) or 0),
+            "links_created": links_created,
+            "missing_activities_after": int((missing_after[0].get("missing") if missing_after else 0) or 0),
+            "next": "Re-run /api/lexa/admin/neo4j/quality-report to see pois_missing_emotion_links improve.",
+        }
+
+    except Exception as e:
+        logger.error("Neo4j fix-emotion-links failed", error=str(e), destination=destination)
+        raise HTTPException(status_code=500, detail=f"Neo4j fix-emotion-links failed: {str(e)}")
 
 
 # ============================================================================
@@ -980,7 +1663,7 @@ def _build_intake_turn_response(user_message: str, emotional_reading: EmotionalR
     # Keep it short and confident—one reflection, one question.
     return (
         f"I hear you. Under the surface, this feels {primary}.\n\n"
-        f"One question — so I can design the feeling (not just the logistics):\n"
+        f"One question - so I can design the feeling (not just the logistics):\n"
         f"{question_text}"
     )
 

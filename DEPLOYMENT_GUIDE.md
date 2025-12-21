@@ -110,6 +110,10 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
+# Backend API URL (FastAPI)
+# IMPORTANT: set this after you deploy the backend (Render/Railway/Fly)
+NEXT_PUBLIC_API_URL=https://your-backend.example.com
+
 # Anthropic Claude
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
@@ -148,6 +152,44 @@ After first deployment:
 2. Go to **Settings** → **Environment Variables**
 3. Update `NEXT_PUBLIC_SITE_URL` to your Vercel URL
 4. Click **"Redeploy"** (or push a new commit)
+
+---
+
+## Step 3B (Required for Experience Chat): Deploy the FastAPI Backend
+
+The `/experience/chat` and `/experience/script` flows call the FastAPI backend directly via `NEXT_PUBLIC_API_URL`.
+
+### Option A: Render (recommended MVP)
+
+1. Create a new Render **Web Service** from this repo.
+2. Render should auto-detect `render.yaml`.
+3. Set these environment variables on the Render service:
+
+```env
+ENVIRONMENT=production
+LOG_LEVEL=INFO
+
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-role-key
+
+# Neo4j
+NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your-neo4j-password
+NEO4J_DATABASE=neo4j
+
+# Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+
+# CORS (recommended in production)
+CORS_ALLOW_ORIGINS=https://your-project.vercel.app
+```
+
+4. Copy the Render service URL and set it in Vercel as:
+`NEXT_PUBLIC_API_URL=https://<your-render-service>.onrender.com`
+5. Redeploy the Vercel project.
 
 ---
 

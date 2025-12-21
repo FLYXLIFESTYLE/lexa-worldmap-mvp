@@ -74,7 +74,11 @@ class ClientSyncService:
             # Create or update ClientProfile in Neo4j
             sync_query = """
             MERGE (cp:ClientProfile {id: $account_id})
-            SET cp.email = $email,
+            ON CREATE SET
+                cp.created_at = datetime(),
+                cp.first_interaction = datetime($last_interaction)
+            SET
+                cp.email = $email,
                 cp.name = $name,
                 cp.primary_archetype = $archetype,
                 cp.estimated_wealth_tier = $wealth_tier,
@@ -88,10 +92,6 @@ class ClientSyncService:
                 cp.supabase_synced = true,
                 cp.last_sync = datetime(),
                 cp.updated_at = datetime()
-            
-            // Set created_at only if this is a new node
-            ON CREATE SET cp.created_at = datetime(),
-                          cp.first_interaction = datetime($last_interaction)
             
             RETURN cp.id AS id
             """
@@ -309,6 +309,62 @@ class ClientSyncService:
             
         except Exception as e:
             logger.error("Failed to track emotional resonance", error=str(e))
+            return False
+
+    async def sync_profile_signals(
+        self,
+        account_id: str,
+        profile_snapshot: Dict
+    ) -> bool:
+        """
+        Project a few durable 'profile' signals into Neo4j ClientProfile properties.
+
+        This stays intentionally small (Neo4j properties are primitive/arrays),
+        and complements the richer JSON we store in Supabase.
+        """
+        try:
+            await self.sync_client_to_neo4j(account_id)
+
+            intake = (profile_snapshot or {}).get("intake_signals") or {}
+            constraints = (profile_snapshot or {}).get("constraints") or {}
+
+            query = """
+            MATCH (cp:ClientProfile {id: $account_id})
+            SET cp.primary_emotion_goal = $primary_emotion_goal,
+                cp.social_appetite = $social_appetite,
+                cp.meaning_anchor = $meaning_anchor,
+                cp.red_lines = $red_lines,
+                cp.energy_rhythm_raw = $energy_rhythm_raw,
+                cp.destination_hint = $destination_hint,
+                cp.duration_days_hint = $duration_days_hint,
+                cp.month_hint = $month_hint,
+                cp.budget_hint = $budget_hint,
+                cp.profile_last_updated = datetime($profile_last_updated)
+            RETURN cp.id AS id
+            """
+
+            params = {
+                "account_id": account_id,
+                "primary_emotion_goal": intake.get("primary_emotion_goal"),
+                "social_appetite": intake.get("social_appetite"),
+                "meaning_anchor": intake.get("meaning_anchor"),
+                "red_lines": intake.get("red_lines") or [],
+                "energy_rhythm_raw": (intake.get("energy_rhythm") or {}).get("raw")
+                if isinstance(intake.get("energy_rhythm"), dict)
+                else intake.get("energy_rhythm"),
+                "destination_hint": constraints.get("destination_hint") or constraints.get("destination"),
+                "duration_days_hint": constraints.get("duration_days"),
+                "month_hint": constraints.get("month"),
+                "budget_hint": constraints.get("budget"),
+                "profile_last_updated": profile_snapshot.get("timestamp") or datetime.now().isoformat(),
+            }
+
+            await self.neo4j.execute_query(query, params)
+            logger.info("Client profile signals synced to Neo4j", account_id=account_id)
+            return True
+
+        except Exception as e:
+            logger.error("Failed to sync profile signals", error=str(e), account_id=account_id)
             return False
     
     async def get_marketing_segment(

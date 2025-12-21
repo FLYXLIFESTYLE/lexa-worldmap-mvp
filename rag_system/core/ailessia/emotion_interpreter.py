@@ -610,3 +610,12 @@ Respond in this JSON format:
 # Global emotion interpreter instance
 emotion_interpreter = EmotionInterpreter()
 
+
+def initialize_emotion_interpreter(claude_client=None) -> EmotionInterpreter:
+    """
+    Inject an optional Claude client into the global EmotionInterpreter instance.
+    """
+    global emotion_interpreter
+    emotion_interpreter.claude_client = claude_client
+    return emotion_interpreter
+

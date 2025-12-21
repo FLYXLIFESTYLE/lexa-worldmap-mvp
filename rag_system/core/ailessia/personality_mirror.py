@@ -1,17 +1,38 @@
 """
-AIlessia's Personality Mirror - Adaptive communication system.
+LEXA Personality Mirror - Adaptive communication system.
 
-This module enables AIlessia to adapt her personality, tone, and communication style
+This module enables LEXA to adapt her personality, tone, and communication style
 to match ultra-luxury clients exactly where they are emotionally.
 """
 
 from typing import Dict, Optional
 from dataclasses import dataclass
+import asyncio
 import structlog
 
 from core.ailessia.emotion_interpreter import EmotionalReading, EmotionalState
+from config.settings import settings
 
 logger = structlog.get_logger()
+
+LEXA_LUXURY_SYSTEM_PROMPT = """You are LEXA (Luxury Experience Assistant) — emotional intelligence for luxury travel experiences.
+
+Your job: create emotion-driven, themed experiences that feel rare, intimate, and inevitable — not generic itineraries.
+
+KNOWLEDGE YOU ALREADY HAVE (use it freely — do not ask basic questions you can infer):
+1) World knowledge: geography, seasons, culture, distances, logistics
+2) Human understanding: relationships, psychology, life stages, social dynamics
+3) Reasoning: time, pacing, constraints, trade-offs
+4) Luxury expertise: UHNWI expectations, discretion, status markers, service standards
+
+RULES (Luxury You Can’t Buy):
+- Be decisive and elegant. Ask fewer, better questions.
+- Never sound like a chatbot. No hedging. No “as an AI…”.
+- Never be sales-y. Luxury is implied, not pushed.
+- Anticipate the unspoken: friction, privacy, energy, relationship dynamics.
+- Make it feel personal: reflect the client's emotional subtext in one crisp line.
+- No markdown code fences. If JSON is requested, output valid JSON only.
+"""
 
 
 @dataclass
@@ -151,7 +172,7 @@ class PersonalityMirror:
         conversation_stage: str = "discovery"
     ) -> str:
         """
-        Generate AIlessia's response in the adapted tone.
+        Generate LEXA's response in the adapted tone.
         
         Args:
             content: Core content/message to communicate
@@ -161,7 +182,7 @@ class PersonalityMirror:
             conversation_stage: Current conversation stage
         
         Returns:
-            Generated response in AIlessia's voice
+            Generated response in LEXA's voice
         """
         tone_config = self.TONE_PROFILES.get(
             tone_name, 
@@ -182,10 +203,23 @@ class PersonalityMirror:
         )
         
         try:
-            # This would call Claude API
-            # response = await self.claude_client.generate(prompt)
-            # For now, return formatted content
-            response = self._format_with_tone(content, tone_config, client_name)
+            # Anthropic client is sync; call it in a thread.
+            def _call():
+                msg = self.claude_client.messages.create(
+                    model=getattr(settings, "model_name", "claude-3-5-sonnet-latest"),
+                    max_tokens=800,
+                    system=LEXA_LUXURY_SYSTEM_PROMPT,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                parts = []
+                for block in getattr(msg, "content", []) or []:
+                    if getattr(block, "type", None) == "text":
+                        parts.append(getattr(block, "text", ""))
+                return ("\n".join([p for p in parts if p]).strip()) or None
+
+            response = await asyncio.to_thread(_call)
+            if not response:
+                response = self._format_with_tone(content, tone_config, client_name)
             
             logger.info("Generated response",
                        tone=tone_name,
@@ -246,9 +280,7 @@ Emotional context:
 - Hidden desires: {', '.join(emotional_context.get('hidden_desires', []))}
 """
         
-        prompt = f"""You are AIlessia, an emotional intelligence system for ultra-luxury experiences.
-
-{name_instruction}Conversation stage: {conversation_stage}
+        prompt = f"""{name_instruction}Conversation stage: {conversation_stage}
 
 Your tone: {tone_config.style}
 Language style: {tone_config.language}
@@ -261,13 +293,14 @@ Example of this tone:
 Core message to communicate:
 {content}
 
-Transform this into AIlessia's voice with these guidelines:
+Transform this into LEXA's voice with these guidelines:
 - Deeply personal and present
 - Emotionally intelligent and intuitive
 - Never pushy or sales-y
 - Anticipatory—she knows what they need
 - Creates emotional experiences through words
 - Match the tone profile exactly
+- Keep it concise (no fluff). Ask at most one question, only if it materially improves the outcome.
 
 Generate the response:"""
         
@@ -280,7 +313,7 @@ Generate the response:"""
         is_returning: bool = False
     ) -> str:
         """
-        Generate AIlessia's opening greeting.
+        Generate LEXA's opening greeting.
         
         Args:
             client_name: Client's name
@@ -292,7 +325,7 @@ Generate the response:"""
         """
         greetings = {
             "new_client": [
-                "Welcome. I'm AIlessia, and I'm here to design something extraordinary for you.",
+                "Welcome. I'm LEXA - here to design something extraordinary for you.",
                 "Hello. I sense you're ready for an experience that truly moves you.",
                 "Welcome. Let's create something unforgettable together."
             ],
@@ -398,4 +431,13 @@ Generate the response:"""
 
 # Global personality mirror instance
 personality_mirror = PersonalityMirror()
+
+
+def initialize_personality_mirror(claude_client=None) -> PersonalityMirror:
+    """
+    Inject an optional Claude client into the global PersonalityMirror instance.
+    """
+    global personality_mirror
+    personality_mirror.claude_client = claude_client
+    return personality_mirror
 

@@ -200,5 +200,15 @@ def get_or_create_context_extractor(claude_client: Any = None) -> ContextExtract
     global context_extractor
     if context_extractor is None:
         context_extractor = ContextExtractor(claude_client=claude_client)
+    elif claude_client is not None and getattr(context_extractor, "claude_client", None) is None:
+        # Allow late injection during app startup
+        context_extractor.claude_client = claude_client
     return context_extractor
+
+
+def initialize_context_extractor(claude_client: Any = None) -> ContextExtractor:
+    """
+    Ensure the singleton exists and has the Claude client injected.
+    """
+    return get_or_create_context_extractor(claude_client=claude_client)
 

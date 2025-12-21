@@ -127,7 +127,7 @@ class POIRecommendationService:
         result = await neo4j_client.execute_query(query, params)
         
         pois = []
-        for record in result.records:
+        for record in result or []:
             pois.append({
                 "name": record["name"],
                 "rating": record.get("rating"),
@@ -213,7 +213,7 @@ class POIRecommendationService:
         result = await neo4j_client.execute_query(query, params)
         
         pois = []
-        for record in result.records:
+        for record in result or []:
             pois.append({
                 "name": record["name"],
                 "rating": record.get("rating"),

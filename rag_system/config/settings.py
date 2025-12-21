@@ -3,7 +3,7 @@ Configuration settings for the RAG system.
 This file loads all environment variables and provides them to the application.
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 from pathlib import Path
 
@@ -13,12 +13,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
+
+    # Pydantic Settings v2 configuration:
+    # - `extra="ignore"` makes the backend robust when the environment contains
+    #   unrelated variables (e.g. Next.js `NEXT_PUBLIC_*`).
+    model_config = SettingsConfigDict(
+        env_file=str(BASE_DIR / ".env"),
+        case_sensitive=False,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
     
     # API Configuration
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     environment: str = "development"
     log_level: str = "INFO"
+
+    # CORS (comma-separated list). Use "*" for MVP or set to your Vercel domain(s) in production.
+    cors_allow_origins: str = "*"
     
     # Neo4j Configuration
     neo4j_uri: str
@@ -61,13 +74,14 @@ class Settings(BaseSettings):
     def regions_list(self) -> List[str]:
         """Returns supported regions as a list."""
         return [r.strip() for r in self.supported_regions.split(",")]
+
+    @property
+    def cors_allow_origins_list(self) -> List[str]:
+        v = (self.cors_allow_origins or "*").strip()
+        if v == "*":
+            return ["*"]
+        return [x.strip() for x in v.split(",") if x.strip()]
     
-    class Config:
-        env_file = str(BASE_DIR / ".env")
-        case_sensitive = False
-        env_file_encoding = 'utf-8'
-
-
 # Global settings instance
 settings = Settings()
 

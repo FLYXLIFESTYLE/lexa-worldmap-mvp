@@ -753,7 +753,7 @@ export default function ExperienceBuilderPage() {
               onClick={handleApprove}
               className="group relative overflow-hidden px-10 py-4 rounded-xl bg-gradient-to-r from-lexa-gold to-yellow-600 text-zinc-900 font-semibold transition-all hover:scale-105 hover:shadow-2xl hover:shadow-lexa-gold/50 flex items-center gap-2"
             >
-              <span>Continue to AIlessia</span>
+              <span>Continue to LEXA</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>

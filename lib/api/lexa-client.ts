@@ -207,7 +207,7 @@ class LexaAPIClient {
   // ==========================================================================
 
   /**
-   * Send message to AIlessia
+   * Send message to LEXA
    */
   async converse(data: ConverseRequest): Promise<ConverseResponse> {
     return this.request<ConverseResponse>('/api/lexa/converse', {

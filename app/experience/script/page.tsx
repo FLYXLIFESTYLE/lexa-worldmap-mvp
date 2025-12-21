@@ -271,7 +271,7 @@ export default function ScriptPreviewPage() {
         <div className="bg-gradient-to-br from-lexa-navy via-zinc-900 to-black rounded-2xl p-12 text-center text-white">
           <h3 className="text-2xl font-bold mb-4">Ready to make this real?</h3>
           <p className="text-zinc-300 mb-8 max-w-2xl mx-auto">
-            This script is the beginning. Book a consultation with a LEXA travel curator to bring this vision to life—or let AIlessia refine it further.
+            This script is the beginning. Book a consultation with a LEXA travel curator to bring this vision to life - or let LEXA refine it further.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <button
@@ -291,7 +291,7 @@ export default function ScriptPreviewPage() {
 
         {/* Footer Note */}
         <div className="text-center text-sm text-zinc-500 pt-8">
-          <p>Crafted by AIlessia • Powered by emotional intelligence • {new Date().toLocaleDateString()}</p>
+          <p>Crafted by LEXA • Powered by emotional intelligence • {new Date().toLocaleDateString()}</p>
         </div>
       </main>
     </div>

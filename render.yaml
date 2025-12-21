@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: lexa-backend
+    runtime: python
+    plan: starter
+    rootDir: rag_system
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+

@@ -74,6 +74,19 @@ class Neo4jClient:
         except Exception as e:
             logger.error("Failed to initialize schema", error=str(e))
             raise
+
+    async def execute_query(self, cypher_query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """
+        Convenience wrapper used across the codebase.
+
+        Returns:
+            List of dictionaries (Neo4j result rows).
+        """
+        await self.connect()
+        params = params or {}
+        async with self._driver.session(database=settings.neo4j_database) as session:
+            result = await session.run(cypher_query, params)
+            return await result.data()
     
     async def search_regions(
         self,
