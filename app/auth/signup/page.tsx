@@ -12,6 +12,8 @@ import { Sparkles } from 'lucide-react';
 import { lexaAPI, saveToLocalStorage } from '@/lib/api/lexa-client';
 
 export default function SignUpPage() {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,6 +28,13 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
+      // Validate name fields
+      if (!firstName.trim() || !lastName.trim()) {
+        setError('Please enter your first and last name');
+        setLoading(false);
+        return;
+      }
+
       // 1. Create Supabase auth account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -37,10 +46,10 @@ export default function SignUpPage() {
 
       if (authError) throw authError;
 
-      // 2. Create LEXA account in backend (with automatic fallback to UUID if offline)
+      // 2. Create LEXA account in backend with full name
       const lexaAccount = await lexaAPI.createAccount({
         email,
-        name: email.split('@')[0], // Use email prefix as name for now
+        name: `${firstName.trim()} ${lastName.trim()}`,
       });
 
       console.log('✅ LEXA account created:', {
@@ -147,6 +156,37 @@ export default function SignUpPage() {
                 {error}
               </div>
             )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="firstName" className="block text-sm font-semibold text-zinc-700 mb-2">
+                  First Name
+                </label>
+                <input
+                  id="firstName"
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  className="w-full rounded-xl border-2 border-zinc-200 px-4 py-3 text-zinc-900 focus:border-lexa-gold focus:outline-none focus:ring-2 focus:ring-lexa-gold/20 transition-all"
+                  placeholder="John"
+                />
+              </div>
+              <div>
+                <label htmlFor="lastName" className="block text-sm font-semibold text-zinc-700 mb-2">
+                  Last Name
+                </label>
+                <input
+                  id="lastName"
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  className="w-full rounded-xl border-2 border-zinc-200 px-4 py-3 text-zinc-900 focus:border-lexa-gold focus:outline-none focus:ring-2 focus:ring-lexa-gold/20 transition-all"
+                  placeholder="Doe"
+                />
+              </div>
+            </div>
 
             <div>
               <label htmlFor="email" className="block text-sm font-semibold text-zinc-700 mb-2">

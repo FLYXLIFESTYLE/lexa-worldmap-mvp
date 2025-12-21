@@ -317,7 +317,8 @@ async def converse_with_ailessia(request: ConverseRequest):
             anticipated_desires=anticipated_desires,
             proactive_suggestions=proactive_suggestions,
             conversation_stage=current_stage,
-            client_profile=client_profile
+            client_profile=client_profile,
+            conversation_history=conversation_history
         )
         
         # 8. Generate AIlessia's response in adapted tone
@@ -699,7 +700,7 @@ async def _determine_conversation_stage(
     conversation_history: List[Dict],
     message: str
 ) -> str:
-    """Determine current conversation stage."""
+    """Determine current conversation stage based on conversation depth and content."""
     message_lower = message.lower()
     turn_count = len([m for m in conversation_history if m.get("role") == "user"])
     
@@ -707,10 +708,12 @@ async def _determine_conversation_stage(
     if turn_count <= 1:
         return "opening"  # First user message = opening
     elif turn_count == 2:
-        return "discovery"  # Second turn = start discovering
-    elif any(word in message_lower for word in ["yes", "sounds good", "perfect", "let's do it"]):
+        return "deepening"  # Second turn = deepen understanding
+    elif turn_count == 3:
+        return "discovery"  # Third turn = discover specifics
+    elif any(word in message_lower for word in ["yes", "sounds good", "perfect", "let's do it", "that's right"]):
         return "recommendation"
-    elif any(word in message_lower for word in ["change", "different", "instead", "prefer"]):
+    elif any(word in message_lower for word in ["change", "different", "instead", "prefer", "actually"]):
         return "refinement"
     elif turn_count > 8:
         return "closing"
@@ -747,43 +750,210 @@ async def _build_response_content(
     anticipated_desires: List,
     proactive_suggestions: List[Dict],
     conversation_stage: str,
-    client_profile: Dict
+    client_profile: Dict,
+    conversation_history: List[Dict] = None
 ) -> str:
-    """Build core response content before tone adaptation."""
+    """Build core response content with gentle, empathetic listening."""
     message_lower = message.lower()
     
-    # Opening stage - acknowledge their answer and dig deeper
+    # Opening stage - acknowledge their answer gently and dig deeper
     if conversation_stage == "opening":
-        # They've answered, now ask a follow-up
+        # They've answered the initial question, respond to what they said
         if "peace" in message_lower or "relax" in message_lower or "calm" in message_lower:
-            return "Peace and serenity... I hear that. Tell me, what does 'peace of mind' look like for you? Is it absolute silence, or maybe the sound of waves?"
+            return (
+                "Peace and serenity... I hear that. Sometimes we all need that deep exhale, don't we? "
+                "When you think of 'peace of mind,' what does it look like for you? "
+                "Maybe it's absolute silence under the stars, or perhaps the gentle rhythm of waves on a shore, "
+                "or even the soft sounds of nature around you. What calls to you?"
+            )
         elif "connect" in message_lower or "partner" in message_lower or "love" in message_lower:
-            return "Connection with your partner... beautiful. What kind of moments bring you two closest together? Quiet intimacy or shared adventure?"
+            return (
+                "Connection with your partner... that's beautiful. The moments that bring us closest to someone we love "
+                "are so precious. I'm curious—what kind of moments make you two feel most connected? "
+                "Is it quiet intimacy over a private dinner, or maybe shared adventure and discovery together? "
+                "Tell me what 'together' feels like at its best for you both."
+            )
         elif "proud" in message_lower or "achiev" in message_lower or "special" in message_lower:
-            return "You want to feel proud of this achievement. Tell me, what would make this truly extraordinary? What's the pinnacle moment you're imagining?"
+            return (
+                "You want to feel genuinely proud of this achievement—I love that. "
+                "This isn't just about *doing* something; it's about creating a moment that lives in your memory forever. "
+                "What would make this truly extraordinary for you? Is it a pinnacle moment—like reaching a summit, "
+                "or maybe something more intimate, like a private celebration in a place that takes your breath away? "
+                "What's the feeling you want to carry with you afterward?"
+            )
         elif "free" in message_lower or "spontaneous" in message_lower:
-            return "Freedom and spontaneity... I sense you're craving escape from structure. What constraints are you leaving behind?"
+            return (
+                "Freedom and spontaneity... yes, I sense you're craving escape from the usual structure. "
+                "Sometimes we need to just *be*, without schedules or expectations. "
+                "Tell me—what constraints are you hoping to leave behind, even if just for a while? "
+                "And when you imagine yourself completely free, what are you doing? Are you wandering, "
+                "exploring, or maybe just sitting somewhere stunning without a care in the world?"
+            )
+        elif "present" in message_lower or "apologize" in message_lower or "missing" in message_lower or "fomo" in message_lower:
+            return (
+                "Being fully present, without that nagging fear of missing out or the weight of apologies... "
+                "that's profound. It sounds like you're seeking permission to just *be* in the moment, guilt-free. "
+                "I'm imagining you somewhere where time slows down, where there's nothing pulling at your attention. "
+                "What kind of environment makes you feel most at ease? Is it the openness of the sea, "
+                "the intimacy of a hidden villa, or perhaps something entirely different?"
+            )
         else:
-            return f"I hear what you're seeking. Now, tell me more - when you imagine closing your eyes at the end of this experience, what specific feeling do you want to have?"
+            # Generic but gentle response
+            return (
+                f"I hear what you're seeking. Let me understand you better. "
+                f"When you imagine closing your eyes at the very end of this experience—after everything—"
+                f"what specific feeling do you want to have? Maybe it's contentment, maybe joy, "
+                f"maybe something deeper. There's no wrong answer—just what's true for you."
+            )
     
-    # Discovery stage
+    # Deepening stage - acknowledge their answer and ask about specifics
+    elif conversation_stage == "deepening":
+        # Extract what they mentioned from their message
+        location_mentioned = None
+        if "monaco" in message_lower:
+            location_mentioned = "Monaco"
+        elif "france" in message_lower or "french" in message_lower or "riviera" in message_lower:
+            location_mentioned = "the French Riviera"
+        elif "italy" in message_lower or "italian" in message_lower or "amalfi" in message_lower:
+            location_mentioned = "the Amalfi Coast"
+        
+        # Check if they mentioned specifics or kept it vague
+        if "same" in message_lower or "similar" in message_lower or "like that" in message_lower:
+            # They're confirming what was already said
+            if location_mentioned:
+                return (
+                    f"Wonderful. So you're drawn to {location_mentioned}—that makes perfect sense for what you're seeking. "
+                    f"Now, tell me about timing. When are you imagining this experience? "
+                    f"Is it soon, within the next few months, or are you dreaming a bit further ahead?"
+                )
+            else:
+                return (
+                    f"I understand. So we're looking for that same feeling—sustained and deep. "
+                    f"Let me ask you this: when you picture yourself in that state, where are you? "
+                    f"Are you by the ocean, in the mountains, or perhaps in an intimate city setting?"
+                )
+        elif location_mentioned:
+            return (
+                f"Ah, {location_mentioned}—excellent choice. There's something truly special about that area. "
+                f"And you want to feel that sense of {_extract_emotion_from_history(conversation_history)} there. "
+                f"Tell me, are you imagining yourself staying in one beautiful place, "
+                f"or would you prefer to explore and move between a few carefully chosen spots?"
+            )
+        else:
+            # They gave more emotional detail
+            return (
+                f"I'm really hearing you now. {_acknowledge_emotion(message_lower)} "
+                f"So we're creating an experience where you can truly {_extract_main_desire(message_lower)}. "
+                f"Last question for now: who's joining you on this journey? "
+                f"Is this for you alone, with your partner, or perhaps a small group of close friends or family?"
+            )
+    
+    # Discovery stage - build on what they've shared
     elif conversation_stage == "discovery":
         if anticipated_desires:
             desire = anticipated_desires[0]
-            return f"I'm sensing that {desire.emotional_fulfillment}. Let me ask you this: {_generate_discovery_question(desire, emotional_reading)}"
+            return (
+                f"I think I'm getting the full picture now. Based on everything you've told me, "
+                f"I'm sensing that {desire.emotional_fulfillment}. "
+                f"Before I show you what I have in mind, let me confirm one thing: {_generate_discovery_question(desire, emotional_reading)}"
+            )
         else:
-            return "Tell me more about what you're imagining. What emotions do you want to feel during this experience?"
+            return (
+                "I'm building a clear picture of what matters to you. "
+                "One more thing—what emotions do you want to feel during this experience? "
+                "For example, do you want to feel adventurous and alive, peaceful and restored, "
+                "or maybe deeply connected to the world around you?"
+            )
     
     # Recommendation stage
     elif conversation_stage == "recommendation":
         if proactive_suggestions:
-            return f"Based on everything you've shared, I have some perfect experiences in mind. {_format_suggestions(proactive_suggestions)}"
+            return (
+                f"Perfect. I believe I have exactly what you're looking for. "
+                f"Based on everything you've shared—your desire for {_extract_main_emotion_from_history(conversation_history)}, "
+                f"the setting you've described, and the feeling you want to carry with you—"
+                f"here's what I'm seeing for you: {_format_suggestions(proactive_suggestions)}"
+            )
         else:
-            return "I'm starting to see exactly what you need. Let me curate some experiences that will resonate deeply with you."
+            return (
+                "I have it now. Give me just a moment—"
+                "I'm curating something that I believe will resonate deeply with everything you've told me."
+            )
     
     # Default
     else:
-        return "I'm listening. Tell me more about what you're seeking."
+        return (
+            "I'm listening. Tell me more about what you're seeking, and I'll help you find it."
+        )
+
+
+def _extract_emotion_from_history(conversation_history: List[Dict]) -> str:
+    """Extract the main emotion mentioned in the conversation."""
+    if not conversation_history:
+        return "peace"
+    
+    first_user_msg = next((m["content"].lower() for m in conversation_history if m["role"] == "user"), "")
+    if "peace" in first_user_msg or "relax" in first_user_msg:
+        return "peace and serenity"
+    elif "connect" in first_user_msg or "partner" in first_user_msg:
+        return "deep connection"
+    elif "proud" in first_user_msg or "achiev" in first_user_msg:
+        return "pride and accomplishment"
+    elif "free" in first_user_msg or "spontaneous" in first_user_msg:
+        return "freedom and spontaneity"
+    else:
+        return "tranquility"
+
+
+def _acknowledge_emotion(message: str) -> str:
+    """Acknowledge the emotion in their message."""
+    if "present" in message or "moment" in message:
+        return "Being fully present is such a gift to yourself."
+    elif "relax" in message or "calm" in message:
+        return "That deep relaxation you're craving—I understand completely."
+    elif "escape" in message or "away" in message:
+        return "Sometimes we need to step away from it all."
+    else:
+        return "I hear the longing in what you're describing."
+
+
+def _extract_main_desire(message: str) -> str:
+    """Extract what they want to do/feel."""
+    if "relax" in message:
+        return "let go and truly relax"
+    elif "present" in message or "be" in message:
+        return "be fully present"
+    elif "connect" in message:
+        return "connect deeply"
+    elif "explore" in message or "discover" in message:
+        return "explore and discover"
+    else:
+        return "experience something meaningful"
+
+
+def _extract_main_emotion_from_history(conversation_history: List[Dict]) -> str:
+    """Get a summary of what they're seeking from the full conversation."""
+    if not conversation_history:
+        return "peace and connection"
+    
+    all_text = " ".join([m["content"].lower() for m in conversation_history if m["role"] == "user"])
+    
+    emotions = []
+    if "peace" in all_text or "relax" in all_text or "calm" in all_text:
+        emotions.append("peace")
+    if "present" in all_text or "moment" in all_text:
+        emotions.append("presence")
+    if "connect" in all_text:
+        emotions.append("connection")
+    if "free" in all_text or "spontaneous" in all_text:
+        emotions.append("freedom")
+    
+    if len(emotions) >= 2:
+        return f"{emotions[0]} and {emotions[1]}"
+    elif emotions:
+        return emotions[0]
+    else:
+        return "tranquility and meaning"
 
 
 def _generate_discovery_question(desire, emotional_reading) -> str:
