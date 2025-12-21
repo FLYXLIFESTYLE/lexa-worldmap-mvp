@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
             logger.error("Neo4j connection verification failed")
             sys.exit(1)
         
-        logger.info("All databases ready, AIlessia fully initialized")
+        logger.info("All databases ready, LEXA fully initialized")
         
     except Exception as e:
         logger.error("Startup failed", error=str(e))

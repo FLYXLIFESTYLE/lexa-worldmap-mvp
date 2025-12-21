@@ -149,7 +149,7 @@ class LexaAPIClient {
    */
   async createAccount(data: AccountCreateRequest): Promise<AccountResponse> {
     try {
-      const response = await this.request<AccountResponse>('/api/ailessia/account/create', {
+      const response = await this.request<AccountResponse>('/api/lexa/account/create', {
         method: 'POST',
         body: JSON.stringify(data),
       });
@@ -196,7 +196,7 @@ class LexaAPIClient {
    * Get account by ID
    */
   async getAccount(accountId: string): Promise<AccountResponse> {
-    return this.request<AccountResponse>(`/api/ailessia/account/${accountId}`, {
+    return this.request<AccountResponse>(`/api/lexa/account/${accountId}`, {
       method: 'GET',
     });
   }
@@ -209,7 +209,7 @@ class LexaAPIClient {
    * Send message to AIlessia
    */
   async converse(data: ConverseRequest): Promise<ConverseResponse> {
-    return this.request<ConverseResponse>('/api/ailessia/converse', {
+    return this.request<ConverseResponse>('/api/lexa/converse', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -249,7 +249,7 @@ class LexaAPIClient {
    * Compose experience script
    */
   async composeScript(data: ComposeScriptRequest): Promise<ScriptResponse> {
-    return this.request<ScriptResponse>('/api/ailessia/compose-script', {
+    return this.request<ScriptResponse>('/api/lexa/compose-script', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -259,7 +259,7 @@ class LexaAPIClient {
    * Get script by ID
    */
   async getScript(scriptId: string): Promise<ScriptResponse> {
-    return this.request<ScriptResponse>(`/api/ailessia/script/${scriptId}`, {
+    return this.request<ScriptResponse>(`/api/lexa/script/${scriptId}`, {
       method: 'GET',
     });
   }
@@ -269,7 +269,7 @@ class LexaAPIClient {
    */
   async downloadScriptPDF(scriptId: string): Promise<Blob> {
     const response = await fetch(
-      `${this.baseURL}/api/ailessia/script/${scriptId}/pdf`
+      `${this.baseURL}/api/lexa/script/${scriptId}/pdf`
     );
     if (!response.ok) {
       throw new Error('Failed to download PDF');
@@ -288,7 +288,7 @@ class LexaAPIClient {
     data: POIRecommendationRequest
   ): Promise<POIRecommendationResponse> {
     return this.request<POIRecommendationResponse>(
-      '/api/ailessia/recommendations/pois',
+      '/api/lexa/recommendations/pois',
       {
         method: 'POST',
         body: JSON.stringify(data),
@@ -311,7 +311,7 @@ class LexaAPIClient {
     script_id?: string;
     session_id?: string;
   }): Promise<{ status: string }> {
-    return this.request<{ status: string }>('/api/ailessia/feedback', {
+    return this.request<{ status: string }>('/api/lexa/feedback', {
       method: 'POST',
       body: JSON.stringify(data),
     });
