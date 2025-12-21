@@ -173,10 +173,10 @@ class LexaAPIClient {
         session_id: `session-${uuid}`,
         email: data.email,
         name: data.name || data.email.split('@')[0],
-        personality_archetype: null,
+        personality_archetype: undefined, // Changed from null to undefined
         vip_status: 'General',
         total_scripts_created: 0,
-        ailessia_greeting: null,
+        ailessia_greeting: undefined, // Changed from null to undefined
       };
       
       // Store offline account
