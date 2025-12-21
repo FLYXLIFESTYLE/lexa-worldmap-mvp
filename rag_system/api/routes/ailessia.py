@@ -277,14 +277,14 @@ async def converse_with_ailessia(request: ConverseRequest):
             activity_preferences=None  # Could add from account history
         )
         
-        # Store in account profile
+        # Store in account profile (emotional_profile only - archetype_weights column to be added later)
         await get_account_manager().update_account_profile(
             account_id=request.account_id,
-            emotional_profile=emotional_resonances,
-            archetype_weights=archetype_weights.as_dict()
+            emotional_profile=emotional_resonances
+            # archetype_weights=archetype_weights.as_dict()  # TODO: Add this column to Supabase schema
         )
         
-        logger.info("Archetype weights calculated and stored",
+        logger.info("Archetype weights calculated (stored in memory for this session)",
                    account_id=request.account_id,
                    weights=archetype_weights.as_dict())
         
