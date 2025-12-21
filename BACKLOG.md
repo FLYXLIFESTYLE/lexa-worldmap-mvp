@@ -139,6 +139,29 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
   - [ ] User mentioned in priority list
   - [ ] Better showcase of LEXA's value proposition
 
+### **Frontend Refinements** ⚠️ NEW - Dec 21
+- [ ] **Theme Category Images** (Complexity: Medium, 3 hours)
+  - Current: 12 theme categories use icons (Sparkles, etc.)
+  - Requested: Replace with license-free images (like destinations)
+  - Use Unsplash for curated luxury-themed images
+  - Maintains visual consistency with destination cards
+- [ ] **Landing Page Dynamic Sections** (Complexity: High, 1-2 weeks) 🔮 FUTURE
+  - [ ] 4 Latest Experience Scripts section with marketplace link
+  - [ ] 4 Latest Blog Posts section  
+  - [ ] Theme Categories with images, links, and descriptions
+  - Note: Requires content management system and marketplace
+  - Status: Placeholder TODO comments exist in code
+- [ ] **Destination Naming Consistency** (Complexity: Low, 1 hour)
+  - Review all 17 destinations for consistent "City • Region • Country" format
+  - Currently varies: "Monaco • French Riviera • France" vs "Maldives • Indian Ocean"
+  - Ensure geographic hierarchy is clear and consistent
+- [ ] **Improve Duplicate Email Handling** (Complexity: Low, 1 hour)
+  - Backend checks for duplicates, returns existing account
+  - Frontend shows generic Supabase Auth error
+  - Add proactive email check before Supabase signup attempt
+  - Show friendly message: "This email already has an account. Sign in instead?"
+  - Add "Forgot password?" link to error message
+
 ### **Bugs/Issues**
 - [ ] **Fix Port Conflict Handling** - Better detection/resolution when port 3000 is in use (Complexity: Low)
 - [ ] **Handle Empty Neo4j Responses** - Graceful handling when no data returned (Complexity: Low)
@@ -358,6 +381,36 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
 - [ ] **Batch Edit Knowledge Entries** - Edit multiple entries at once (Complexity: Medium)
 - [ ] **Add Undo/Redo to Knowledge Editor** - Prevent accidental loss (Complexity: Low)
 
+### **AIfred/Backend Intelligence** 🔮 PHASE 3 - Dec 21
+- [ ] **Behavioral Trait Detection During Conversation** (Complexity: High, 2-3 weeks)
+  - Detect communication style: short answers = concise preference, lengthy = detail-oriented
+  - Detect urgency: impatient = wants fast results, exploratory = enjoys the journey
+  - Detect decision-making: quick decisions = confident, asks many questions = analytical
+  - Store traits in client profile for personalized interaction style
+  - Adapt LEXA's response length and pacing accordingly
+  - Documented in: `rag_system/PHASE_3_ADVANCED_FEATURES.md`
+- [ ] **Unstructured Data Ingestion & Analysis** (Complexity: Very High, 3-4 weeks)
+  - Ingest Zoom transcripts with speaker detection
+  - Analyze news articles and blog posts for industry insights
+  - Extract structured data with Claude/GPT-4
+  - Captain approval required before data usage
+  - Automatic and manual deletion options
+  - Multi-format support: audio, video, text, PDF
+  - Documented in: `rag_system/PHASE_3_ADVANCED_FEATURES.md`
+- [ ] **Historical AI Chat Integration** (Complexity: High, 2 weeks)
+  - Import 5 years of previous AI conversations
+  - Extract patterns and insights
+  - Continuous learning from historical data
+  - Knowledge graph integration for context
+  - Documented in: `rag_system/PHASE_3_ADVANCED_FEATURES.md`
+- [ ] **Codebreaker AI Integration** (Complexity: Very High, 4+ weeks) 🔮
+  - Integrate B.A.N.K. buying behavior analysis
+  - External tool: https://codebreakertech.com/codebreaker-ai.html
+  - Complements weighted archetype calculation
+  - Provides deeper client profiling
+  - Note: Different from internal archetype weights
+  - Requires API partnership with Codebreaker
+
 ### **Observability & QA** ⭐ NEW
 - [ ] **Dashboard Day-over-Day KPIs** - Add `stats_history` table + nightly snapshot + API delta + UI arrows (Complexity: Medium)
 - [ ] **RAG Regression Harness** - Golden Q/A set hitting Neo4j+embeddings; alert on quality drops (Complexity: Medium)
@@ -525,6 +578,19 @@ Currently being worked on:
   - EMERGENCY_DEPLOYMENT_GUIDE.md
 - ✅ Automated deployment via GitHub + Vercel (Dec 20)
 
+### **Week of Dec 21 (Sprint Day):**
+- ✅ Name fields added to signup (Dec 21)
+  - First Name and Last Name fields (side-by-side)
+  - Full name validation before signup
+  - Passed to backend as "FirstName LastName"
+- ✅ Conversation flow complete rewrite (Dec 21) ⭐ MAJOR QUALITY IMPROVEMENT
+  - Empathetic, gentle responses with examples
+  - Context-aware progression (opening → deepening → discovery → recommendation)
+  - Extracts locations, emotions from conversation history
+  - No more repetitive questions
+  - Helper functions for emotion tracking
+  - LEXA now truly listens and builds on previous answers
+
 ---
 
 ## 💡 Ideas Parking Lot
@@ -584,15 +650,15 @@ Future exploration (not prioritized yet):
 
 ## 📊 Backlog Statistics
 
-- **Total Items**: 120+
+- **Total Items**: 130+
 - **High Priority**: 25+ (includes strategic pivot items)
 - **Quick Wins**: 6 (ready to implement)
-- **Medium Priority**: 35+
+- **Medium Priority**: 41+ (includes new Phase 3 items)
 - **Low Priority**: 30+
 - **Ideas Parking Lot**: 25+
-- **Completed (Dec 2025)**: 24
+- **Completed (Dec 2025)**: 30+ (including Dec 21 sprint)
 - **Critical Path**: Multi-source discovery → Emotional intelligence → User features
-- **Last Major Update**: Dec 18, 2025 (Strategic Pivot to Activity-First Discovery)
+- **Last Major Update**: Dec 21, 2025 (Conversation quality improvements + Phase 3 backlog items)
 
 ---
 
