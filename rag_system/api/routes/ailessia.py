@@ -704,8 +704,10 @@ async def _determine_conversation_stage(
     turn_count = len([m for m in conversation_history if m.get("role") == "user"])
     
     # Stage progression logic
-    if turn_count <= 2:
-        return "opening"
+    if turn_count <= 1:
+        return "opening"  # First user message = opening
+    elif turn_count == 2:
+        return "discovery"  # Second turn = start discovering
     elif any(word in message_lower for word in ["yes", "sounds good", "perfect", "let's do it"]):
         return "recommendation"
     elif any(word in message_lower for word in ["change", "different", "instead", "prefer"]):
@@ -750,9 +752,19 @@ async def _build_response_content(
     """Build core response content before tone adaptation."""
     message_lower = message.lower()
     
-    # Opening stage
+    # Opening stage - acknowledge their answer and dig deeper
     if conversation_stage == "opening":
-        return "I'm here to create something extraordinary for you. Tell me, what brings you to me today? What kind of experience are you dreaming of?"
+        # They've answered, now ask a follow-up
+        if "peace" in message_lower or "relax" in message_lower or "calm" in message_lower:
+            return "Peace and serenity... I hear that. Tell me, what does 'peace of mind' look like for you? Is it absolute silence, or maybe the sound of waves?"
+        elif "connect" in message_lower or "partner" in message_lower or "love" in message_lower:
+            return "Connection with your partner... beautiful. What kind of moments bring you two closest together? Quiet intimacy or shared adventure?"
+        elif "proud" in message_lower or "achiev" in message_lower or "special" in message_lower:
+            return "You want to feel proud of this achievement. Tell me, what would make this truly extraordinary? What's the pinnacle moment you're imagining?"
+        elif "free" in message_lower or "spontaneous" in message_lower:
+            return "Freedom and spontaneity... I sense you're craving escape from structure. What constraints are you leaving behind?"
+        else:
+            return f"I hear what you're seeking. Now, tell me more - when you imagine closing your eyes at the end of this experience, what specific feeling do you want to have?"
     
     # Discovery stage
     elif conversation_stage == "discovery":
