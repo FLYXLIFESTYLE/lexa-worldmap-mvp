@@ -5,6 +5,7 @@ Health check endpoints.
 from fastapi import APIRouter, HTTPException
 from database.neo4j_client import neo4j_client
 from database.supabase_vector_client import vector_db_client
+from config.settings import settings
 import structlog
 
 logger = structlog.get_logger()
@@ -22,16 +23,17 @@ async def health_check():
         # Check Neo4j connection
         neo4j_ok = await neo4j_client.verify_connection()
         
-        # Check Qdrant connection (simple test)
-        qdrant_ok = vector_db_client.client is not None
+        # Check Supabase connection (simple test)
+        supabase_ok = vector_db_client.client is not None
         
         health_status = {
-            "status": "healthy" if (neo4j_ok and qdrant_ok) else "degraded",
+            "status": "healthy" if (neo4j_ok and supabase_ok) else "degraded",
             "neo4j": "connected" if neo4j_ok else "disconnected",
-            "qdrant": "connected" if qdrant_ok else "disconnected"
+            "supabase": "connected" if supabase_ok else "disconnected",
+            "embeddings_enabled": bool(getattr(settings, "enable_embeddings", False)),
         }
         
-        if not neo4j_ok or not qdrant_ok:
+        if not neo4j_ok or not supabase_ok:
             logger.warning("Health check shows degraded state", **health_status)
             raise HTTPException(status_code=503, detail=health_status)
         
@@ -53,9 +55,9 @@ async def readiness_check():
     """
     try:
         neo4j_ok = await neo4j_client.verify_connection()
-        qdrant_ok = vector_db_client.client is not None
+        supabase_ok = vector_db_client.client is not None
         
-        if neo4j_ok and qdrant_ok:
+        if neo4j_ok and supabase_ok:
             return {"status": "ready"}
         else:
             raise HTTPException(status_code=503, detail={"status": "not_ready"})
