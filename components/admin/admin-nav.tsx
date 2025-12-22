@@ -80,6 +80,12 @@ const adminPages = [
     description: 'Initialize theme categories'
   },
   {
+    name: 'Yacht Destinations',
+    href: '/admin/upload-yacht-destinations',
+    icon: '⛵',
+    description: 'Upload yacht ports & routes'
+  },
+  {
     name: 'Upload History',
     href: '/admin/knowledge/history',
     icon: '📊',
