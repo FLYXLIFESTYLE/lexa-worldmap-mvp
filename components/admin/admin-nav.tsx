@@ -38,6 +38,12 @@ const adminPages = [
     description: 'Query database'
   },
   {
+    name: 'LEXA Demo Chat',
+    href: '/demo/chat',
+    icon: '✨',
+    description: 'Test conversation flow'
+  },
+  {
     name: 'Platform Architecture',
     href: '/admin/documentation',
     icon: '📖',

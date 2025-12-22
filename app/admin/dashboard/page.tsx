@@ -20,6 +20,16 @@ interface DashboardStats {
 
 const adminTools = [
   {
+    id: 'demo-chat',
+    name: 'LEXA Demo Chat',
+    description: 'Test the LEXA conversation experience with admin access',
+    icon: '✨',
+    href: '/demo/chat',
+    color: 'bg-gradient-to-r from-lexa-gold to-yellow-600',
+    features: ['Full conversation flow', 'Dark/Light mode', 'Reset session', 'Admin testing'],
+    featured: true
+  },
+  {
     id: 'captains-portal',
     name: "Captain's Knowledge Portal",
     description: 'Contribute knowledge, upload files, scrape URLs, and manage content',
@@ -368,8 +378,10 @@ export default function AdminDashboard() {
               <Link
                 key={tool.id}
                 href={tool.comingSoon ? '#' : tool.href}
-                className={`bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden ${
+                className={`bg-white rounded-lg shadow-sm hover:shadow-md transition-all overflow-hidden ${
                   tool.comingSoon ? 'opacity-60 cursor-not-allowed' : ''
+                } ${
+                  tool.featured ? 'ring-2 ring-lexa-gold shadow-lg shadow-lexa-gold/20 hover:shadow-xl hover:shadow-lexa-gold/30' : ''
                 }`}
                 onClick={(e) => tool.comingSoon && e.preventDefault()}
               >
@@ -380,6 +392,11 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">
                         {tool.name}
+                        {tool.featured && (
+                          <span className="ml-2 text-xs bg-lexa-gold text-zinc-900 px-2 py-1 rounded font-bold">
+                            NEW
+                          </span>
+                        )}
                         {tool.comingSoon && (
                           <span className="ml-2 text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
                             Coming Soon
