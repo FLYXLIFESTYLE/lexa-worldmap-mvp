@@ -34,11 +34,35 @@ interface POIEditModalProps {
 }
 
 export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
+  const [activePoiId, setActivePoiId] = useState<string>(poiId);
   const [poi, setPoi] = useState<POIDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Relationship editing
+  const [relInput, setRelInput] = useState({
+    destination: '',
+    theme: '',
+    activity: '',
+    emotion: '',
+  });
+
+  // Jump-to-POI via relation click (search POIs by text)
+  const [jump, setJump] = useState<{
+    isOpen: boolean;
+    query: string;
+    isLoading: boolean;
+    error: string | null;
+    results: Array<{ poi_uid: string; name: string; destination_name: string | null; type: string | null }>;
+  }>({
+    isOpen: false,
+    query: '',
+    isLoading: false,
+    error: null,
+    results: [],
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -50,12 +74,17 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
     captain_comments: '',
   });
 
+  // Keep activePoiId in sync with the initial poiId (when user opens modal for a different POI)
+  useEffect(() => {
+    setActivePoiId(poiId);
+  }, [poiId]);
+
   // Fetch POI details
   useEffect(() => {
     const fetchPOI = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/knowledge/poi/${poiId}`);
+        const response = await fetch(`/api/knowledge/poi/${activePoiId}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch POI details');
@@ -83,7 +112,112 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
     };
 
     fetchPOI();
-  }, [poiId]);
+  }, [activePoiId]);
+
+  const refreshPoi = async () => {
+    try {
+      const response = await fetch(`/api/knowledge/poi/${activePoiId}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setPoi(data.poi);
+    } catch {
+      // ignore
+    }
+  };
+
+  const updateRelation = async (
+    action: 'add' | 'remove',
+    kind: 'destination' | 'theme' | 'activity' | 'emotion',
+    value: string
+  ) => {
+    const v = (value || '').trim();
+    if (!v) return;
+
+    setIsSaving(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`/api/knowledge/poi/${activePoiId}/relations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, kind, value: v }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update relationships');
+      }
+
+      if (action === 'add') {
+        setRelInput((prev) => ({ ...prev, [kind]: '' }));
+      }
+
+      await refreshPoi();
+      onSaved();
+      setSuccessMessage('Relationship updated.');
+    } catch (err) {
+      console.error('Relationship update error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update relationships');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const verifyPoi = async () => {
+    setIsSaving(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`/api/knowledge/poi/${activePoiId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verified: true }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to verify POI');
+      }
+
+      setFormData((prev) => ({ ...prev, luxury_confidence: '1' }));
+      await refreshPoi();
+      onSaved();
+      setSuccessMessage('Verified. Confidence set to 100%.');
+    } catch (err) {
+      console.error('Verify error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to verify POI');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const searchJump = async (q: string) => {
+    const query = (q || '').trim();
+    if (query.length < 2) return;
+
+    setJump((prev) => ({ ...prev, isOpen: true, query, isLoading: true, error: null, results: [] }));
+    try {
+      const response = await fetch(`/api/knowledge/search-poi?q=${encodeURIComponent(query)}&limit=10`);
+      if (!response.ok) throw new Error('Search failed');
+      const data = (await response.json()) as { results?: unknown[] };
+      const results = (data.results || [])
+        .map((r) => {
+          const rec = r as Record<string, unknown>;
+          return {
+            poi_uid: String(rec.poi_uid || ''),
+            name: String(rec.name || ''),
+            destination_name: (rec.destination_name as string | null) ?? null,
+            type: (rec.type as string | null) ?? null,
+          };
+        })
+        .filter((r) => r.poi_uid && r.name);
+      setJump((prev) => ({ ...prev, isLoading: false, results }));
+    } catch (err) {
+      setJump((prev) => ({ ...prev, isLoading: false, error: err instanceof Error ? err.message : 'Search failed' }));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +227,7 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
 
     try {
       // Prepare update payload
-      const updates: any = {};
+      const updates: Record<string, unknown> = {};
 
       if (formData.name !== poi?.name) updates.name = formData.name;
       if (formData.type !== poi?.type) updates.type = formData.type || null;
@@ -116,7 +250,7 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
         return;
       }
 
-      const response = await fetch(`/api/knowledge/poi/${poiId}`, {
+      const response = await fetch(`/api/knowledge/poi/${activePoiId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -128,10 +262,8 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
       }
 
       setSuccessMessage('POI updated successfully!');
-      setTimeout(() => {
-        onSaved();
-        onClose();
-      }, 1500);
+      await refreshPoi();
+      onSaved();
 
     } catch (err) {
       console.error('Update error:', err);
@@ -230,28 +362,247 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
           {/* Relationships */}
           {poi && (
             <div className="mt-4 pt-4 border-t border-zinc-200">
-              <div className="text-sm text-zinc-500 mb-2">Relationships:</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-zinc-500 mb-2">Relationships (click to jump):</div>
+                <button
+                  type="button"
+                  onClick={verifyPoi}
+                  disabled={isSaving}
+                  className="text-xs px-3 py-1 bg-lexa-navy text-white rounded hover:bg-lexa-navy/90 disabled:opacity-50"
+                >
+                  Verify (100%)
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {poi.relationships.destinations.map((d, i) => (
-                  <span key={i} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                  <button
+                    key={`dest-${i}`}
+                    type="button"
+                    onClick={() => searchJump(d)}
+                    className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
+                    title="Click to search POIs related to this"
+                  >
                     📍 {d}
-                  </span>
+                  </button>
                 ))}
                 {poi.relationships.themes.map((t, i) => (
-                  <span key={i} className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">
+                  <button
+                    key={`theme-${i}`}
+                    type="button"
+                    onClick={() => searchJump(t)}
+                    className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200"
+                    title="Click to search POIs related to this"
+                  >
                     🎨 {t}
-                  </span>
+                  </button>
                 ))}
                 {poi.relationships.activities.map((a, i) => (
-                  <span key={i} className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
+                  <button
+                    key={`act-${i}`}
+                    type="button"
+                    onClick={() => searchJump(a)}
+                    className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200"
+                    title="Click to search POIs related to this"
+                  >
                     ⚡ {a}
-                  </span>
+                  </button>
                 ))}
                 {poi.relationships.emotions.map((e, i) => (
-                  <span key={i} className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">
+                  <button
+                    key={`emo-${i}`}
+                    type="button"
+                    onClick={() => searchJump(e)}
+                    className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs hover:bg-orange-200"
+                    title="Click to search POIs related to this"
+                  >
                     ❤️ {e}
-                  </span>
+                  </button>
                 ))}
+              </div>
+
+              {/* Jump search results */}
+              {jump.isOpen && (
+                <div className="mt-3 p-3 bg-white border border-zinc-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs text-zinc-600">
+                      Jump search: <span className="font-semibold">{jump.query}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-xs text-zinc-500 hover:text-lexa-navy"
+                      onClick={() => setJump((prev) => ({ ...prev, isOpen: false }))}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  {jump.isLoading && (
+                    <div className="text-xs text-zinc-500">Searching...</div>
+                  )}
+                  {jump.error && (
+                    <div className="text-xs text-red-600">{jump.error}</div>
+                  )}
+                  {!jump.isLoading && !jump.error && jump.results.length === 0 && (
+                    <div className="text-xs text-zinc-500">No POIs found.</div>
+                  )}
+                  {!jump.isLoading && !jump.error && jump.results.length > 0 && (
+                    <div className="grid grid-cols-1 gap-2">
+                      {jump.results.map((r) => (
+                        <button
+                          key={r.poi_uid}
+                          type="button"
+                          className="text-left p-2 rounded border border-zinc-100 hover:bg-zinc-50"
+                          onClick={() => {
+                            setActivePoiId(r.poi_uid);
+                            setJump((prev) => ({ ...prev, isOpen: false }));
+                            setSuccessMessage(null);
+                            setError(null);
+                          }}
+                        >
+                          <div className="text-sm font-semibold text-lexa-navy">{r.name}</div>
+                          <div className="text-xs text-zinc-600">
+                            {r.destination_name ? `📍 ${r.destination_name}` : ''}{' '}
+                            {r.type ? `• ${r.type}` : ''}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Edit relationships */}
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="p-3 border border-zinc-200 rounded-lg">
+                  <div className="text-xs font-semibold text-zinc-700 mb-2">Destination</div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {poi.relationships.destinations.map((d, i) => (
+                      <button
+                        key={`dest-rm-${i}`}
+                        type="button"
+                        onClick={() => updateRelation('remove', 'destination', d)}
+                        className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100"
+                        title="Click to remove"
+                      >
+                        {d} ✕
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={relInput.destination}
+                      onChange={(e) => setRelInput((prev) => ({ ...prev, destination: e.target.value }))}
+                      className="flex-1 px-3 py-2 border border-zinc-200 rounded text-sm"
+                      placeholder="Add destination..."
+                    />
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => updateRelation('add', 'destination', relInput.destination)}
+                      className="px-3 py-2 bg-blue-600 text-white rounded text-sm disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 border border-zinc-200 rounded-lg">
+                  <div className="text-xs font-semibold text-zinc-700 mb-2">Theme</div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {poi.relationships.themes.map((t, i) => (
+                      <button
+                        key={`theme-rm-${i}`}
+                        type="button"
+                        onClick={() => updateRelation('remove', 'theme', t)}
+                        className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs hover:bg-purple-100"
+                        title="Click to remove"
+                      >
+                        {t} ✕
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={relInput.theme}
+                      onChange={(e) => setRelInput((prev) => ({ ...prev, theme: e.target.value }))}
+                      className="flex-1 px-3 py-2 border border-zinc-200 rounded text-sm"
+                      placeholder="Add theme..."
+                    />
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => updateRelation('add', 'theme', relInput.theme)}
+                      className="px-3 py-2 bg-purple-600 text-white rounded text-sm disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 border border-zinc-200 rounded-lg">
+                  <div className="text-xs font-semibold text-zinc-700 mb-2">Activity</div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {poi.relationships.activities.map((a, i) => (
+                      <button
+                        key={`act-rm-${i}`}
+                        type="button"
+                        onClick={() => updateRelation('remove', 'activity', a)}
+                        className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs hover:bg-green-100"
+                        title="Click to remove"
+                      >
+                        {a} ✕
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={relInput.activity}
+                      onChange={(e) => setRelInput((prev) => ({ ...prev, activity: e.target.value }))}
+                      className="flex-1 px-3 py-2 border border-zinc-200 rounded text-sm"
+                      placeholder="Add activity..."
+                    />
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => updateRelation('add', 'activity', relInput.activity)}
+                      className="px-3 py-2 bg-green-600 text-white rounded text-sm disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 border border-zinc-200 rounded-lg">
+                  <div className="text-xs font-semibold text-zinc-700 mb-2">Emotion</div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {poi.relationships.emotions.map((e, i) => (
+                      <button
+                        key={`emo-rm-${i}`}
+                        type="button"
+                        onClick={() => updateRelation('remove', 'emotion', e)}
+                        className="px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs hover:bg-orange-100"
+                        title="Click to remove"
+                      >
+                        {e} ✕
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={relInput.emotion}
+                      onChange={(e) => setRelInput((prev) => ({ ...prev, emotion: e.target.value }))}
+                      className="flex-1 px-3 py-2 border border-zinc-200 rounded text-sm"
+                      placeholder="Add emotion..."
+                    />
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => updateRelation('add', 'emotion', relInput.emotion)}
+                      className="px-3 py-2 bg-orange-600 text-white rounded text-sm disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

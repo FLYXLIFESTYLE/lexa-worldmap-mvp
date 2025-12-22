@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
 import { createClient } from '@/lib/supabase/server';
+import levenshtein from 'fast-levenshtein';
 
 export const runtime = 'nodejs';
 
@@ -21,6 +22,12 @@ interface SearchResult {
   luxury_confidence: number | null;
   source: string;
   last_updated: string | null;
+}
+
+function normalizeQuery(s: string): string {
+  return (s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, ''); // removes spaces, punctuation, etc.
 }
 
 export async function GET(req: NextRequest) {
@@ -38,6 +45,7 @@ export async function GET(req: NextRequest) {
     const query = searchParams.get('q') || '';
     const limit = parseInt(searchParams.get('limit') || '20');
     const destination = searchParams.get('destination');
+    const qNorm = normalizeQuery(query);
 
     if (!query || query.length < 2) {
       return NextResponse.json({
@@ -51,16 +59,24 @@ export async function GET(req: NextRequest) {
 
     try {
       // Build Cypher query with optional destination filter
+      // We pull more candidates than requested, then rank in JS (typo tolerant).
+      const candidateLimit = Math.min(200, Math.max(limit * 10, 50));
       let cypherQuery = `
         MATCH (p:poi)
         WHERE (
           toLower(p.name) CONTAINS toLower($query)
+          OR replace(replace(replace(replace(toLower(p.name),' ',''),'-',''),'.',''),'\'','') CONTAINS $q_norm
           OR toLower(p.destination_name) CONTAINS toLower($query)
           OR toLower(p.type) CONTAINS toLower($query)
         )
       `;
 
-      const params: any = { query, limit };
+      const params: {
+        query: string;
+        q_norm: string;
+        limit: number;
+        destination?: string;
+      } = { query, q_norm: qNorm, limit: candidateLimit };
 
       if (destination) {
         cypherQuery += ` AND toLower(p.destination_name) = toLower($destination)`;
@@ -78,13 +94,12 @@ export async function GET(req: NextRequest) {
                p.luxury_confidence as luxury_confidence,
                p.source as source,
                p.updated_at as last_updated
-        ORDER BY p.luxury_score DESC NULLS LAST, p.name ASC
         LIMIT $limit
       `;
 
       const result = await session.run(cypherQuery, params);
 
-      const pois: SearchResult[] = result.records.map(record => ({
+      const candidates: SearchResult[] = result.records.map(record => ({
         poi_uid: record.get('poi_uid'),
         name: record.get('name'),
         type: record.get('type'),
@@ -97,9 +112,35 @@ export async function GET(req: NextRequest) {
         last_updated: record.get('last_updated'),
       }));
 
+      const ranked = candidates
+        .map((p) => {
+          const nameNorm = normalizeQuery(p.name || '');
+          const destNorm = normalizeQuery(p.destination_name || '');
+          const typeNorm = normalizeQuery(p.type || '');
+
+          let score = 1000;
+
+          if (qNorm && nameNorm === qNorm) score = 0;
+          else if (qNorm && nameNorm.includes(qNorm)) score = 1 + Math.min(5, Math.max(0, nameNorm.length - qNorm.length)) / 100;
+          else if (qNorm && destNorm.includes(qNorm)) score = 3;
+          else if (qNorm && typeNorm.includes(qNorm)) score = 4;
+          else if (qNorm && nameNorm) score = 10 + levenshtein.get(nameNorm, qNorm);
+
+          return { p, score };
+        })
+        .sort((a, b) => {
+          if (a.score !== b.score) return a.score - b.score;
+          const as = a.p.luxury_score ?? -1;
+          const bs = b.p.luxury_score ?? -1;
+          if (as !== bs) return bs - as;
+          return (a.p.name || '').localeCompare(b.p.name || '');
+        })
+        .slice(0, Math.max(1, Math.min(limit, 50)))
+        .map((x) => x.p);
+
       return NextResponse.json({
-        results: pois,
-        count: pois.length,
+        results: ranked,
+        count: ranked.length,
         query,
       });
 

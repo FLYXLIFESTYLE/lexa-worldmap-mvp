@@ -142,7 +142,7 @@ export async function PATCH(
       .single();
 
     const { id } = await params;
-    const updates = await req.json();
+    const updates = (await req.json()) as Record<string, unknown>;
 
     // Validate updates
     const allowedFields = [
@@ -152,13 +152,24 @@ export async function PATCH(
       'captain_comments',
       'type',
       'name',
+      'verified',
+      'verified_by',
+      'verified_at',
     ];
 
-    const updateFields: any = {};
+    const updateFields: Record<string, unknown> = {};
     for (const field of allowedFields) {
       if (updates[field] !== undefined) {
         updateFields[field] = updates[field];
       }
+    }
+
+    // One-click verification: if verified=true, force confidence to 1.0 and stamp verifier.
+    if (updates.verified === true) {
+      updateFields.verified = true;
+      updateFields.luxury_confidence = 1.0;
+      updateFields.verified_by = profile?.full_name || user.email;
+      updateFields.verified_at = new Date().toISOString();
     }
 
     if (Object.keys(updateFields).length === 0) {
