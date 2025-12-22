@@ -74,6 +74,12 @@ const adminPages = [
     description: 'Manage scraped content'
   },
   {
+    name: 'Seed Themes',
+    href: '/admin/seed-themes',
+    icon: '🎨',
+    description: 'Initialize theme categories'
+  },
+  {
     name: 'Upload History',
     href: '/admin/knowledge/history',
     icon: '📊',
