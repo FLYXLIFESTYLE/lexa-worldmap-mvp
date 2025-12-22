@@ -125,6 +125,13 @@ async def intake_upload(
     detected_source_type = source_type or ("url" if url else _guess_source_type(getattr(file, "filename", None), getattr(file, "content_type", None)))
     upload_id = str(uuid.uuid4())
 
+    # Images must be stored (keep_raw=true) so OCR can be performed later.
+    if detected_source_type == "image" and not keep_raw:
+        raise HTTPException(
+            status_code=400,
+            detail="For images, set keep_raw=true so LEXA can run OCR during extraction."
+        )
+
     # Store minimal record now. Raw content is handled separately.
     record: Dict[str, Any] = {
         "id": upload_id,
@@ -287,7 +294,7 @@ async def _claude_extract_from_text(text: str) -> Dict[str, Any]:
     return await llm_extract_json(system=system, user_text=text, max_tokens=2500, prefer=settings.default_llm)
 
 
-async def _claude_ocr_image(image_bytes: bytes) -> Dict[str, Any]:
+async def _claude_ocr_image(image_bytes: bytes, media_type: str = "image/png") -> Dict[str, Any]:
     """
     OCR + extraction with failover:
     Anthropic vision (primary) -> OpenAI vision (fallback) -> pending payload.
@@ -299,7 +306,7 @@ async def _claude_ocr_image(image_bytes: bytes) -> Dict[str, Any]:
         "- entities, relations, knowledge, chunks (same schema as text extraction)\n"
         "Prefer correct place names; if uncertain, lower confidence.\n"
     )
-    return await llm_ocr_json(system=system, image_bytes=image_bytes, max_tokens=2500, prefer=settings.default_llm, media_type="image/png")
+    return await llm_ocr_json(system=system, image_bytes=image_bytes, max_tokens=2500, prefer=settings.default_llm, media_type=media_type)
 
 
 @router.post("/intake/extract-draft")
@@ -336,7 +343,9 @@ async def intake_extract_draft(
             image_bytes = data if isinstance(data, (bytes, bytearray)) else getattr(data, "data", None)
             if not image_bytes:
                 raise HTTPException(status_code=500, detail="Failed to download image bytes for OCR")
-            extracted = await _claude_ocr_image(bytes(image_bytes))
+            meta = upload.get("metadata") or {}
+            media_type = meta.get("file_content_type") or "image/png"
+            extracted = await _claude_ocr_image(bytes(image_bytes), media_type=media_type)
         else:
             text = request.text or upload.get("raw_text")
             if not text and upload.get("source_url"):
