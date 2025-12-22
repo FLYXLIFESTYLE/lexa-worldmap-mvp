@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { Send, Sparkles, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { lexaAPI, loadFromLocalStorage, saveToLocalStorage } from '@/lib/api/lexa-client';
+import ThemeSelector from '@/components/theme-selector';
 
 interface Message {
   id: string;
@@ -18,6 +19,7 @@ interface Message {
   content: string;
   quickReplies?: string[];
   timestamp: string;
+  showThemeSelector?: boolean;
 }
 
 export default function AdminDemoChatPage() {
@@ -34,6 +36,8 @@ export default function AdminDemoChatPage() {
   const [authChecking, setAuthChecking] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
 
   // Check admin auth
   useEffect(() => {
@@ -123,16 +127,20 @@ export default function AdminDemoChatPage() {
     const welcomeMsg: Message = {
       id: 'welcome',
       role: 'assistant',
-      content: '✨ Welcome to the LEXA Demo Chat! This is a testing environment where you can experience the full conversation flow.\n\nI\'m LEXA, your Luxury Experience Assistant. I design travel experiences based on emotional intelligence.\n\nWhat kind of experience are you dreaming of?',
-      quickReplies: [
-        'A relaxing beach escape',
-        'An adventurous mountain retreat',
-        'A cultural city experience',
-        'Something completely unique'
-      ],
-      timestamp: new Date().toISOString()
+      content: '✨ Welcome to the LEXA Demo Chat!\n\nI\'m LEXA, your Luxury Experience Assistant. I design travel experiences based on emotional intelligence.\n\nLet\'s begin by discovering what kind of experience resonates with your soul...',
+      timestamp: new Date().toISOString(),
+      showThemeSelector: true
     };
     setMessages([welcomeMsg]);
+    setShowThemeSelector(true);
+  }
+
+  function handleThemeSelect(themeName: string) {
+    setSelectedTheme(themeName);
+    setShowThemeSelector(false);
+    
+    // Send the selected theme as a user message
+    handleSendMessage(`I'm interested in: ${themeName}`);
   }
 
   async function handleSendMessage(content: string) {
@@ -326,6 +334,16 @@ export default function AdminDemoChatPage() {
                   >
                     <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                   </div>
+                  
+                  {/* Theme Selector */}
+                  {message.role === 'assistant' && message.showThemeSelector && showThemeSelector && (
+                    <div className="mt-6">
+                      <ThemeSelector 
+                        onSelect={handleThemeSelect}
+                        selectedTheme={selectedTheme}
+                      />
+                    </div>
+                  )}
                   
                   {/* Quick Replies */}
                   {message.role === 'assistant' && message.quickReplies && message.quickReplies.length > 0 && (
