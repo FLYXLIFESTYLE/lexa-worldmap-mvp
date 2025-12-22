@@ -14,7 +14,7 @@ import structlog
 import httpx
 
 from config.settings import settings
-from database.account_manager import account_manager
+import database.account_manager as account_manager_module
 from database.neo4j_client import neo4j_client
 
 logger = structlog.get_logger()
@@ -28,9 +28,10 @@ def _require_admin_token(x_lexa_admin_token: Optional[str]) -> None:
 
 
 def _supabase():
-    if account_manager is None:
+    am = account_manager_module.account_manager
+    if am is None:
         raise HTTPException(status_code=503, detail="Supabase not initialized")
-    return account_manager.supabase
+    return am.supabase
 
 
 class PlacesEnrichRequest(BaseModel):

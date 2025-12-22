@@ -19,7 +19,7 @@ from urllib.parse import urlparse, urljoin
 
 from config.settings import settings
 from database.neo4j_client import neo4j_client
-from database.account_manager import account_manager
+import database.account_manager as account_manager_module
 from core.llm.router import extract_json as llm_extract_json, ocr_and_extract_json as llm_ocr_json
 
 logger = structlog.get_logger()
@@ -34,9 +34,10 @@ def _require_admin_token(x_lexa_admin_token: Optional[str]) -> None:
 
 
 def _supabase():
-    if account_manager is None:
+    am = account_manager_module.account_manager
+    if am is None:
         raise HTTPException(status_code=503, detail="Supabase not initialized")
-    return account_manager.supabase
+    return am.supabase
 
 
 def _norm_text(s: str) -> str:
