@@ -22,6 +22,7 @@ export default function SeedThemesPage() {
   const [result, setResult] = useState<SeedResult | null>(null);
   const [existingThemes, setExistingThemes] = useState<any[]>([]);
   const [showingExisting, setShowingExisting] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<any>(null);
 
   async function handleSeed() {
     setLoading(true);
@@ -73,6 +74,37 @@ export default function SeedThemesPage() {
     }
   }
 
+  async function handleCleanup() {
+    if (!confirm('This will delete 6 redundant theme categories and update 2 others. Continue?')) {
+      return;
+    }
+
+    setLoading(true);
+    setCleanupResult(null);
+    setResult(null);
+
+    try {
+      const response = await fetch('/api/admin/cleanup-themes', {
+        method: 'POST'
+      });
+      const data = await response.json();
+      setCleanupResult(data);
+      
+      // Refresh the view
+      if (showingExisting) {
+        handleViewExisting();
+      }
+    } catch (error: any) {
+      setCleanupResult({
+        success: false,
+        error: 'Failed to cleanup themes',
+        details: error.message
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-zinc-900">
       <AdminNav />
@@ -105,11 +137,19 @@ export default function SeedThemesPage() {
           >
             {loading ? '⏳ Loading...' : '👀 View Existing'}
           </button>
+
+          <button
+            onClick={handleCleanup}
+            disabled={loading}
+            className="px-8 py-4 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? '⏳ Cleaning...' : '🧹 Cleanup Duplicates'}
+          </button>
         </div>
 
         {/* Result Display */}
         {result && (
-          <div className={`p-6 rounded-xl ${result.success ? 'bg-green-900/20 border border-green-500/30' : 'bg-red-900/20 border border-red-500/30'}`}>
+          <div className={`p-6 rounded-xl mb-8 ${result.success ? 'bg-green-900/20 border border-green-500/30' : 'bg-red-900/20 border border-red-500/30'}`}>
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">{result.success ? '✅' : '⚠️'}</span>
               <h2 className={`text-xl font-semibold ${result.success ? 'text-green-400' : 'text-red-400'}`}>
@@ -147,6 +187,74 @@ export default function SeedThemesPage() {
                 {result.details && (
                   <p className="text-sm text-zinc-400 font-mono bg-zinc-900 p-3 rounded">
                     {result.details}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Cleanup Result Display */}
+        {cleanupResult && (
+          <div className={`p-6 rounded-xl mb-8 ${cleanupResult.success ? 'bg-green-900/20 border border-green-500/30' : 'bg-red-900/20 border border-red-500/30'}`}>
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-3xl">{cleanupResult.success ? '✅' : '⚠️'}</span>
+              <h2 className={`text-xl font-semibold ${cleanupResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                {cleanupResult.success ? 'Cleanup Complete!' : 'Cleanup Error'}
+              </h2>
+            </div>
+
+            {cleanupResult.message && (
+              <p className="text-white mb-3">{cleanupResult.message}</p>
+            )}
+
+            {cleanupResult.total_themes !== undefined && (
+              <p className="text-zinc-300 mb-4">
+                Final count: <span className="text-lexa-gold font-semibold">{cleanupResult.total_themes}</span> theme categories
+              </p>
+            )}
+
+            {cleanupResult.deleted && cleanupResult.deleted.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-red-400 font-semibold mb-2">Deleted ({cleanupResult.deleted_count}):</h3>
+                <ul className="list-disc list-inside text-sm text-zinc-400 space-y-1">
+                  {cleanupResult.deleted.map((name: string, idx: number) => (
+                    <li key={idx}>{name}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {cleanupResult.updated && cleanupResult.updated.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-blue-400 font-semibold mb-2">Updated ({cleanupResult.updated_count}):</h3>
+                <ul className="list-disc list-inside text-sm text-zinc-400 space-y-1">
+                  {cleanupResult.updated.map((name: string, idx: number) => (
+                    <li key={idx}>{name}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {cleanupResult.remaining_themes && (
+              <div>
+                <h3 className="text-green-400 font-semibold mb-2">Remaining Themes:</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {cleanupResult.remaining_themes.map((theme: string, idx: number) => (
+                    <div key={idx} className="text-sm text-white bg-zinc-800 px-3 py-2 rounded-lg">
+                      {theme}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {cleanupResult.error && (
+              <>
+                <p className="text-red-400 font-semibold mb-2">{cleanupResult.error}</p>
+                {cleanupResult.details && (
+                  <p className="text-sm text-zinc-400 font-mono bg-zinc-900 p-3 rounded">
+                    {cleanupResult.details}
                   </p>
                 )}
               </>
