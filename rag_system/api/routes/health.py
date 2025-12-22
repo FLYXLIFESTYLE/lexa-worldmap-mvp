@@ -34,9 +34,11 @@ async def health_check():
         }
         
         if not neo4j_ok or not supabase_ok:
+            # IMPORTANT: /health should be informational and return 200,
+            # otherwise Render and external monitors may treat the service as "down"
+            # even when the API is still running (degraded).
             logger.warning("Health check shows degraded state", **health_status)
-            raise HTTPException(status_code=503, detail=health_status)
-        
+
         return health_status
         
     except Exception as e:
