@@ -1,0 +1,14 @@
+# Optional: Crawl4AI Web Crawling Stack (local/dev)
+#
+# WARNING:
+# - torch/transformers are large and may exceed memory limits on small cloud instances.
+# - Recommended to install this only for local crawling or a dedicated worker.
+#
+# Install:
+#   python -m pip install -r requirements_crawl4ai.txt
+#
+"crawl4ai @ git+https://github.com/unclecode/crawl4ai.git"
+transformers
+torch
+nltk
+
