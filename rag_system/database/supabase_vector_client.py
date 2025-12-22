@@ -4,7 +4,6 @@ This replaces Qdrant and uses your existing Supabase database.
 """
 
 from typing import List, Dict, Any, Optional
-from sentence_transformers import SentenceTransformer
 from config.settings import settings
 import structlog
 import uuid
@@ -24,7 +23,9 @@ class SupabaseVectorClient:
     def __init__(self):
         """Initialize Supabase client and embedding model."""
         self.client: Optional[Client] = None
-        self.embedding_model: Optional[SentenceTransformer] = None
+        # Embeddings are optional. We lazy-import sentence_transformers only when enabled
+        # to avoid heavy torch memory overhead on small instances (e.g., Render Starter 512MB).
+        self.embedding_model = None
         self.table_name = "travel_trends"
     
     async def connect(self):
@@ -37,11 +38,22 @@ class SupabaseVectorClient:
                 key
             )
             logger.info("Connected to Supabase", url=settings.supabase_url)
-        
-        if self.embedding_model is None:
-            # Load sentence transformer model for embeddings
-            self.embedding_model = SentenceTransformer(settings.embedding_model)
-            logger.info("Loaded embedding model", model=settings.embedding_model)
+
+        # IMPORTANT: Embeddings are optional. Avoid importing torch/sentence-transformers unless enabled.
+        if getattr(settings, "enable_embeddings", False):
+            if self.embedding_model is None:
+                try:
+                    from sentence_transformers import SentenceTransformer  # type: ignore
+                except Exception as e:
+                    logger.warning("Embeddings enabled but sentence-transformers not available", error=str(e))
+                    return
+                self.embedding_model = SentenceTransformer(settings.embedding_model)
+                logger.info("Loaded embedding model", model=settings.embedding_model)
+        else:
+            # Don't even import sentence-transformers on small instances.
+            if self.embedding_model is not None:
+                self.embedding_model = None
+            logger.info("Embeddings disabled (skipping model load)")
     
     def generate_embedding(self, text: str) -> List[float]:
         """
@@ -54,7 +66,7 @@ class SupabaseVectorClient:
             Embedding vector as list of floats
         """
         if self.embedding_model is None:
-            raise RuntimeError("Embedding model not initialized. Call connect() first.")
+            raise RuntimeError("Embeddings are disabled or not initialized. Set ENABLE_EMBEDDINGS=true and restart.")
         
         embedding = self.embedding_model.encode(text)
         return embedding.tolist()

@@ -48,7 +48,10 @@ async def lifespan(app: FastAPI):
         logger.info("Neo4j connected")
         
         await vector_db_client.connect()
-        logger.info("Supabase connected")
+        logger.info(
+            "Supabase connected",
+            embeddings_enabled=bool(getattr(settings, "enable_embeddings", False))
+        )
         
         # Initialize Account Manager with Supabase client
         initialize_account_manager(vector_db_client.client)

@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     
     # Embedding Model
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    enable_embeddings: bool = False
     
     # Security
     session_secret: str = "dev-secret-key-change-in-production"

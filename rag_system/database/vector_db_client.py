@@ -6,7 +6,6 @@ This handles semantic search over market trends and booking behavior.
 from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
-from sentence_transformers import SentenceTransformer
 from config.settings import settings
 import structlog
 import uuid
@@ -20,7 +19,9 @@ class VectorDBClient:
     def __init__(self):
         """Initialize Qdrant client and embedding model."""
         self.client: Optional[QdrantClient] = None
-        self.embedding_model: Optional[SentenceTransformer] = None
+        # Embeddings are optional. Lazy-import sentence-transformers only when enabled to
+        # avoid torch memory overhead on small instances.
+        self.embedding_model = None
         self.collection_name = settings.qdrant_collection_name
     
     async def connect(self):
@@ -43,8 +44,9 @@ class VectorDBClient:
                        host=settings.qdrant_host,
                        port=settings.qdrant_port)
         
-        if self.embedding_model is None:
+        if self.embedding_model is None and getattr(settings, "enable_embeddings", False):
             # Load sentence transformer model for embeddings
+            from sentence_transformers import SentenceTransformer  # type: ignore
             self.embedding_model = SentenceTransformer(settings.embedding_model)
             logger.info("Loaded embedding model", model=settings.embedding_model)
     
@@ -94,7 +96,7 @@ class VectorDBClient:
             Embedding vector as list of floats
         """
         if self.embedding_model is None:
-            raise RuntimeError("Embedding model not initialized. Call connect() first.")
+            raise RuntimeError("Embeddings are disabled or not initialized. Set ENABLE_EMBEDDINGS=true and restart.")
         
         embedding = self.embedding_model.encode(text)
         return embedding.tolist()
