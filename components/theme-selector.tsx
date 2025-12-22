@@ -36,17 +36,27 @@ export default function ThemeSelector({ onSelect, selectedTheme }: ThemeSelector
 
   async function fetchThemes() {
     try {
+      setLoading(true);
+      setError(null);
+      
       const response = await fetch('/api/admin/seed-themes');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
       
-      if (data.success) {
+      if (data.success && data.themes && data.themes.length > 0) {
         setThemes(data.themes);
+      } else if (data.themes && data.themes.length === 0) {
+        setError('No themes found - please seed the database first');
       } else {
-        setError('Failed to load themes');
+        setError(data.error || 'Failed to load themes');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching themes:', err);
-      setError('Could not connect to database');
+      setError(err.message || 'Could not connect to database');
     } finally {
       setLoading(false);
     }
@@ -87,7 +97,15 @@ export default function ThemeSelector({ onSelect, selectedTheme }: ThemeSelector
         <div className="text-center">
           <div className="text-5xl mb-4">✨</div>
           <p className="text-zinc-400 mb-4">No themes available yet</p>
-          <p className="text-sm text-zinc-500">Please seed the database first</p>
+          <p className="text-sm text-zinc-500 mb-4">The database needs to be seeded with theme categories</p>
+          <a
+            href="/admin/seed-themes"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-6 py-3 bg-lexa-gold text-zinc-900 rounded-lg hover:bg-yellow-600 transition-colors font-semibold"
+          >
+            🌱 Seed Database
+          </a>
         </div>
       </div>
     );
