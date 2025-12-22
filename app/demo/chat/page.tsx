@@ -32,6 +32,8 @@ export default function AdminDemoChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [authChecking, setAuthChecking] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   // Check admin auth
   useEffect(() => {
@@ -57,11 +59,18 @@ export default function AdminDemoChatPage() {
   }, [router, supabase.auth]);
 
   async function initializeDemoSession(email: string) {
+    setIsInitializing(true);
+    setInitError(null);
+    
     try {
+      console.log('[Demo Chat] Initializing session for:', email);
+      
       // Try to load existing session from localStorage
       const stored = loadFromLocalStorage('lexa_account');
+      console.log('[Demo Chat] Stored session:', stored);
       
       if (stored?.account_id && stored?.session_id) {
+        console.log('[Demo Chat] Restoring session:', stored.session_id);
         setAccountId(stored.account_id);
         setSessionId(stored.session_id);
         
@@ -74,35 +83,56 @@ export default function AdminDemoChatPage() {
             timestamp: new Date().toISOString()
           }));
           setMessages(formattedMessages);
+        } else {
+          // Add welcome message if no history
+          addWelcomeMessage();
         }
       } else {
         // Create new demo account
+        console.log('[Demo Chat] Creating new account...');
         const account = await lexaAPI.createAccount({
           email,
           name: 'Admin Demo User',
         });
         
+        console.log('[Demo Chat] Account created:', account);
         setAccountId(account.account_id || null);
         setSessionId(account.session_id || null);
         
         // Add welcome message
-        const welcomeMsg: Message = {
-          id: 'welcome',
-          role: 'assistant',
-          content: '✨ Welcome to the LEXA Demo Chat! This is a testing environment where you can experience the full conversation flow.\n\nI\'m LEXA, your Luxury Experience Assistant. I design travel experiences based on emotional intelligence.\n\nWhat kind of experience are you dreaming of?',
-          quickReplies: [
-            'A relaxing beach escape',
-            'An adventurous mountain retreat',
-            'A cultural city experience',
-            'Something completely unique'
-          ],
-          timestamp: new Date().toISOString()
-        };
-        setMessages([welcomeMsg]);
+        addWelcomeMessage();
       }
-    } catch (error) {
-      console.error('Failed to initialize demo session:', error);
+    } catch (error: any) {
+      console.error('[Demo Chat] Failed to initialize demo session:', error);
+      setInitError(error.message || 'Failed to initialize session');
+      
+      // Show error message in chat
+      const errorMsg: Message = {
+        id: 'error-init',
+        role: 'assistant',
+        content: `⚠️ Session initialization failed: ${error.message || 'Unknown error'}\n\nThis might be because the backend API is not running. Please check the admin dashboard or try again later.`,
+        timestamp: new Date().toISOString()
+      };
+      setMessages([errorMsg]);
+    } finally {
+      setIsInitializing(false);
     }
+  }
+
+  function addWelcomeMessage() {
+    const welcomeMsg: Message = {
+      id: 'welcome',
+      role: 'assistant',
+      content: '✨ Welcome to the LEXA Demo Chat! This is a testing environment where you can experience the full conversation flow.\n\nI\'m LEXA, your Luxury Experience Assistant. I design travel experiences based on emotional intelligence.\n\nWhat kind of experience are you dreaming of?',
+      quickReplies: [
+        'A relaxing beach escape',
+        'An adventurous mountain retreat',
+        'A cultural city experience',
+        'Something completely unique'
+      ],
+      timestamp: new Date().toISOString()
+    };
+    setMessages([welcomeMsg]);
   }
 
   async function handleSendMessage(content: string) {
@@ -159,6 +189,7 @@ export default function AdminDemoChatPage() {
       setMessages([]);
       setAccountId(null);
       setSessionId(null);
+      setInitError(null);
       initializeDemoSession(userEmail);
     }
   }
@@ -241,11 +272,39 @@ export default function AdminDemoChatPage() {
         <div className={`rounded-2xl shadow-lg overflow-hidden ${isDarkMode ? 'bg-zinc-800' : 'bg-white'}`}>
           {/* Messages */}
           <div className="h-[calc(100vh-280px)] overflow-y-auto p-6 space-y-6">
-            {messages.length === 0 && (
+            {isInitializing && messages.length === 0 && (
+              <div className="text-center py-12">
+                <Sparkles className="w-12 h-12 text-lexa-gold mx-auto mb-4 animate-pulse" />
+                <p className={`${isDarkMode ? 'text-zinc-400' : 'text-gray-600'}`}>
+                  Initializing demo session...
+                </p>
+                <p className={`text-xs mt-2 ${isDarkMode ? 'text-zinc-500' : 'text-gray-500'}`}>
+                  Creating your LEXA account and session
+                </p>
+              </div>
+            )}
+            
+            {initError && messages.length === 0 && (
+              <div className="text-center py-12">
+                <div className="text-5xl mb-4">⚠️</div>
+                <p className="text-red-500 font-semibold mb-2">Session Initialization Failed</p>
+                <p className={`text-sm mb-4 ${isDarkMode ? 'text-zinc-400' : 'text-gray-600'}`}>
+                  {initError}
+                </p>
+                <button
+                  onClick={() => initializeDemoSession(userEmail)}
+                  className="px-6 py-3 bg-lexa-gold text-zinc-900 rounded-lg hover:bg-yellow-600 transition-colors"
+                >
+                  Retry Initialization
+                </button>
+              </div>
+            )}
+            
+            {!isInitializing && messages.length === 0 && !initError && (
               <div className="text-center py-12">
                 <Sparkles className="w-12 h-12 text-lexa-gold mx-auto mb-4" />
                 <p className={`${isDarkMode ? 'text-zinc-400' : 'text-gray-600'}`}>
-                  Initializing demo session...
+                  Session ready. Start chatting below!
                 </p>
               </div>
             )}
