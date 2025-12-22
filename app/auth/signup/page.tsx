@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
 import { lexaAPI, saveToLocalStorage } from '@/lib/api/lexa-client';
+import LuxuryBackground from '@/components/luxury-background';
 
 export default function SignUpPage() {
   const [firstName, setFirstName] = useState('');
@@ -83,10 +84,8 @@ export default function SignUpPage() {
 
   if (success) {
     return (
-      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-lexa-navy via-zinc-900 to-black px-4">
-        <div className="absolute inset-0">
-          <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-lexa-gold/10 rounded-full blur-3xl animate-pulse-slow" />
-        </div>
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
+        <LuxuryBackground />
         <div className="relative z-10 w-full max-w-md text-center">
           <div className="rounded-2xl bg-white/95 backdrop-blur-lg p-12 shadow-2xl border border-lexa-gold/30">
             <div className="mb-6 text-6xl">✨</div>
@@ -106,21 +105,24 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-lexa-navy via-zinc-900 to-black px-4">
-      {/* Animated background */}
-      <div className="absolute inset-0">
-        <div className="absolute -top-1/2 -right-1/2 w-full h-full bg-lexa-gold/5 rounded-full blur-3xl animate-pulse-slow" />
-      </div>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
+      <LuxuryBackground />
       
       <div className="relative z-10 w-full max-w-md">
         {/* Header */}
         <div className="mb-8 text-center">
           <Link href="/" className="inline-block mb-6">
-            <h1 className="text-5xl font-bold">
-              <span className="bg-gradient-to-r from-white via-lexa-gold to-white bg-clip-text text-transparent">
-                LEXA
+            <div className="relative inline-block">
+              <h1 className="text-5xl font-bold">
+                <span className="bg-gradient-to-r from-white via-lexa-gold to-white bg-clip-text text-transparent">
+                  LEXA
+                </span>
+              </h1>
+              {/* Beta Badge */}
+              <span className="absolute top-0 -right-8 inline-block px-2 py-0.5 rounded-full bg-lexa-gold text-zinc-900 text-xs font-bold tracking-wider shadow-lg shadow-lexa-gold/50 transform rotate-12">
+                BETA
               </span>
-            </h1>
+            </div>
           </Link>
           <h2 className="mb-2 text-3xl font-bold text-white">Begin Your Journey</h2>
           <p className="text-zinc-400">Create your personal experience account</p>
@@ -143,7 +145,7 @@ export default function SignUpPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-lexa-gold mt-0.5">•</span>
-              <span><strong>Lifetime tracking:</strong> When you book through LEXA, your assigned broker earns commission for life—fair recognition for the relationship.</span>
+              <span><strong>Work with your clients:</strong> Brokers, travel advisors, and luxury agents can <Link href="/affiliate-signup" className="text-lexa-gold underline hover:text-yellow-400 transition-colors">sign up as affiliates</Link> to collaborate with clients in their accounts for a consistent emotional profile and preferences.</span>
             </li>
           </ul>
         </div>

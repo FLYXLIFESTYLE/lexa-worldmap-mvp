@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client-browser';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import LuxuryBackground from '@/components/luxury-background';
 
 function SignInForm() {
   const [email, setEmail] = useState('');
@@ -46,21 +47,24 @@ function SignInForm() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-lexa-navy via-zinc-900 to-black px-4">
-      {/* Animated background */}
-      <div className="absolute inset-0">
-        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-lexa-gold/5 rounded-full blur-3xl animate-pulse-slow" />
-      </div>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
+      <LuxuryBackground />
       
       <div className="relative z-10 w-full max-w-md">
         {/* Header */}
         <div className="mb-8 text-center">
           <Link href="/" className="inline-block mb-6">
-            <h1 className="text-5xl font-bold">
-              <span className="bg-gradient-to-r from-white via-lexa-gold to-white bg-clip-text text-transparent">
-                LEXA
+            <div className="relative inline-block">
+              <h1 className="text-5xl font-bold">
+                <span className="bg-gradient-to-r from-white via-lexa-gold to-white bg-clip-text text-transparent">
+                  LEXA
+                </span>
+              </h1>
+              {/* Beta Badge */}
+              <span className="absolute top-0 -right-8 inline-block px-2 py-0.5 rounded-full bg-lexa-gold text-zinc-900 text-xs font-bold tracking-wider shadow-lg shadow-lexa-gold/50 transform rotate-12">
+                BETA
               </span>
-            </h1>
+            </div>
           </Link>
           <h2 className="mb-2 text-3xl font-bold text-white">Welcome Back</h2>
           <p className="text-zinc-400">Continue your journey</p>

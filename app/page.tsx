@@ -4,40 +4,24 @@
  */
 
 import Link from 'next/link';
+import LuxuryBackground from '@/components/luxury-background';
 
 export default function LandingPage() {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-8 sm:py-0">
-      {/* Background Image - Full screen, responsive */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1505881502353-a1986add3762?q=80&w=2400&auto=format&fit=crop')`,
-            backgroundPosition: 'center center',
-          }}
-        />
-        {/* Semi-transparent dark overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-lexa-navy/85 via-zinc-900/80 to-black/90" />
-      </div>
-      
-      {/* Animated accent elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-lexa-gold/5 rounded-full blur-3xl animate-pulse-slow" />
-        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-lexa-gold/5 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1s' }} />
-      </div>
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-12 md:py-16">
+      <LuxuryBackground />
       
       <main className="relative z-10 mx-auto max-w-5xl text-center px-4 sm:px-6">
         {/* Logo / Brand with Beta Badge */}
-        <div className="mb-8 mt-8 sm:mt-0">
+        <div className="mb-8">
           <div className="relative inline-block">
             <h1 className="mb-3 text-6xl sm:text-7xl md:text-9xl font-bold tracking-tighter">
               <span className="bg-gradient-to-r from-white via-lexa-gold to-white bg-clip-text text-transparent animate-gradient">
                 LEXA
               </span>
             </h1>
-            {/* Beta Badge on Logo - Repositioned to prevent cutoff */}
-            <span className="absolute -top-1 sm:-top-2 -right-8 sm:-right-12 md:-right-20 inline-block px-2 sm:px-3 py-1 rounded-full bg-lexa-gold text-zinc-900 text-xs sm:text-sm font-bold tracking-wider shadow-lg shadow-lexa-gold/50 transform rotate-12">
+            {/* Beta Badge on Logo - Better positioned */}
+            <span className="absolute top-0 -right-6 sm:-right-10 md:-right-16 inline-block px-2 sm:px-3 py-1 rounded-full bg-lexa-gold text-zinc-900 text-xs sm:text-sm font-bold tracking-wider shadow-lg shadow-lexa-gold/50 transform rotate-12">
               BETA
             </span>
           </div>
