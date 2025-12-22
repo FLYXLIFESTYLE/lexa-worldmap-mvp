@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     default_llm: str = "anthropic"
     model_name: str = "claude-3-sonnet-20240229"
+    anthropic_model: str = "claude-sonnet-4-5-20250929"
+    openai_text_model: str = "gpt-4o-mini"
+    openai_vision_model: str = "gpt-4o-mini"
     
     # Embedding Model
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
@@ -57,6 +60,8 @@ class Settings(BaseSettings):
     # Security
     session_secret: str = "dev-secret-key-change-in-production"
     max_violations_per_session: int = 3
+    lexa_admin_token: str = ""  # Optional: protects admin/ingestion endpoints
+    intake_storage_bucket: str = "intake-uploads"
     
     # RAG Configuration
     vector_search_top_k: int = 5

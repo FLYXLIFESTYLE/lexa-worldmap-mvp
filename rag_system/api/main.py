@@ -133,10 +133,13 @@ app.include_router(chat.router, prefix="/api", tags=["Chat"])
 # Import LEXA router (module name kept as `ailessia` for compatibility)
 try:
     from api.routes import ailessia
+    from api.routes import intake
     # Backwards compatible path used by the current frontend client:
     app.include_router(ailessia.router, prefix="/api/ailessia", tags=["LEXA"])
     # Brand-correct alias:
     app.include_router(ailessia.router, prefix="/api/lexa", tags=["LEXA"])
+    # Intake pipeline (uploads / screen / draft extraction / publish)
+    app.include_router(intake.router, prefix="/api/lexa", tags=["Intake"])
     logger.info("LEXA routes loaded (aliases: /api/ailessia and /api/lexa)")
 except ImportError as e:
     logger.warning("LEXA routes not loaded", error=str(e))

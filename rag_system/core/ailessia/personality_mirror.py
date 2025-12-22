@@ -7,11 +7,11 @@ to match ultra-luxury clients exactly where they are emotionally.
 
 from typing import Dict, Optional
 from dataclasses import dataclass
-import asyncio
 import structlog
 
 from core.ailessia.emotion_interpreter import EmotionalReading, EmotionalState
 from config.settings import settings
+from core.llm.router import generate_text as llm_generate_text
 
 logger = structlog.get_logger()
 
@@ -189,11 +189,11 @@ class PersonalityMirror:
             self.TONE_PROFILES["sophisticated_friend"]
         )
         
-        if not self.claude_client:
-            # Fallback: format content with basic tone adjustment
+        # If no provider keys exist, use deterministic formatting.
+        if not settings.anthropic_api_key and not settings.openai_api_key:
             return self._format_with_tone(content, tone_config, client_name)
-        
-        # Use Claude for nuanced generation
+
+        # Use provider (Claude primary, OpenAI fallback) for nuanced generation
         prompt = self._build_generation_prompt(
             content, 
             tone_config, 
@@ -203,21 +203,12 @@ class PersonalityMirror:
         )
         
         try:
-            # Anthropic client is sync; call it in a thread.
-            def _call():
-                msg = self.claude_client.messages.create(
-                    model=getattr(settings, "model_name", "claude-3-5-sonnet-latest"),
-                    max_tokens=800,
-                    system=LEXA_LUXURY_SYSTEM_PROMPT,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                parts = []
-                for block in getattr(msg, "content", []) or []:
-                    if getattr(block, "type", None) == "text":
-                        parts.append(getattr(block, "text", ""))
-                return ("\n".join([p for p in parts if p]).strip()) or None
-
-            response = await asyncio.to_thread(_call)
+            response = await llm_generate_text(
+                system=LEXA_LUXURY_SYSTEM_PROMPT,
+                user_text=prompt,
+                max_tokens=800,
+                prefer=settings.default_llm,
+            )
             if not response:
                 response = self._format_with_tone(content, tone_config, client_name)
             
