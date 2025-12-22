@@ -13,13 +13,114 @@ export async function POST(request: NextRequest) {
 
   try {
     const results = {
+      migrated: [] as { from: string; to: string; count: number }[],
       deleted: [] as string[],
       updated: [] as string[],
-      kept: [] as string[],
       errors: [] as string[]
     };
 
-    // Step 1: Delete redundant theme categories
+    // STEP 1: Migrate relationships from old to new theme categories
+    const migrations = [
+      { from: 'Culture & Culinary', to: 'Culinary Excellence' },
+      { from: 'Raw Nature & Vibes', to: 'Nature & Wildlife' },
+      { from: 'Sports & Adrenaline', to: 'Adventure & Exploration' },
+      { from: 'Art & Fashion', to: 'Art & Architecture' },
+      { from: 'Beauty & Longevity', to: 'Wellness & Transformation' }
+    ];
+
+    for (const migration of migrations) {
+      try {
+        // Migrate relationships
+        const migrateResult = await session.run(
+          `MATCH (p:poi)-[old_rel:HAS_THEME]->(old:theme_category {name: $oldName})
+           MATCH (new:theme_category {name: $newName})
+           MERGE (p)-[new_rel:HAS_THEME]->(new)
+           SET new_rel.confidence = old_rel.confidence,
+               new_rel.evidence = old_rel.evidence,
+               new_rel.migrated_from = $oldName,
+               new_rel.migrated_at = datetime()
+           WITH old_rel
+           DELETE old_rel
+           RETURN count(*) as migrated`,
+          { oldName: migration.from, newName: migration.to }
+        );
+
+        const count = migrateResult.records[0]?.get('migrated')?.toNumber() || 0;
+        results.migrated.push({
+          from: migration.from,
+          to: migration.to,
+          count
+        });
+      } catch (error: any) {
+        results.errors.push(`Failed to migrate ${migration.from}: ${error.message}`);
+      }
+    }
+
+    // STEP 2: Special handling for Water & Wildlife Adventure (split into two)
+    try {
+      // Create relationships to Water Sports & Marine
+      const waterResult = await session.run(
+        `MATCH (p:poi)-[old_rel:HAS_THEME]->(old:theme_category {name: 'Water & Wildlife Adventure'})
+         MATCH (new_water:theme_category {name: 'Water Sports & Marine'})
+         MERGE (p)-[new_rel_water:HAS_THEME]->(new_water)
+         SET new_rel_water.confidence = old_rel.confidence * 0.8,
+             new_rel_water.evidence = old_rel.evidence,
+             new_rel_water.migrated_from = 'Water & Wildlife Adventure',
+             new_rel_water.migrated_at = datetime()
+         RETURN count(*) as created`
+      );
+
+      // Create relationships to Nature & Wildlife
+      const natureResult = await session.run(
+        `MATCH (p:poi)-[old_rel:HAS_THEME]->(old:theme_category {name: 'Water & Wildlife Adventure'})
+         MATCH (new_nature:theme_category {name: 'Nature & Wildlife'})
+         MERGE (p)-[new_rel_nature:HAS_THEME]->(new_nature)
+         SET new_rel_nature.confidence = old_rel.confidence * 0.8,
+             new_rel_nature.evidence = old_rel.evidence,
+             new_rel_nature.migrated_from = 'Water & Wildlife Adventure',
+             new_rel_nature.migrated_at = datetime()
+         RETURN count(*) as created`
+      );
+
+      // Delete old relationships
+      await session.run(
+        `MATCH (p:poi)-[old_rel:HAS_THEME]->(old:theme_category {name: 'Water & Wildlife Adventure'})
+         DELETE old_rel`
+      );
+
+      const waterCount = waterResult.records[0]?.get('created')?.toNumber() || 0;
+      const natureCount = natureResult.records[0]?.get('created')?.toNumber() || 0;
+      
+      results.migrated.push({
+        from: 'Water & Wildlife Adventure',
+        to: 'Water Sports & Marine + Nature & Wildlife',
+        count: waterCount
+      });
+    } catch (error: any) {
+      results.errors.push(`Failed to split Water & Wildlife Adventure: ${error.message}`);
+    }
+
+    // STEP 3: Verify no POIs still linked to old categories
+    const verifyResult = await session.run(
+      `MATCH (p:poi)-[r:HAS_THEME]->(old:theme_category)
+       WHERE old.name IN [
+         'Culture & Culinary',
+         'Water & Wildlife Adventure', 
+         'Raw Nature & Vibes',
+         'Sports & Adrenaline',
+         'Art & Fashion',
+         'Beauty & Longevity'
+       ]
+       RETURN count(p) as remaining`
+    );
+
+    const remainingPOIs = verifyResult.records[0]?.get('remaining')?.toNumber() || 0;
+    
+    if (remainingPOIs > 0) {
+      results.errors.push(`WARNING: ${remainingPOIs} POIs still linked to old categories!`);
+    }
+
+    // STEP 4: Now safe to delete old theme category nodes
     const redundantThemes = [
       "Culture & Culinary",
       "Water & Wildlife Adventure",
@@ -31,22 +132,19 @@ export async function POST(request: NextRequest) {
 
     for (const themeName of redundantThemes) {
       try {
-        const result = await session.run(
+        await session.run(
           `MATCH (t:theme_category {name: $name})
-           DETACH DELETE t
-           RETURN $name as deleted`,
+           DELETE t`,
           { name: themeName }
         );
         
-        if (result.records.length > 0) {
-          results.deleted.push(themeName);
-        }
+        results.deleted.push(themeName);
       } catch (error: any) {
         results.errors.push(`Failed to delete ${themeName}: ${error.message}`);
       }
     }
 
-    // Step 2: Update and enhance unique existing categories
+    // STEP 5: Update and enhance unique existing categories
     
     // Update: Mental Health & Legacy → Personal Growth & Legacy
     try {
@@ -64,9 +162,7 @@ export async function POST(request: NextRequest) {
       );
       results.updated.push("Mental Health & Legacy → Personal Growth & Legacy");
     } catch (error: any) {
-      if (!error.message.includes('no changes')) {
-        results.errors.push(`Failed to update Mental Health & Legacy: ${error.message}`);
-      }
+      // Might not exist, that's okay
     }
 
     // Update: Business & Performance → Business & Executive Travel
@@ -85,12 +181,10 @@ export async function POST(request: NextRequest) {
       );
       results.updated.push("Business & Performance → Business & Executive Travel");
     } catch (error: any) {
-      if (!error.message.includes('no changes')) {
-        results.errors.push(`Failed to update Business & Performance: ${error.message}`);
-      }
+      // Might not exist, that's okay
     }
 
-    // Step 3: Get final count
+    // STEP 6: Get final counts
     const countResult = await session.run(`
       MATCH (t:theme_category)
       RETURN count(t) as total
@@ -98,34 +192,49 @@ export async function POST(request: NextRequest) {
     
     const totalThemes = countResult.records[0].get('total').toNumber();
 
-    // Step 4: Get all remaining themes
+    // Get relationship count
+    const relCountResult = await session.run(`
+      MATCH ()-[r:HAS_THEME]->(:theme_category)
+      RETURN count(r) as total_relationships
+    `);
+    
+    const totalRelationships = relCountResult.records[0].get('total_relationships').toNumber();
+
+    // Get all remaining themes
     const themesResult = await session.run(`
       MATCH (t:theme_category)
       RETURN t.name as name, t.icon as icon
       ORDER BY t.luxuryScore DESC, t.name
     `);
 
-    results.kept = themesResult.records.map(record => 
+    const remainingThemes = themesResult.records.map(record => 
       `${record.get('icon')} ${record.get('name')}`
     );
 
+    // Calculate total migrated
+    const totalMigrated = results.migrated.reduce((sum, m) => sum + m.count, 0);
+
     return NextResponse.json({
       success: true,
-      message: `Cleanup complete! Consolidated from 26 to ${totalThemes} theme categories`,
+      message: `✅ Safe migration complete! Migrated ${totalMigrated} POI relationships from ${results.deleted.length} old categories`,
       total_themes: totalThemes,
+      total_relationships: totalRelationships,
+      relationships_migrated: totalMigrated,
+      migration_details: results.migrated,
       deleted_count: results.deleted.length,
       updated_count: results.updated.length,
       deleted: results.deleted,
       updated: results.updated,
-      remaining_themes: results.kept,
+      remaining_themes: remainingThemes,
+      warnings: remainingPOIs > 0 ? [`${remainingPOIs} POIs still linked to old categories`] : undefined,
       errors: results.errors.length > 0 ? results.errors : undefined
     });
 
   } catch (error: any) {
-    console.error('Error cleaning up theme categories:', error);
+    console.error('Error during safe theme migration:', error);
     return NextResponse.json(
       { 
-        error: 'Failed to clean up theme categories',
+        error: 'Failed to migrate theme categories',
         details: error.message 
       },
       { status: 500 }

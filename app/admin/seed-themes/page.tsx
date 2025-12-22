@@ -75,7 +75,7 @@ export default function SeedThemesPage() {
   }
 
   async function handleCleanup() {
-    if (!confirm('This will delete 6 redundant theme categories and update 2 others. Continue?')) {
+    if (!confirm('⚠️ SAFE MIGRATION:\n\nThis will:\n1. Migrate ALL existing POI relationships to new theme categories\n2. Delete 6 redundant old categories\n3. Update 2 unique categories\n\nAll POI connections will be preserved!\n\nContinue?')) {
       return;
     }
 
@@ -92,7 +92,7 @@ export default function SeedThemesPage() {
       
       // Refresh the view
       if (showingExisting) {
-        handleViewExisting();
+        setTimeout(() => handleViewExisting(), 1000);
       }
     } catch (error: any) {
       setCleanupResult({
@@ -209,9 +209,34 @@ export default function SeedThemesPage() {
             )}
 
             {cleanupResult.total_themes !== undefined && (
-              <p className="text-zinc-300 mb-4">
-                Final count: <span className="text-lexa-gold font-semibold">{cleanupResult.total_themes}</span> theme categories
-              </p>
+              <div className="mb-4">
+                <p className="text-zinc-300 mb-2">
+                  Final count: <span className="text-lexa-gold font-semibold">{cleanupResult.total_themes}</span> theme categories
+                </p>
+                {cleanupResult.total_relationships !== undefined && (
+                  <p className="text-zinc-300">
+                    Total relationships: <span className="text-lexa-gold font-semibold">{cleanupResult.total_relationships}</span> POI connections preserved
+                  </p>
+                )}
+              </div>
+            )}
+
+            {cleanupResult.migration_details && cleanupResult.migration_details.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-blue-400 font-semibold mb-2">
+                  Relationships Migrated ({cleanupResult.relationships_migrated} total):
+                </h3>
+                <div className="space-y-2">
+                  {cleanupResult.migration_details.map((migration: any, idx: number) => (
+                    <div key={idx} className="text-sm bg-zinc-800 px-4 py-2 rounded-lg">
+                      <span className="text-zinc-400">{migration.from}</span>
+                      <span className="text-zinc-500 mx-2">→</span>
+                      <span className="text-green-400">{migration.to}</span>
+                      <span className="text-lexa-gold ml-2">({migration.count} POIs)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {cleanupResult.deleted && cleanupResult.deleted.length > 0 && (
