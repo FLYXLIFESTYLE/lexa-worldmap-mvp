@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_key: str  # Can be anon key or service role key
     supabase_service_key: str = ""  # Optional: for admin operations
+
+    # Google Places (paid enrichment phase; no scraping)
+    google_places_api_key: str = ""
     
     # LLM Configuration
     anthropic_api_key: str = ""
