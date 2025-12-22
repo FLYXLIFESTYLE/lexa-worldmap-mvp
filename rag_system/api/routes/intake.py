@@ -91,6 +91,8 @@ class ExtractDraftRequest(BaseModel):
     include_geo: bool = True
     include_knowledge: bool = True
     include_chunks: bool = True
+    crawl_subpages: bool = False
+    crawl_limit: int = Field(default=5, ge=1, le=20)
 
 
 class PublishRequest(BaseModel):
@@ -358,6 +360,23 @@ async def intake_extract_draft(
                     text = re.sub(r"<style[\\s\\S]*?</style>", " ", text, flags=re.IGNORECASE)
                     text = re.sub(r"<[^>]+>", " ", text)
                     text = _norm_text(text)
+
+            # Optional crawl of discovered subpages (domain-limited)
+            if upload.get("source_url") and request.crawl_subpages:
+                try:
+                    screening = upload.get("screening") or {}
+                    subpages = screening.get("subpages") or []
+                    if subpages:
+                        from core.intake.web_crawler import crawl_and_combine_text
+                        combined = await crawl_and_combine_text(
+                            start_url=upload["source_url"],
+                            discovered_urls=subpages,
+                            max_pages=int(request.crawl_limit),
+                        )
+                        if combined:
+                            text = f"{text or ''}\n\n=== SUBPAGES (CRAWLED) ===\n\n{combined}".strip()
+                except Exception as e:
+                    logger.warning("Subpage crawl failed; continuing with main page only", error=str(e))
 
             if not text:
                 raise HTTPException(status_code=400, detail="No text available for extraction")
