@@ -23,6 +23,7 @@ export default function SeedThemesPage() {
   const [existingThemes, setExistingThemes] = useState<any[]>([]);
   const [showingExisting, setShowingExisting] = useState(false);
   const [cleanupResult, setCleanupResult] = useState<any>(null);
+  const [nullCleanupResult, setNullCleanupResult] = useState<any>(null);
 
   async function handleSeed() {
     setLoading(true);
@@ -105,6 +106,36 @@ export default function SeedThemesPage() {
     }
   }
 
+  async function handleCleanupNullThemes() {
+    if (!confirm('Clean up NULL theme categories?\n\nThis will delete theme categories with NULL/empty names and their invalid relationships.\n\nPOIs can be re-enriched later with valid themes.')) {
+      return;
+    }
+
+    setLoading(true);
+    setNullCleanupResult(null);
+
+    try {
+      const response = await fetch('/api/admin/cleanup-null-themes', {
+        method: 'POST'
+      });
+      const data = await response.json();
+      setNullCleanupResult(data);
+      
+      // Refresh the view
+      if (showingExisting) {
+        setTimeout(() => handleViewExisting(), 1000);
+      }
+    } catch (error: any) {
+      setNullCleanupResult({
+        success: false,
+        error: 'Failed to cleanup NULL themes',
+        details: error.message
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-zinc-900">
       <AdminNav />
@@ -121,7 +152,7 @@ export default function SeedThemesPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-4 justify-center mb-8">
+        <div className="flex flex-wrap gap-4 justify-center mb-8">
           <button
             onClick={handleSeed}
             disabled={loading}
@@ -144,6 +175,14 @@ export default function SeedThemesPage() {
             className="px-8 py-4 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? '⏳ Cleaning...' : '🧹 Cleanup Duplicates'}
+          </button>
+
+          <button
+            onClick={handleCleanupNullThemes}
+            disabled={loading}
+            className="px-8 py-4 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? '⏳ Cleaning...' : '🗑️ Remove NULL Themes'}
           </button>
         </div>
 
@@ -280,6 +319,48 @@ export default function SeedThemesPage() {
                 {cleanupResult.details && (
                   <p className="text-sm text-zinc-400 font-mono bg-zinc-900 p-3 rounded">
                     {cleanupResult.details}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* NULL Cleanup Result Display */}
+        {nullCleanupResult && (
+          <div className={`p-6 rounded-xl mb-8 ${nullCleanupResult.success ? 'bg-green-900/20 border border-green-500/30' : 'bg-red-900/20 border border-red-500/30'}`}>
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-3xl">{nullCleanupResult.success ? '✅' : '⚠️'}</span>
+              <h2 className={`text-xl font-semibold ${nullCleanupResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                {nullCleanupResult.success ? 'NULL Cleanup Complete!' : 'Cleanup Error'}
+              </h2>
+            </div>
+
+            {nullCleanupResult.message && (
+              <p className="text-white mb-3">{nullCleanupResult.message}</p>
+            )}
+
+            {nullCleanupResult.null_categories_deleted !== undefined && nullCleanupResult.null_categories_deleted > 0 && (
+              <div className="space-y-2 text-sm text-zinc-300 mb-4">
+                <p>• Deleted: <span className="text-red-400 font-semibold">{nullCleanupResult.null_categories_deleted}</span> NULL theme categories</p>
+                <p>• Removed: <span className="text-red-400 font-semibold">{nullCleanupResult.relationships_deleted}</span> invalid relationships</p>
+                <p>• Affected POIs: <span className="text-yellow-400 font-semibold">{nullCleanupResult.affected_pois}</span> (can be re-enriched)</p>
+                <p>• Final valid themes: <span className="text-lexa-gold font-semibold">{nullCleanupResult.final_valid_theme_count}</span></p>
+              </div>
+            )}
+
+            {nullCleanupResult.warning && (
+              <p className="text-yellow-400 text-sm bg-yellow-900/20 px-4 py-2 rounded">
+                ⚠️ {nullCleanupResult.warning}
+              </p>
+            )}
+
+            {nullCleanupResult.error && (
+              <>
+                <p className="text-red-400 font-semibold mb-2">{nullCleanupResult.error}</p>
+                {nullCleanupResult.details && (
+                  <p className="text-sm text-zinc-400 font-mono bg-zinc-900 p-3 rounded">
+                    {nullCleanupResult.details}
                   </p>
                 )}
               </>
