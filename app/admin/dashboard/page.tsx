@@ -40,11 +40,12 @@ const adminTools = [
   {
     id: 'destinations',
     name: 'Destinations Browser',
-    description: 'Browse POIs by destination with statistics and data quality metrics',
+    description: 'Enhanced destination analytics with AI-powered insights (integrating into ChatNeo4j)',
     icon: '🗺️',
-    href: '/admin/destinations',
+    href: '#',
     color: 'bg-purple-500',
-    features: ['POI statistics', 'Data quality', 'Destination coverage']
+    features: ['POI statistics', 'Data quality', 'Destination coverage'],
+    comingSoon: true
   },
   {
     id: 'poi-search',

@@ -38,12 +38,6 @@ const adminPages = [
     description: 'Query database'
   },
   {
-    name: 'Destinations',
-    href: '/admin/destinations',
-    icon: '🗺️',
-    description: 'Browse POIs'
-  },
-  {
     name: 'Platform Architecture',
     href: '/admin/documentation',
     icon: '📖',

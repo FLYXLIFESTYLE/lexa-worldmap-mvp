@@ -54,13 +54,6 @@ export default function KnowledgePortalPage() {
       color: 'from-lexa-gold to-lexa-navy',
     },
     {
-      icon: '🌍',
-      title: 'Destination Browser',
-      description: 'Explore POI coverage and quality across all destinations worldwide',
-      action: () => router.push('/admin/destinations'),
-      color: 'from-orange-500 to-red-600',
-    },
-    {
       icon: '🏖️',
       title: 'Scraped URLs',
       description: 'View and manage all URLs scraped for knowledge extraction',
@@ -120,7 +113,7 @@ export default function KnowledgePortalPage() {
         <div className="mx-auto max-w-5xl">
           {/* Feature Cards */}
           <div className="grid md:grid-cols-3 gap-6 mb-12">
-            {features.map((feature, idx) => (
+            {features.slice(0, 3).map((feature, idx) => (
               <div
                 key={idx}
                 className={`bg-white rounded-2xl shadow-lg border ${feature.featured ? 'border-lexa-gold/50 ring-2 ring-lexa-gold/20' : 'border-zinc-200/60'} p-6 hover:shadow-xl transition-all cursor-pointer relative`}
@@ -140,6 +133,28 @@ export default function KnowledgePortalPage() {
                 </p>
                 <button className={`w-full px-4 py-2 bg-gradient-to-r ${feature.color} text-white rounded-lg font-semibold hover:shadow-md transition-all`}>
                   {feature.featured ? '✨ Try It Now →' : 'Get Started →'}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Secondary Tools */}
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            {features.slice(3).map((feature, idx) => (
+              <div
+                key={idx}
+                className="bg-white rounded-2xl shadow-lg border border-zinc-200/60 p-6 hover:shadow-xl transition-all cursor-pointer"
+                onClick={feature.action}
+              >
+                <div className="text-5xl mb-4">{feature.icon}</div>
+                <h3 className="text-xl font-bold text-lexa-navy mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-zinc-600 text-sm mb-4">
+                  {feature.description}
+                </p>
+                <button className={`w-full px-4 py-2 bg-gradient-to-r ${feature.color} text-white rounded-lg font-semibold hover:shadow-md transition-all`}>
+                  Get Started →
                 </button>
               </div>
             ))}
