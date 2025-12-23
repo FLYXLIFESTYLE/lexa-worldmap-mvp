@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import LuxuryBackground from '@/components/luxury-background';
 import AdminNav from '@/components/admin/admin-nav';
 
@@ -35,6 +35,7 @@ export default function UploadYachtDestinationsPage() {
   // Screenshot mode state
   const [uploading, setUploading] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   
   // Shared state
   const [destinations, setDestinations] = useState<EditableDestination[]>([]);
@@ -49,6 +50,7 @@ export default function UploadYachtDestinationsPage() {
     setExtracting(true);
     setDestinations([]);
     setApproved(false);
+    setIsDragging(false);
 
     try {
       const formData = new FormData();
@@ -99,6 +101,63 @@ export default function UploadYachtDestinationsPage() {
       setExtracting(false);
     }
   }
+
+  // Drag and drop handlers
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleScreenshotUpload(files);
+    }
+  }
+
+  // Paste handler (Ctrl+V)
+  useEffect(() => {
+    if (mode !== 'screenshot') return;
+
+    function handlePaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            imageFiles.push(file);
+          }
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        const dataTransfer = new DataTransfer();
+        imageFiles.forEach(file => dataTransfer.items.add(file));
+        handleScreenshotUpload(dataTransfer.files);
+      }
+    }
+
+    document.addEventListener('paste', handlePaste);
+    return () => {
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, [mode]);
 
   // Parse text input
   function handleTextParse() {
@@ -289,7 +348,16 @@ export default function UploadYachtDestinationsPage() {
                 Upload images with city names, routes, or destination lists. We'll extract the text automatically using OCR.
               </p>
               
-              <div className="border-2 border-dashed border-zinc-700 rounded-xl p-12 text-center hover:border-lexa-gold transition-all">
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-xl p-12 text-center transition-all ${
+                  isDragging
+                    ? 'border-lexa-gold bg-lexa-gold/10 scale-105'
+                    : 'border-zinc-700 hover:border-lexa-gold'
+                }`}
+              >
                 <input
                   type="file"
                   id="screenshot-upload"
@@ -308,21 +376,53 @@ export default function UploadYachtDestinationsPage() {
                       <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-lexa-gold"></div>
                       <p className="text-lexa-gold font-semibold">Extracting text from images...</p>
                     </div>
+                  ) : isDragging ? (
+                    <div className="space-y-4">
+                      <div className="text-6xl">📥</div>
+                      <div>
+                        <p className="text-xl font-semibold text-lexa-gold mb-2">
+                          Drop images here
+                        </p>
+                        <p className="text-sm text-zinc-400">
+                          Release to upload
+                        </p>
+                      </div>
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       <div className="text-6xl">📸</div>
                       <div>
                         <p className="text-xl font-semibold text-white mb-2">
-                          Click to upload screenshots
+                          Click, Drag & Drop, or Press Ctrl+V
                         </p>
-                        <p className="text-sm text-zinc-400">
+                        <p className="text-sm text-zinc-400 mb-3">
                           Supports: JPG, PNG, WebP • Multiple files allowed
                         </p>
+                        <div className="flex items-center justify-center gap-4 text-xs text-zinc-500">
+                          <span className="flex items-center gap-1">
+                            <kbd className="px-2 py-1 bg-zinc-800 rounded border border-zinc-700">Click</kbd>
+                            to browse
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <kbd className="px-2 py-1 bg-zinc-800 rounded border border-zinc-700">Drag</kbd>
+                            files here
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <kbd className="px-2 py-1 bg-zinc-800 rounded border border-zinc-700">Ctrl+V</kbd>
+                            to paste
+                          </span>
+                        </div>
                       </div>
                     </div>
                   )}
                 </label>
               </div>
+              
+              {mode === 'screenshot' && !extracting && (
+                <p className="text-center text-xs text-zinc-500 mt-4">
+                  💡 Tip: Copy a screenshot (Windows: Win+Shift+S, Mac: Cmd+Shift+4) and paste it here with Ctrl+V
+                </p>
+              )}
             </div>
           )}
 
