@@ -72,16 +72,28 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Check for captain profile
+    // Check for captain profile - with fresh query to avoid cache
     const { data: profile, error: profileError } = await supabase
       .from('captain_profiles')
       .select('role')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();  // Use maybeSingle() instead of single() to avoid errors
 
-    if (profileError || !profile) {
+    if (profileError) {
+      console.error('Error fetching captain profile:', profileError);
       const url = request.nextUrl.clone();
       url.pathname = '/unauthorized';
+      url.searchParams.set('from', path);
+      url.searchParams.set('error', 'profile_fetch_error');
+      return NextResponse.redirect(url);
+    }
+
+    if (!profile) {
+      console.log('No captain profile found for user:', user.id);
+      const url = request.nextUrl.clone();
+      url.pathname = '/unauthorized';
+      url.searchParams.set('from', path);
+      url.searchParams.set('error', 'no_profile');
       return NextResponse.redirect(url);
     }
 
@@ -89,6 +101,8 @@ export async function middleware(request: NextRequest) {
     if (path.startsWith('/admin/users') && profile.role !== 'admin') {
       const url = request.nextUrl.clone();
       url.pathname = '/unauthorized';
+      url.searchParams.set('from', path);
+      url.searchParams.set('error', 'insufficient_permissions');
       return NextResponse.redirect(url);
     }
   }

@@ -6,8 +6,33 @@
  */
 
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { createClient } from '@/lib/supabase/client-browser';
 
-export default function UnauthorizedPage() {
+function UnauthorizedContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('from') || '/admin/dashboard';
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsSignedIn(!!user);
+      setUserEmail(user?.email || null);
+    }
+    checkAuth();
+  }, []);
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/auth/signin?redirectTo=' + encodeURIComponent(redirectTo));
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-lexa-navy via-zinc-900 to-black flex items-center justify-center p-6">
       <div className="max-w-md w-full">
@@ -36,6 +61,12 @@ export default function UnauthorizedPage() {
           <p className="text-zinc-400 mb-6">
             You don&apos;t have permission to access this area.
           </p>
+
+          {isSignedIn && userEmail && (
+            <p className="text-sm text-zinc-500 mb-4">
+              Signed in as: <span className="text-lexa-gold">{userEmail}</span>
+            </p>
+          )}
         </div>
 
         {/* Info Card */}
@@ -49,21 +80,45 @@ export default function UnauthorizedPage() {
             LEXA team members and verified travel experts.
           </p>
           
-          <div className="bg-lexa-gold/10 border border-lexa-gold/30 rounded-lg p-4">
-            <p className="text-lexa-gold text-sm">
-              <strong>Want to become a Captain?</strong><br />
-              Contact us to learn about joining our team of luxury travel experts.
-            </p>
-          </div>
+          {isSignedIn ? (
+            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+              <p className="text-red-400 text-sm mb-3">
+                <strong>Your account doesn&apos;t have admin access</strong><br />
+                If you just added your captain profile, try signing out and back in.
+              </p>
+              <button
+                onClick={handleSignOut}
+                className="w-full px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
+              >
+                Sign Out & Sign In Again
+              </button>
+            </div>
+          ) : (
+            <div className="bg-lexa-gold/10 border border-lexa-gold/30 rounded-lg p-4">
+              <p className="text-lexa-gold text-sm">
+                <strong>Want to become a Captain?</strong><br />
+                Contact us to learn about joining our team of luxury travel experts.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
         <div className="space-y-3">
+          {!isSignedIn && (
+            <Link
+              href={`/auth/signin?redirectTo=${encodeURIComponent(redirectTo)}`}
+              className="block w-full px-6 py-3 bg-gradient-to-r from-lexa-gold to-yellow-600 text-zinc-900 rounded-xl font-semibold text-center hover:shadow-lg transition-all"
+            >
+              Sign In to Access Admin
+            </Link>
+          )}
+          
           <Link
-            href="/app"
+            href="/demo/chat"
             className="block w-full px-6 py-3 bg-gradient-to-r from-lexa-navy to-lexa-gold text-white rounded-xl font-semibold text-center hover:shadow-lg transition-all"
           >
-            Go to LEXA Chat
+            Go to LEXA Demo Chat
           </Link>
           
           <Link
@@ -78,13 +133,25 @@ export default function UnauthorizedPage() {
         <div className="mt-8 text-center">
           <p className="text-zinc-500 text-sm">
             Need help?{' '}
-            <a href="mailto:support@lexa.com" className="text-lexa-gold hover:underline">
-              Contact Support
-            </a>
+            <Link href="/admin/debug-profile" className="text-lexa-gold hover:underline">
+              Debug Profile
+            </Link>
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UnauthorizedPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-lexa-navy via-zinc-900 to-black flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    }>
+      <UnauthorizedContent />
+    </Suspense>
   );
 }
 
