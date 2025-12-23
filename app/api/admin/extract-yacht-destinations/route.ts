@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { GoogleAuth } from 'google-auth-library';
 
 export const runtime = 'nodejs';
 
@@ -27,15 +28,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_PLACES_API_KEY;
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Google Vision API key not configured' },
-        { status: 500 }
-      );
-    }
-
     const results: ExtractionResult[] = [];
 
     for (const file of files) {
@@ -44,24 +36,12 @@ export async function POST(request: NextRequest) {
       const base64 = Buffer.from(bytes).toString('base64');
 
       // Call Google Vision API for text detection
-      const visionResponse = await fetch(
-        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            requests: [
-              {
-                image: { content: base64 },
-                features: [{ type: 'TEXT_DETECTION', maxResults: 1 }]
-              }
-            ]
-          })
-        }
-      );
+      const visionResponse = await callVisionAPI(base64);
 
       if (!visionResponse.ok) {
-        throw new Error('Google Vision API error: ' + await visionResponse.text());
+        const errorText = await visionResponse.text();
+        console.error('Vision API error:', errorText);
+        throw new Error('Google Vision API error: ' + errorText);
       }
 
       const visionData = await visionResponse.json();
@@ -98,6 +78,79 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Call Google Vision API with authentication
+ * Supports both service account (recommended) and API key (fallback)
+ */
+async function callVisionAPI(base64Image: string): Promise<Response> {
+  const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  
+  // Try service account first (recommended for production)
+  if (credentialsPath) {
+    try {
+      const auth = new GoogleAuth({
+        keyFile: credentialsPath,
+        scopes: ['https://www.googleapis.com/auth/cloud-vision'],
+      });
+      
+      const client = await auth.getClient();
+      const accessToken = await client.getAccessToken();
+      
+      if (!accessToken.token) {
+        throw new Error('Failed to get access token from service account');
+      }
+      
+      const response = await fetch(
+        'https://vision.googleapis.com/v1/images:annotate',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            requests: [
+              {
+                image: { content: base64Image },
+                features: [{ type: 'TEXT_DETECTION', maxResults: 1 }]
+              }
+            ]
+          })
+        }
+      );
+      
+      return response;
+    } catch (error) {
+      console.error('Service account auth failed, falling back to API key:', error);
+    }
+  }
+  
+  // Fallback to API key
+  const apiKey = process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_PLACES_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('No Google Vision API credentials found. Set either GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_VISION_API_KEY/GOOGLE_PLACES_API_KEY');
+  }
+  
+  const response = await fetch(
+    `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [
+          {
+            image: { content: base64Image },
+            features: [{ type: 'TEXT_DETECTION', maxResults: 1 }]
+          }
+        ]
+      })
+    }
+  );
+  
+  return response;
 }
 
 function parseYachtDestinations(text: string): Omit<ExtractionResult, 'raw_text'> {
@@ -177,7 +230,11 @@ function mergeExtractionResults(results: ExtractionResult[]): Omit<ExtractionRes
 export async function GET() {
   return NextResponse.json({
     message: 'Upload images via POST',
-    required_env: 'GOOGLE_VISION_API_KEY or GOOGLE_PLACES_API_KEY'
+    auth_methods: {
+      service_account: process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'Configured ✅' : 'Not configured',
+      api_key: (process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_PLACES_API_KEY) ? 'Configured ✅' : 'Not configured'
+    },
+    required_env: 'GOOGLE_APPLICATION_CREDENTIALS (recommended) or GOOGLE_VISION_API_KEY/GOOGLE_PLACES_API_KEY'
   });
 }
 
