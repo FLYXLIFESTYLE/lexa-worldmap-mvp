@@ -81,7 +81,7 @@ const adminPages = [
   },
   {
     name: 'Yacht Destinations',
-    href: '/admin/upload-yacht-destinations',
+    href: '/admin/upload-yacht-destinations-v2',
     icon: '⛵',
     description: 'Upload yacht ports & routes'
   },
