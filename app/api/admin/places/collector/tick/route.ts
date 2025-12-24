@@ -290,7 +290,10 @@ export async function POST(req: NextRequest) {
         bumpProgressCounters(progress, category, { discovered });
       }
 
-      if (progress.state === 'paused_budget') break;
+      // TS note: `markPausedBudget(progress, ...)` mutates state, but TS doesn't widen after function calls.
+      // Use a fresh string snapshot to avoid incorrect narrowing complaints.
+      const stateAfterDiscovery: string = progress.state;
+      if (stateAfterDiscovery === 'paused_budget') break;
 
       // 3) Details + upsert
       const placeIds = Array.from(placeCategoryMap.keys()).slice(0, maxPlacesPerDestination);
@@ -342,7 +345,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (progress.state === 'paused_budget') break;
+      const stateAfterDetails: string = progress.state;
+      if (stateAfterDetails === 'paused_budget') break;
 
       item.status = 'done';
       progress.current_index += 1;
