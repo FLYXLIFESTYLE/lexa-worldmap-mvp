@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { fetchFallbackRegions, fetchYachtDestinations, insertJob, newProgress } from '../_shared';
+import { fetchFallbackRegions, fetchYachtDestinations, insertJob, newProgress, type CollectorQueueItem } from '../_shared';
 
 export const runtime = 'nodejs';
 
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     // Queue: yacht destinations first
     const yachtNames = await fetchYachtDestinations();
-    const queue = yachtNames.map(name => ({
+    const queue: CollectorQueueItem[] = yachtNames.map(name => ({
       name,
       kind: 'destination' as const,
       radius_km: radiusKmCity,
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     }
 
     const batchId = randomUUID();
-    const progress = newProgress(queue as any, batchId);
+    const progress = newProgress(queue, batchId);
 
     const jobRow = await insertJob({
       requested_by_user_id: requestedBy,
