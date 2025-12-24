@@ -181,7 +181,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not a collector job' }, { status: 400 });
     }
 
-    if (progress.state === 'paused_manual' || progress.state === 'paused_budget' || progress.state === 'completed' || progress.state === 'failed') {
+    // IMPORTANT: use a snapshot variable so TypeScript doesn't permanently narrow `progress.state`.
+    // `markPausedBudget(progress, ...)` mutates `progress.state` later in this function.
+    const initialState = progress.state;
+    if (initialState === 'paused_manual' || initialState === 'paused_budget' || initialState === 'completed' || initialState === 'failed') {
       return NextResponse.json({ ok: true, job_id: body.job_id, progress });
     }
 
