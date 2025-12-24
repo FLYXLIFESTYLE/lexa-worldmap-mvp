@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
     progress.reason = undefined;
     progress.updated_at = new Date().toISOString();
 
-    await updateJob(body.job_id, { progress, status: 'running', error: null });
+    // Clear any previous error (Supabase column can be NULL, but our TS helper uses string | undefined)
+    await updateJob(body.job_id, { progress, status: 'running', error: undefined });
     return NextResponse.json({ ok: true, job_id: body.job_id, progress });
   } catch (e: any) {
     return NextResponse.json({ error: 'Failed to resume job', details: e?.message || String(e) }, { status: 500 });
