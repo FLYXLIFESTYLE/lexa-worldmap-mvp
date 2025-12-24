@@ -16,6 +16,8 @@ export type CollectorProgress = {
   job_type: 'collector';
   state: 'running' | 'paused_manual' | 'paused_budget' | 'paused_rate_limit' | 'completed' | 'failed';
   reason?: string;
+  // When paused due to a temporary rate limit, we can auto-resume after this timestamp.
+  next_retry_at?: string;
   started_at: string;
   updated_at: string;
   requests_used_total: number;
@@ -140,6 +142,9 @@ export function markPausedBudget(progress: CollectorProgress, reason: string) {
 export function markPausedRateLimit(progress: CollectorProgress, reason: string) {
   progress.state = 'paused_rate_limit';
   progress.reason = reason;
+  // Most Google per-minute rate limits clear quickly.
+  const retryMs = 70_000;
+  progress.next_retry_at = new Date(Date.now() + retryMs).toISOString();
   progress.updated_at = _isoNow();
 }
 

@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
 
     progress.state = 'running';
     progress.reason = undefined;
+    progress.next_retry_at = undefined;
     progress.updated_at = new Date().toISOString();
 
     // Clear any previous error (Supabase column can be NULL, but our TS helper uses string | undefined)

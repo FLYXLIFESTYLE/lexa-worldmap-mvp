@@ -23,6 +23,7 @@ type CollectorProgress = {
   job_type: 'collector';
   state: string;
   reason?: string;
+  next_retry_at?: string;
   started_at: string;
   updated_at: string;
   requests_used_total: number;
@@ -68,7 +69,8 @@ export default function PoiCollectionPage() {
   const [stats, setStats] = useState<CollectorStatsResponse | null>(null);
 
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['wellness', 'dining', 'nightlife']);
-  const [maxRequestsPerTick, setMaxRequestsPerTick] = useState<number>(80);
+  // Default lower to reduce Google per-minute rate limits (429)
+  const [maxRequestsPerTick, setMaxRequestsPerTick] = useState<number>(20);
   const [maxQueueItemsPerTick, setMaxQueueItemsPerTick] = useState<number>(1);
   const [maxPlacesPerDestination, setMaxPlacesPerDestination] = useState<number>(200);
   const [radiusKmCity, setRadiusKmCity] = useState<number>(25);
@@ -87,6 +89,8 @@ export default function PoiCollectionPage() {
   const currentIndex = (job?.progress?.current_index || 0) as number;
   const currentItem = queue[currentIndex] || null;
   const currentDestinationLabel = currentItem ? `${currentItem.name} (${currentItem.kind}, ${currentItem.radius_km}km)` : '—';
+  const nextRetryAt = job?.progress?.next_retry_at ? new Date(job.progress.next_retry_at).getTime() : null;
+  const msUntilRetry = nextRetryAt ? Math.max(0, nextRetryAt - Date.now()) : null;
 
   const batch: CollectorBatch | null = stats?.batch || job?.progress?.batch || null;
   const batchRows = useMemo(() => {
@@ -202,6 +206,22 @@ export default function PoiCollectionPage() {
       if (!job?.progress) return;
 
       const s = job.progress.state;
+      if (s === 'paused_rate_limit') {
+        const retryAt = job.progress.next_retry_at ? new Date(job.progress.next_retry_at).getTime() : null;
+        if (retryAt && Date.now() >= retryAt) {
+          runningRef.current = true;
+          try {
+            await resume(jobId);
+            await tick(jobId);
+          } catch {
+            // ignore; user can click Resume manually
+          } finally {
+            runningRef.current = false;
+            setTimeout(loop, 1000);
+          }
+        }
+        return;
+      }
       if (s !== 'running') return;
 
       runningRef.current = true;
@@ -243,6 +263,11 @@ export default function PoiCollectionPage() {
             <div>
               <div className="text-xs uppercase tracking-wider text-zinc-400">Currently scanning</div>
               <div className="text-2xl font-semibold text-white">{currentDestinationLabel}</div>
+              {state === 'paused_rate_limit' && msUntilRetry !== null ? (
+                <div className="text-xs text-zinc-400 mt-1">
+                  Auto-resume in ~{Math.ceil(msUntilRetry / 1000)}s (Google rate limit)
+                </div>
+              ) : null}
             </div>
             <div className="text-sm text-zinc-300">
               <span className="text-zinc-500">State:</span> <span className="font-semibold">{state || job?.status || '—'}</span>
