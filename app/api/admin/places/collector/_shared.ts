@@ -70,8 +70,11 @@ export async function fetchYachtDestinations(): Promise<string[]> {
       OPTIONAL MATCH (p:poi)-[:LOCATED_IN]->(d)
       WITH d, max(coalesce(p.updated_at, p.created_at, p.ingested_at, p.enriched_at)) AS last_poi_ts
       WITH d, coalesce(d.updated_at, d.created_at, last_poi_ts, datetime({epochMillis: 0})) AS priority_ts
-      RETURN DISTINCT d.name as name
+      WITH d.name as name, priority_ts
+      // If there are multiple destination nodes with the same name, keep the newest one.
+      WITH name, max(priority_ts) AS priority_ts
       ORDER BY priority_ts DESC, name
+      RETURN name as name
     `);
     return result.records.map(r => r.get('name'));
   } finally {
