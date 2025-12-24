@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local Python virtualenvs (can be huge; not part of Next.js code)
+    "rag_system/venv/**",
+    "**/venv/**",
   ]),
 ]);
 

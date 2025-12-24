@@ -86,6 +86,12 @@ const adminPages = [
     description: 'Upload yacht ports & routes'
   },
   {
+    name: 'POI Collection',
+    href: '/admin/poi-collection',
+    icon: '📍',
+    description: 'Google Places batch collector'
+  },
+  {
     name: 'Upload History',
     href: '/admin/knowledge/history',
     icon: '📊',
