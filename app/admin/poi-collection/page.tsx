@@ -84,6 +84,7 @@ export default function PoiCollectionPage() {
   const queue = (job?.progress?.queue || []) as CollectorQueueItem[];
   const currentIndex = (job?.progress?.current_index || 0) as number;
   const currentItem = queue[currentIndex] || null;
+  const currentDestinationLabel = currentItem ? `${currentItem.name} (${currentItem.kind}, ${currentItem.radius_km}km)` : '—';
 
   const batch: CollectorBatch | null = stats?.batch || job?.progress?.batch || null;
   const batchRows = useMemo(() => {
@@ -231,6 +232,18 @@ export default function PoiCollectionPage() {
             <p className="text-zinc-400">
               This runs in safe “ticks” so you can start, pause, resume, and it will automatically stop when Google quota/budget is exhausted.
             </p>
+          </div>
+
+          {/* Current destination field (prominent) */}
+          <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800 rounded-xl p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-zinc-400">Currently scanning</div>
+              <div className="text-2xl font-semibold text-white">{currentDestinationLabel}</div>
+            </div>
+            <div className="text-sm text-zinc-300">
+              <span className="text-zinc-500">State:</span> <span className="font-semibold">{state || job?.status || '—'}</span>
+              {job?.progress?.reason ? <span className="text-zinc-400"> — {job.progress.reason}</span> : null}
+            </div>
           </div>
 
           {/* Setup */}

@@ -61,11 +61,17 @@ export async function insertJob(row: any) {
 export async function fetchYachtDestinations(): Promise<string[]> {
   const session = getSession();
   try {
+    // Priority ordering:
+    // 1) destinations with most recent activity (newly created destinations or destinations with recently added POIs)
+    // 2) fallback alphabetical
     const result = await session.run(`
       MATCH (d:destination)
       WHERE d.yacht_port = true OR d.yacht_destination = true OR d.luxury_destination = true
+      OPTIONAL MATCH (p:poi)-[:LOCATED_IN]->(d)
+      WITH d, max(coalesce(p.updated_at, p.created_at, p.ingested_at, p.enriched_at)) AS last_poi_ts
+      WITH d, coalesce(d.updated_at, d.created_at, last_poi_ts, datetime({epochMillis: 0})) AS priority_ts
       RETURN DISTINCT d.name as name
-      ORDER BY name
+      ORDER BY priority_ts DESC, name
     `);
     return result.records.map(r => r.get('name'));
   } finally {
