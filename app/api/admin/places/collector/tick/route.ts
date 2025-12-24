@@ -183,7 +183,9 @@ export async function POST(req: NextRequest) {
 
     // IMPORTANT: use a snapshot variable so TypeScript doesn't permanently narrow `progress.state`.
     // `markPausedBudget(progress, ...)` mutates `progress.state` later in this function.
-    const initialState = progress.state;
+    // NOTE: keep this as a plain string snapshot; otherwise TS can treat it as narrowing `progress.state`
+    // for the rest of the function, even though we mutate `progress.state` later.
+    const initialState: string = progress.state;
     if (initialState === 'paused_manual' || initialState === 'paused_budget' || initialState === 'completed' || initialState === 'failed') {
       return NextResponse.json({ ok: true, job_id: body.job_id, progress });
     }
