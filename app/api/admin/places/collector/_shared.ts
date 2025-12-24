@@ -14,7 +14,7 @@ export type CollectorQueueItem = {
 
 export type CollectorProgress = {
   job_type: 'collector';
-  state: 'running' | 'paused_manual' | 'paused_budget' | 'completed' | 'failed';
+  state: 'running' | 'paused_manual' | 'paused_budget' | 'paused_rate_limit' | 'completed' | 'failed';
   reason?: string;
   started_at: string;
   updated_at: string;
@@ -133,6 +133,12 @@ export function bumpProgressCounters(
 
 export function markPausedBudget(progress: CollectorProgress, reason: string) {
   progress.state = 'paused_budget';
+  progress.reason = reason;
+  progress.updated_at = _isoNow();
+}
+
+export function markPausedRateLimit(progress: CollectorProgress, reason: string) {
+  progress.state = 'paused_rate_limit';
   progress.reason = reason;
   progress.updated_at = _isoNow();
 }

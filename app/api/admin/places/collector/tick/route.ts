@@ -8,6 +8,7 @@ import {
   markCompleted,
   markFailed,
   markPausedBudget,
+  markPausedRateLimit,
   updateJob,
   type CollectorProgress,
   type CollectorQueueItem,
@@ -30,6 +31,21 @@ const CATEGORY_QUERIES: Record<string, string[]> = {
   beach: ['beach club', 'private beach'],
   experiences: ['yacht charter', 'helicopter tour', 'private tour'],
 };
+
+function isPerMinuteRateLimit(msg: string) {
+  const m = msg.toLowerCase();
+  return m.includes('per minute') || m.includes('rate limit') || m.includes('too many requests') || m.includes('(429)') || m.includes(' 429 ');
+}
+
+function pauseForQuotaOrRateLimit(progress: CollectorProgress, msg: string) {
+  if (isPerMinuteRateLimit(msg)) {
+    // This is usually temporary (wait ~60s and resume).
+    markPausedRateLimit(progress, msg);
+  } else {
+    // Budget/credits or hard quota.
+    markPausedBudget(progress, msg);
+  }
+}
 
 function displayName(place: any) {
   const dn = place?.displayName;
@@ -186,7 +202,13 @@ export async function POST(req: NextRequest) {
     // NOTE: keep this as a plain string snapshot; otherwise TS can treat it as narrowing `progress.state`
     // for the rest of the function, even though we mutate `progress.state` later.
     const initialState: string = progress.state;
-    if (initialState === 'paused_manual' || initialState === 'paused_budget' || initialState === 'completed' || initialState === 'failed') {
+    if (
+      initialState === 'paused_manual' ||
+      initialState === 'paused_budget' ||
+      initialState === 'paused_rate_limit' ||
+      initialState === 'completed' ||
+      initialState === 'failed'
+    ) {
       return NextResponse.json({ ok: true, job_id: body.job_id, progress });
     }
 
@@ -224,7 +246,7 @@ export async function POST(req: NextRequest) {
       } catch (e: any) {
         const msg = e?.message || String(e);
         if (isQuotaError(msg)) {
-          markPausedBudget(progress, msg);
+          pauseForQuotaOrRateLimit(progress, msg);
           break;
         }
         item.status = 'failed';
@@ -277,7 +299,7 @@ export async function POST(req: NextRequest) {
           } catch (e: any) {
             const msg = e?.message || String(e);
             if (isQuotaError(msg)) {
-              markPausedBudget(progress, msg);
+              pauseForQuotaOrRateLimit(progress, msg);
               break;
             }
             // non-fatal: continue next template/category
@@ -293,7 +315,7 @@ export async function POST(req: NextRequest) {
       // TS note: `markPausedBudget(progress, ...)` mutates state, but TS doesn't widen after function calls.
       // Use a fresh string snapshot to avoid incorrect narrowing complaints.
       const stateAfterDiscovery: string = progress.state;
-      if (stateAfterDiscovery === 'paused_budget') break;
+      if (stateAfterDiscovery === 'paused_budget' || stateAfterDiscovery === 'paused_rate_limit') break;
 
       // 3) Details + upsert
       const placeIds = Array.from(placeCategoryMap.keys()).slice(0, maxPlacesPerDestination);
@@ -309,7 +331,7 @@ export async function POST(req: NextRequest) {
         } catch (e: any) {
           const msg = e?.message || String(e);
           if (isQuotaError(msg)) {
-            markPausedBudget(progress, msg);
+            pauseForQuotaOrRateLimit(progress, msg);
             break;
           }
           continue;
@@ -338,7 +360,7 @@ export async function POST(req: NextRequest) {
         } catch (e: any) {
           const msg = e?.message || String(e);
           if (isQuotaError(msg)) {
-            markPausedBudget(progress, msg);
+            pauseForQuotaOrRateLimit(progress, msg);
             break;
           }
           // ignore and continue
@@ -346,7 +368,7 @@ export async function POST(req: NextRequest) {
       }
 
       const stateAfterDetails: string = progress.state;
-      if (stateAfterDetails === 'paused_budget') break;
+      if (stateAfterDetails === 'paused_budget' || stateAfterDetails === 'paused_rate_limit') break;
 
       item.status = 'done';
       progress.current_index += 1;
@@ -354,7 +376,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Finish conditions
-    if (progress.state !== 'paused_budget' && progress.current_index >= progress.queue.length) {
+    if (progress.state !== 'paused_budget' && progress.state !== 'paused_rate_limit' && progress.current_index >= progress.queue.length) {
       markCompleted(progress);
     } else {
       progress.updated_at = new Date().toISOString();

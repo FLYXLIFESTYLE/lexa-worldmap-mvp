@@ -25,6 +25,35 @@ const FALLBACK_REGION_NAMES = [
   'Dutch Antilles',
 ];
 
+// For large regions, a single geocoded point + 25km radius often misses most POIs.
+// We expand regions into city/island seed points and search each seed with the region radius.
+const REGION_SEEDS: Record<string, string[]> = {
+  Adriatic: [
+    'Venice',
+    'Trieste',
+    'Rovinj',
+    'Pula',
+    'Zadar',
+    'Sibenik',
+    'Split',
+    'Trogir',
+    'Hvar',
+    'Brac',
+    'Vis',
+    'Korcula',
+    'Dubrovnik',
+    'Kotor',
+    'Budva',
+  ],
+  'Ionian Sea': ['Corfu', 'Paxos', 'Lefkada', 'Kefalonia', 'Zakynthos', 'Ithaca'],
+  Balearics: ['Ibiza', 'Formentera', 'Mallorca', 'Palma', 'Menorca', 'Mahon'],
+  Bahamas: ['Nassau', 'Paradise Island', 'Exuma', 'George Town (Exuma)', 'Harbour Island', 'Eleuthera', 'Abaco'],
+  BVI: ['Tortola', 'Virgin Gorda', 'Jost Van Dyke', 'Anegada'],
+  Caribbean: ['St Barth', 'St Martin', 'Anguilla', 'Antigua', 'St Lucia', 'Barbados', 'Grenada', 'Martinique', 'Guadeloupe'],
+  'French Antilles': ['St Barth', 'Martinique', 'Guadeloupe'],
+  'Dutch Antilles': ['Curacao', 'Aruba', 'Bonaire', 'St Maarten'],
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => ({}))) as StartRequest;
@@ -34,7 +63,8 @@ export async function POST(req: NextRequest) {
       String(c).trim().toLowerCase()
     );
     const maxPlacesPerDestination = Math.max(10, Math.min(1000, body.max_places_per_destination || 200));
-    const radiusKmCity = Math.max(1, Math.min(50, body.radius_km_city || 10));
+    // Default to 25km so islands/cities have more coverage out of the box (user can lower to 10km for dense cities).
+    const radiusKmCity = Math.max(1, Math.min(50, body.radius_km_city || 25));
     const radiusKmRegion = Math.max(1, Math.min(100, body.radius_km_region || 25));
 
     // Queue: yacht destinations first
@@ -46,15 +76,28 @@ export async function POST(req: NextRequest) {
       status: 'pending' as const,
     }));
 
-    // Fallback: known OSM regions
+    // Fallback: known OSM regions (expanded into seed cities/islands)
     const regions = await fetchFallbackRegions(FALLBACK_REGION_NAMES);
     for (const r of regions) {
-      queue.push({
-        name: r,
-        kind: 'region' as const,
-        radius_km: radiusKmRegion,
-        status: 'pending' as const,
-      });
+      const seeds = REGION_SEEDS[r];
+      if (seeds && seeds.length > 0) {
+        for (const seed of seeds) {
+          queue.push({
+            name: seed,
+            kind: 'destination' as const,
+            radius_km: radiusKmRegion,
+            status: 'pending' as const,
+          });
+        }
+      } else {
+        // If we don't know the seed list yet, fall back to searching the region label itself.
+        queue.push({
+          name: r,
+          kind: 'region' as const,
+          radius_km: radiusKmRegion,
+          status: 'pending' as const,
+        });
+      }
     }
 
     if (queue.length === 0) {

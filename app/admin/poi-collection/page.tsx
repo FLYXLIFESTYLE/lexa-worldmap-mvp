@@ -71,6 +71,8 @@ export default function PoiCollectionPage() {
   const [maxRequestsPerTick, setMaxRequestsPerTick] = useState<number>(80);
   const [maxQueueItemsPerTick, setMaxQueueItemsPerTick] = useState<number>(1);
   const [maxPlacesPerDestination, setMaxPlacesPerDestination] = useState<number>(200);
+  const [radiusKmCity, setRadiusKmCity] = useState<number>(25);
+  const [radiusKmRegion, setRadiusKmRegion] = useState<number>(25);
 
   const [autoRun, setAutoRun] = useState<boolean>(true);
   const [pollMs, setPollMs] = useState<number>(2500);
@@ -107,6 +109,8 @@ export default function PoiCollectionPage() {
       body: JSON.stringify({
         categories: selectedCategories,
         max_places_per_destination: maxPlacesPerDestination,
+        radius_km_city: radiusKmCity,
+        radius_km_region: radiusKmRegion,
       }),
     });
     const data = (await res.json()) as { job_id?: string; job?: CollectorJob; error?: string; details?: string };
@@ -289,6 +293,24 @@ export default function PoiCollectionPage() {
                     type="number"
                     value={maxQueueItemsPerTick}
                     onChange={e => setMaxQueueItemsPerTick(Number(e.target.value))}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2"
+                  />
+                </label>
+                <label className="block">
+                  <div className="text-sm text-zinc-300 mb-1">City radius (km)</div>
+                  <input
+                    type="number"
+                    value={radiusKmCity}
+                    onChange={e => setRadiusKmCity(Number(e.target.value))}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2"
+                  />
+                </label>
+                <label className="block">
+                  <div className="text-sm text-zinc-300 mb-1">Region seed radius (km)</div>
+                  <input
+                    type="number"
+                    value={radiusKmRegion}
+                    onChange={e => setRadiusKmRegion(Number(e.target.value))}
                     className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2"
                   />
                 </label>

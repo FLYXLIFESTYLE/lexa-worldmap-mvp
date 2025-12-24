@@ -89,7 +89,8 @@ export async function placesSearchText(input: {
     textQuery: input.textQuery,
     maxResultCount: Math.max(1, Math.min(20, input.maxResultCount || 20)),
     languageCode: input.languageCode || 'en',
-    locationBias: {
+    // Use restriction (not bias) so we stay *inside* the circle.
+    locationRestriction: {
       circle: {
         center: { latitude: input.center.lat, longitude: input.center.lon },
         radius: Math.max(100, Math.min(50000, input.radius_m)),
@@ -155,7 +156,9 @@ export function isQuotaError(message: string) {
     m.includes('resource_exhausted') ||
     m.includes('billing') ||
     m.includes('rate limit') ||
-    m.includes('too many requests')
+    m.includes('too many requests') ||
+    m.includes('(429)') ||
+    m.includes(' 429 ')
   );
 }
 
