@@ -19,9 +19,31 @@ export async function POST(request: NextRequest) {
       errors: [] as string[]
     };
 
-    // STEP 1: Migrate relationships from old to new theme categories
+    // STEP 1: Migrate relationships from old/duplicate to canonical theme categories
+    // NOTE: We merge by case-insensitive match to catch "culture", "Culture", etc.
     const migrations = [
+      // Canonical split: keep TWO themes, never combined
       { from: 'Culture & Culinary', to: 'Culinary Excellence' },
+      { from: 'Culture and Culinary', to: 'Culinary Excellence' },
+      { from: 'Culinary & Culture', to: 'Culinary Excellence' },
+      { from: 'Culinary and Culture', to: 'Culinary Excellence' },
+      { from: 'Culture+Culinary', to: 'Culinary Excellence' },
+      { from: 'Culture/Culinary', to: 'Culinary Excellence' },
+      { from: 'culture&culinary', to: 'Culinary Excellence' },
+      { from: 'culture & culinary', to: 'Culinary Excellence' },
+      { from: 'culinary', to: 'Culinary Excellence' },
+      { from: 'Culinary', to: 'Culinary Excellence' },
+      { from: 'food', to: 'Culinary Excellence' },
+      { from: 'Food', to: 'Culinary Excellence' },
+
+      { from: 'culture', to: 'Cultural Immersion' },
+      { from: 'Culture', to: 'Cultural Immersion' },
+      { from: 'cultural', to: 'Cultural Immersion' },
+      { from: 'Cultural', to: 'Cultural Immersion' },
+      { from: 'Cultural & Immersion', to: 'Cultural Immersion' },
+      { from: 'Cultural Immersion & Culture', to: 'Cultural Immersion' },
+
+      // Other legacy merges
       { from: 'Raw Nature & Vibes', to: 'Nature & Wildlife' },
       { from: 'Sports & Adrenaline', to: 'Adventure & Exploration' },
       { from: 'Art & Fashion', to: 'Art & Architecture' },
@@ -30,27 +52,25 @@ export async function POST(request: NextRequest) {
 
     for (const migration of migrations) {
       try {
-        // Migrate relationships
         const migrateResult = await session.run(
-          `MATCH (p:poi)-[old_rel:HAS_THEME]->(old:theme_category {name: $oldName})
-           MATCH (new:theme_category {name: $newName})
-           MERGE (p)-[new_rel:HAS_THEME]->(new)
-           SET new_rel.confidence = old_rel.confidence,
-               new_rel.evidence = old_rel.evidence,
-               new_rel.migrated_from = $oldName,
-               new_rel.migrated_at = datetime()
-           WITH old_rel
-           DELETE old_rel
-           RETURN count(*) as migrated`,
+          `
+          MATCH (p:poi)-[old_rel:HAS_THEME]->(old:theme_category)
+          WHERE toLower(trim(old.name)) = toLower(trim($oldName))
+          MATCH (new:theme_category {name: $newName})
+          MERGE (p)-[new_rel:HAS_THEME]->(new)
+          SET new_rel.confidence = old_rel.confidence,
+              new_rel.evidence = old_rel.evidence,
+              new_rel.migrated_from = old.name,
+              new_rel.migrated_at = datetime()
+          WITH old_rel
+          DELETE old_rel
+          RETURN count(*) as migrated
+          `,
           { oldName: migration.from, newName: migration.to }
         );
 
         const count = migrateResult.records[0]?.get('migrated')?.toNumber() || 0;
-        results.migrated.push({
-          from: migration.from,
-          to: migration.to,
-          count
-        });
+        results.migrated.push({ from: migration.from, to: migration.to, count });
       } catch (error: any) {
         results.errors.push(`Failed to migrate ${migration.from}: ${error.message}`);
       }
@@ -101,18 +121,28 @@ export async function POST(request: NextRequest) {
     }
 
     // STEP 3: Verify no POIs still linked to old categories
-    const verifyResult = await session.run(
-      `MATCH (p:poi)-[r:HAS_THEME]->(old:theme_category)
-       WHERE old.name IN [
-         'Culture & Culinary',
-         'Water & Wildlife Adventure', 
-         'Raw Nature & Vibes',
-         'Sports & Adrenaline',
-         'Art & Fashion',
-         'Beauty & Longevity'
-       ]
-       RETURN count(p) as remaining`
-    );
+    const verifyResult = await session.run(`
+      MATCH (p:poi)-[r:HAS_THEME]->(old:theme_category)
+      WHERE toLower(trim(old.name)) IN [
+        'culture & culinary',
+        'culture and culinary',
+        'culinary & culture',
+        'culinary and culture',
+        'culture+culinary',
+        'culture/culinary',
+        'culture&culinary',
+        'culinary',
+        'food',
+        'culture',
+        'cultural',
+        'raw nature & vibes',
+        'sports & adrenaline',
+        'art & fashion',
+        'beauty & longevity',
+        'water & wildlife adventure'
+      ]
+      RETURN count(p) as remaining
+    `);
 
     const remainingPOIs = verifyResult.records[0]?.get('remaining')?.toNumber() || 0;
     
@@ -120,28 +150,55 @@ export async function POST(request: NextRequest) {
       results.errors.push(`WARNING: ${remainingPOIs} POIs still linked to old categories!`);
     }
 
-    // STEP 4: Now safe to delete old theme category nodes
-    const redundantThemes = [
-      "Culture & Culinary",
-      "Water & Wildlife Adventure",
-      "Raw Nature & Vibes",
-      "Sports & Adrenaline",
-      "Art & Fashion",
-      "Beauty & Longevity"
+    // STEP 4: Now safe to delete old theme category nodes (case-insensitive)
+    const redundantThemeKeys = [
+      'culture & culinary',
+      'culture and culinary',
+      'culinary & culture',
+      'culinary and culture',
+      'culture+culinary',
+      'culture/culinary',
+      'culture&culinary',
+      'culinary',
+      'food',
+      'culture',
+      'cultural',
+      'raw nature & vibes',
+      'sports & adrenaline',
+      'art & fashion',
+      'beauty & longevity',
+      'water & wildlife adventure',
     ];
 
-    for (const themeName of redundantThemes) {
+    for (const themeKey of redundantThemeKeys) {
       try {
-        await session.run(
-          `MATCH (t:theme_category {name: $name})
-           DELETE t`,
-          { name: themeName }
+        const del = await session.run(
+          `
+          MATCH (t:theme_category)
+          WHERE toLower(trim(t.name)) = toLower(trim($key))
+            AND t.name <> 'Culinary Excellence'
+            AND t.name <> 'Cultural Immersion'
+          WITH t LIMIT 50
+          DETACH DELETE t
+          RETURN count(*) as deleted
+          `,
+          { key: themeKey }
         );
-        
-        results.deleted.push(themeName);
+        const deletedCount = del.records[0]?.get('deleted')?.toNumber?.() || 0;
+        if (deletedCount > 0) results.deleted.push(`${themeKey} (${deletedCount})`);
       } catch (error: any) {
-        results.errors.push(`Failed to delete ${themeName}: ${error.message}`);
+        results.errors.push(`Failed to delete theme '${themeKey}': ${error.message}`);
       }
+    }
+
+    // Optional hardening: ensure theme names are unique going forward (will fail if duplicates still exist)
+    try {
+      await session.run(`
+        CREATE CONSTRAINT theme_category_name_unique IF NOT EXISTS
+        FOR (t:theme_category) REQUIRE t.name IS UNIQUE
+      `);
+    } catch (error: any) {
+      results.errors.push(`Could not create unique constraint on theme_category.name: ${error.message}`);
     }
 
     // STEP 5: Update and enhance unique existing categories

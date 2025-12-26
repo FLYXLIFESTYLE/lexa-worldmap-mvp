@@ -194,17 +194,25 @@ export async function GET(request: NextRequest) {
   const session = getSession();
 
   try {
-    // Get all existing theme categories
-    const result = await session.run(`
+    // Return ONLY the canonical theme list used by the website (prevents legacy duplicates showing up)
+    const canonicalNames = THEME_CATEGORIES.map(t => t.name);
+
+    const result = await session.run(
+      `
       MATCH (t:theme_category)
+      WHERE t.name IN $names
       RETURN t.name as name,
              t.icon as icon,
              t.description as description,
              t.luxuryScore as luxuryScore,
              t.image_url as image_url,
-             t.short_description as short_description
+             t.short_description as short_description,
+             t.personality_types as personality_types,
+             t.evoked_feelings as evoked_feelings
       ORDER BY t.luxuryScore DESC
-    `);
+      `,
+      { names: canonicalNames }
+    );
 
     const themes = result.records.map(record => ({
       name: record.get('name'),
@@ -212,7 +220,9 @@ export async function GET(request: NextRequest) {
       description: record.get('description'),
       luxuryScore: record.get('luxuryScore'),
       image_url: record.get('image_url'),
-      short_description: record.get('short_description')
+      short_description: record.get('short_description'),
+      personality_types: record.get('personality_types') || [],
+      evoked_feelings: record.get('evoked_feelings') || [],
     }));
 
     return NextResponse.json({
