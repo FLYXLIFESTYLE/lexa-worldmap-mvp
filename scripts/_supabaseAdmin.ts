@@ -11,6 +11,20 @@ export function createSupabaseAdmin() {
     );
   }
 
+  if (supabaseUrl.includes('placeholder.supabase.co') || supabaseUrl.includes('placeholder')) {
+    throw new Error(
+      'Your NEXT_PUBLIC_SUPABASE_URL looks like a placeholder. ' +
+        'Put the real Supabase Project URL into .env.local (project root).'
+    );
+  }
+
+  if (supabaseServiceKey.includes('placeholder')) {
+    throw new Error(
+      'Your SUPABASE_SERVICE_ROLE_KEY looks like a placeholder. ' +
+        'Put the real Supabase service role key into .env.local (project root).'
+    );
+  }
+
   return createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,

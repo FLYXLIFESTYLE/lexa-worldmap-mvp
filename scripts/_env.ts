@@ -16,8 +16,16 @@ function loadIfExists(p: string) {
   }
 }
 
-// Load in the same priority Next.js expects locally
-loadIfExists('.env.local');
+function loadIfExistsOverride(p: string) {
+  const abs = path.isAbsolute(p) ? p : path.join(process.cwd(), p);
+  if (fs.existsSync(abs)) {
+    dotenv.config({ path: abs, override: true });
+  }
+}
+
+// Load in the same priority Next.js expects locally:
+// `.env.local` should WIN over `.env`
 loadIfExists('.env');
+loadIfExistsOverride('.env.local');
 
 
