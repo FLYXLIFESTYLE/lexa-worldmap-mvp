@@ -13,10 +13,10 @@
  *   npm run ingest:overture -- "Monaco" "C:\\Users\\chris\\overture_monaco_places.geojson"
  */
 
-import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
-import { supabaseAdmin } from '../lib/supabase/client';
+import './_env';
+import { createSupabaseAdmin } from './_supabaseAdmin';
 
 type BBox = { minLon: number; minLat: number; maxLon: number; maxLat: number };
 
@@ -30,6 +30,7 @@ function assertEnv() {
 }
 
 async function fetchDestinationByName(name: string) {
+  const supabaseAdmin = createSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from('destinations_geo')
     .select('*')
@@ -87,6 +88,7 @@ function getPoint(feature: any): { lon: number; lat: number } | null {
 }
 
 async function loadExistingOvertureSources(overtureIds: string[]) {
+  const supabaseAdmin = createSupabaseAdmin();
   const existing = new Map<string, { entity_id: string | null }>();
   const batches = chunk(overtureIds, 500);
 
@@ -108,6 +110,7 @@ async function loadExistingOvertureSources(overtureIds: string[]) {
 
 async function main() {
   assertEnv();
+  const supabaseAdmin = createSupabaseAdmin();
 
   const args = process.argv.slice(2);
   const destinationName = (args[0] ?? '').trim();

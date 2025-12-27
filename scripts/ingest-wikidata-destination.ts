@@ -12,9 +12,8 @@
  *   - destination exists in Supabase table `destinations_geo` with a bbox
  */
 
-import 'dotenv/config';
-// Use relative import so this script works with `tsx` without TS path alias resolution.
-import { supabaseAdmin } from '../lib/supabase/client';
+import './_env';
+import { createSupabaseAdmin } from './_supabaseAdmin';
 
 type BBox = { minLon: number; minLat: number; maxLon: number; maxLat: number };
 
@@ -28,6 +27,7 @@ function assertEnv() {
 }
 
 async function fetchDestinationByName(name: string) {
+  const supabaseAdmin = createSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from('destinations_geo')
     .select('*')
@@ -87,6 +87,7 @@ function parseWikidataId(uri: string) {
 
 async function main() {
   assertEnv();
+  const supabaseAdmin = createSupabaseAdmin();
 
   const destinationName = process.argv.slice(2).join(' ').trim();
   if (!destinationName) {
