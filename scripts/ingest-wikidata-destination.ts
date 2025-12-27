@@ -13,7 +13,8 @@
  */
 
 import 'dotenv/config';
-import { supabaseAdmin } from '@/lib/supabase/client';
+// Use relative import so this script works with `tsx` without TS path alias resolution.
+import { supabaseAdmin } from '../lib/supabase/client';
 
 type BBox = { minLon: number; minLat: number; maxLon: number; maxLat: number };
 
