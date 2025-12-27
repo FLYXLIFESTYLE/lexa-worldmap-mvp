@@ -59,6 +59,15 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+type OvertureCandidate = {
+  overtureId: string;
+  name: string;
+  lat: number;
+  lon: number;
+  raw: any;
+  props: any;
+};
+
 function getOvertureId(feature: any): string | null {
   // Prefer properties.id; fallback to feature.id
   const p = feature?.properties ?? {};
@@ -112,6 +121,72 @@ async function loadExistingOvertureSources(overtureIds: string[]) {
   return existing;
 }
 
+async function ingestOvertureBatch(params: {
+  supabaseAdmin: ReturnType<typeof createSupabaseAdmin>;
+  destId: string;
+  candidates: OvertureCandidate[];
+}) {
+  const { supabaseAdmin, destId, candidates } = params;
+
+  // 1) Insert canonical entities (batch)
+  const entityRows = candidates.map((c) => ({
+    kind: 'poi' as const,
+    name: c.name,
+    normalized_name: c.name.toLowerCase(),
+    destination_id: destId,
+    lat: c.lat,
+    lon: c.lon,
+    categories: {
+      overture: {
+        categories: c.props?.categories ?? null,
+        class: c.props?.class ?? null,
+        confidence: c.props?.confidence ?? null,
+      },
+    },
+    tags: ['overture'],
+    source_hints: { overture_id: c.overtureId },
+    score_evidence: {},
+    risk_flags: {},
+  }));
+
+  const { data: inserted, error: insertErr } = await supabaseAdmin
+    .from('experience_entities')
+    .insert(entityRows)
+    .select('id, source_hints');
+
+  if (insertErr) {
+    throw new Error(`Failed to insert experience_entities batch: ${insertErr.message}`);
+  }
+
+  const idByOvertureId = new Map<string, string>();
+  for (const row of inserted ?? []) {
+    const oid = row?.source_hints?.overture_id;
+    if (typeof oid === 'string' && row?.id) idByOvertureId.set(oid, row.id);
+  }
+
+  // 2) Upsert source payloads (batch)
+  const sourceRows = candidates.map((c) => {
+    const entityId = idByOvertureId.get(c.overtureId) ?? null;
+    return {
+      source: 'overture' as const,
+      source_id: c.overtureId,
+      entity_id: entityId,
+      normalized: { name: c.name, lat: c.lat, lon: c.lon },
+      raw: c.raw,
+    };
+  });
+
+  const { error: srcErr } = await supabaseAdmin
+    .from('experience_entity_sources')
+    .upsert(sourceRows, { onConflict: 'source,source_id' });
+
+  if (srcErr) {
+    throw new Error(`Failed to upsert experience_entity_sources batch: ${srcErr.message}`);
+  }
+
+  return { insertedEntities: candidates.length, insertedSources: candidates.length };
+}
+
 async function main() {
   assertEnv();
   const supabaseAdmin = createSupabaseAdmin();
@@ -131,9 +206,21 @@ async function main() {
   console.log(`Loaded GeoJSON features: ${features.length}`);
 
   const overtureIds: string[] = [];
-  for (const f of features) {
-    const id = getOvertureId(f);
-    if (id) overtureIds.push(id);
+  const candidatesAll: OvertureCandidate[] = [];
+  for (const feature of features) {
+    const overtureId = getOvertureId(feature);
+    const name = getName(feature);
+    const pt = getPoint(feature);
+    if (!overtureId || !name || !pt) continue;
+    overtureIds.push(overtureId);
+    candidatesAll.push({
+      overtureId,
+      name,
+      lat: pt.lat,
+      lon: pt.lon,
+      raw: feature,
+      props: feature?.properties ?? {},
+    });
   }
 
   const existing = await loadExistingOvertureSources(overtureIds);
@@ -142,79 +229,30 @@ async function main() {
   let insertedEntities = 0;
   let insertedSources = 0;
   let skipped = 0;
-  let bad = 0;
 
-  for (const feature of features) {
-    const overtureId = getOvertureId(feature);
-    const name = getName(feature);
-    const pt = getPoint(feature);
+  const toInsert = candidatesAll.filter((c) => !existing.get(c.overtureId)?.entity_id);
+  skipped = candidatesAll.length - toInsert.length;
 
-    if (!overtureId || !name || !pt) {
-      bad++;
-      continue;
+  console.log(`Will ingest: ${toInsert.length} (skipped existing: ${skipped})`);
+
+  // Keep batches small to avoid request-size limits (raw GeoJSON payload can be large).
+  const batches = chunk(toInsert, 25);
+  const totalBatches = batches.length;
+
+  for (let i = 0; i < batches.length; i++) {
+    const batch = batches[i];
+    const res = await ingestOvertureBatch({ supabaseAdmin, destId: dest.id, candidates: batch });
+    insertedEntities += res.insertedEntities;
+    insertedSources += res.insertedSources;
+
+    const done = i + 1;
+    if (done === 1 || done % 10 === 0 || done === totalBatches) {
+      console.log(`Progress: ${done}/${totalBatches} batches (inserted=${insertedEntities})`);
     }
-
-    const already = existing.get(overtureId);
-    if (already?.entity_id) {
-      skipped++;
-      continue;
-    }
-
-    // 1) Create canonical entity
-    const props = feature?.properties ?? {};
-    const { data: entity, error: entityErr } = await supabaseAdmin
-      .from('experience_entities')
-      .insert({
-        kind: 'poi',
-        name,
-        normalized_name: name.toLowerCase(),
-        destination_id: dest.id,
-        lat: pt.lat,
-        lon: pt.lon,
-        categories: {
-          overture: {
-            categories: props.categories ?? null,
-            class: props.class ?? null,
-            confidence: props.confidence ?? null,
-          },
-        },
-        tags: ['overture'],
-        source_hints: { overture_id: overtureId },
-        score_evidence: {},
-        risk_flags: {},
-      })
-      .select('id')
-      .single();
-
-    if (entityErr) {
-      throw new Error(`Failed to insert experience_entity for overture ${overtureId}: ${entityErr.message}`);
-    }
-
-    insertedEntities++;
-
-    // 2) Create or update source record
-    const { error: srcErr } = await supabaseAdmin
-      .from('experience_entity_sources')
-      .upsert(
-        {
-          source: 'overture',
-          source_id: overtureId,
-          entity_id: entity.id,
-          normalized: { name, lat: pt.lat, lon: pt.lon },
-          raw: feature,
-        },
-        { onConflict: 'source,source_id' }
-      );
-
-    if (srcErr) {
-      throw new Error(`Failed to upsert source for overture ${overtureId}: ${srcErr.message}`);
-    }
-
-    insertedSources++;
   }
 
   console.log(
-    `Done for destination="${dest.name}". insertedEntities=${insertedEntities}, insertedSources=${insertedSources}, skipped=${skipped}, bad=${bad}`
+    `Done for destination="${dest.name}". insertedEntities=${insertedEntities}, insertedSources=${insertedSources}, skipped=${skipped}`
   );
 }
 
