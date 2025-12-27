@@ -90,7 +90,11 @@ function getPoint(feature: any): { lon: number; lat: number } | null {
 async function loadExistingOvertureSources(overtureIds: string[]) {
   const supabaseAdmin = createSupabaseAdmin();
   const existing = new Map<string, { entity_id: string | null }>();
-  const batches = chunk(overtureIds, 500);
+  // IMPORTANT:
+  // PostgREST encodes `.in()` lists into the URL query string.
+  // Overture IDs are long; large batches can exceed URL limits and cause `TypeError: fetch failed`.
+  // Keep this intentionally small for reliability.
+  const batches = chunk(overtureIds, 50);
 
   for (const ids of batches) {
     const { data, error } = await supabaseAdmin
