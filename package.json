@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "ingest:wikidata": "tsx scripts/ingest-wikidata-destination.ts",
+    "ingest:overture": "tsx scripts/ingest-overture-geojson.ts",
     "quality-check": "tsx scripts/run-quality-check.ts",
     "test-scoring": "tsx scripts/test-scoring.ts",
     "bulk-enrich": "tsx scripts/bulk-enrich.ts",

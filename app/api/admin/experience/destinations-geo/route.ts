@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
 const DestinationUpsertSchema = z.object({
@@ -21,6 +22,21 @@ const DestinationUpsertSchema = z.object({
 });
 
 export async function GET() {
+  // Require authenticated admin/captain (same pattern as other /api/admin routes)
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
+  const { data: profile } = await supabase
+    .from('captain_profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single();
+  if (!profile || !['admin', 'captain'].includes(profile.role)) {
+    return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 });
+  }
+
   const { data, error } = await supabaseAdmin
     .from('destinations_geo')
     .select('*')
@@ -34,6 +50,21 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Require authenticated admin/captain (same pattern as other /api/admin routes)
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
+  const { data: profile } = await supabase
+    .from('captain_profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single();
+  if (!profile || !['admin', 'captain'].includes(profile.role)) {
+    return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 });
+  }
+
   const body = await req.json().catch(() => null);
   const parsed = DestinationUpsertSchema.safeParse(body);
   if (!parsed.success) {
@@ -45,8 +76,22 @@ export async function POST(req: Request) {
 
   const payload = parsed.data;
 
+  // Avoid duplicates: if no id provided, try to find existing by (name, kind)
+  let existingId: string | undefined = payload.id;
+  if (!existingId) {
+    const { data: existing, error: existingErr } = await supabaseAdmin
+      .from('destinations_geo')
+      .select('id')
+      .eq('name', payload.name)
+      .eq('kind', payload.kind)
+      .maybeSingle();
+    if (!existingErr && existing?.id) {
+      existingId = existing.id;
+    }
+  }
+
   const insertRow: Record<string, unknown> = {
-    ...(payload.id ? { id: payload.id } : {}),
+    ...(existingId ? { id: existingId } : {}),
     name: payload.name,
     kind: payload.kind,
     bbox: payload.bbox ?? null,
