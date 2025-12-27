@@ -207,6 +207,12 @@ CORS_ALLOW_ORIGINS=https://your-project.vercel.app
 -- supabase/migrations/001_lexa_schema.sql
 ```
 
+**Experience Graph (Milestone 1):**
+```sql
+-- Copy and paste contents of:
+-- supabase/migrations/20251227001_experience_graph_core.sql
+```
+
 **Second Migration (Captain Portal):**
 ```sql
 -- Copy and paste contents of:

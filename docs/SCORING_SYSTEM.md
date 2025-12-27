@@ -7,6 +7,8 @@ LEXA uses **two distinct scoring systems** to measure quality and certainty in t
 1. **Luxury Score** (0-100): Measures how luxurious a POI is
 2. **Confidence Score** (0.0-1.0): Measures certainty of relationships
 
+> **New convention (going forward):** our canonical product fields use **0.0 → 1.0** for `luxury_score_base`, `luxury_score_verified`, `confidence_score`, and theme-fit (`theme_fit`). See `docs/SCORE_CONVENTIONS.md`.
+
 ---
 
 ## 1. Luxury Score (POI Property)
