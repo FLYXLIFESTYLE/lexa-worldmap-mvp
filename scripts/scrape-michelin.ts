@@ -172,9 +172,9 @@ async function storeMichelinPOI(session: neo4j.Session, poi: MichelinPOI) {
         name: $name
       })
       SET p.type = 'restaurant',
-          p.luxury_score = $luxuryScore,
-          p.luxury_confidence = 0.98,
-          p.luxury_evidence = $evidence,
+          p.luxury_score_base = $luxuryScore,
+          p.confidence_score = 0.98,
+          p.score_evidence = $evidence_json,
           p.michelin_stars = $stars,
           p.michelin_bib_gourmand = $bibGourmand,
           p.cuisine = $cuisine,
@@ -194,7 +194,12 @@ async function storeMichelinPOI(session: neo4j.Session, poi: MichelinPOI) {
     `, {
       name,
       luxuryScore: neo4j.int(luxuryScore),
-      evidence,
+      evidence_json: JSON.stringify({
+        source: 'michelin_scrape',
+        legacy_text: evidence,
+        stars,
+        bib_gourmand: bibGourmand,
+      }),
       stars: neo4j.int(stars),
       bibGourmand,
       cuisine: cuisine || null,

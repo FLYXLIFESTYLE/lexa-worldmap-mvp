@@ -20,7 +20,7 @@ LIMIT 10;
 
 // 3. COUNT POIs WITHOUT LUXURY SCORES
 MATCH (p:poi)
-WHERE p.luxury_score IS NULL
+WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NULL
 RETURN count(p) as missing_luxury_scores;
 
 // 4. COUNT RELATIONSHIPS WITHOUT CONFIDENCE
@@ -38,11 +38,11 @@ RETURN count(p) as total_pois;
 
 // 6. POIs WITH LUXURY SCORES
 MATCH (p:poi)
-WHERE p.luxury_score IS NOT NULL
+WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
 RETURN count(p) as scored_pois,
-       avg(p.luxury_score) as avg_score,
-       min(p.luxury_score) as min_score,
-       max(p.luxury_score) as max_score;
+       avg(coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore)) as avg_score,
+       min(coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore)) as min_score,
+       max(coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore)) as max_score;
 
 // 7. POTENTIAL DUPLICATES (same name + close coordinates)
 MATCH (p1:poi), (p2:poi)
@@ -81,9 +81,9 @@ MATCH (p:poi)
 WITH count(p) as total
 MATCH (p:poi) WHERE p.name IS NULL OR p.name = '' OR trim(p.name) = ''
 WITH total, count(p) as unnamed
-MATCH (p:poi) WHERE p.luxury_score IS NULL
+MATCH (p:poi) WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NULL
 WITH total, unnamed, count(p) as unscored
-MATCH (p:poi) WHERE p.luxury_score IS NOT NULL
+MATCH (p:poi) WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
 WITH total, unnamed, unscored, count(p) as scored
 RETURN 
   total as total_pois,

@@ -77,9 +77,9 @@ export function CreatePOIForm({ onSuccess, onCancel }: CreatePOIFormProps) {
     destination_name: '',
     lat: '',
     lon: '',
-    luxury_score: '',
-    luxury_confidence: '',
-    luxury_evidence: '',
+    luxury_score_base: '',
+    confidence_score: '',
+    score_evidence: '',
     captain_comments: '',
     description: '',
     themes: [] as string[],
@@ -116,14 +116,15 @@ export function CreatePOIForm({ onSuccess, onCancel }: CreatePOIFormProps) {
         lon,
       };
 
-      if (formData.luxury_score) {
-        payload.luxury_score = parseFloat(formData.luxury_score);
+      if (formData.luxury_score_base) {
+        payload.luxury_score_base = parseFloat(formData.luxury_score_base);
       }
-      if (formData.luxury_confidence) {
-        payload.luxury_confidence = parseFloat(formData.luxury_confidence);
+      if (formData.confidence_score) {
+        payload.confidence_score = parseFloat(formData.confidence_score);
       }
-      if (formData.luxury_evidence) {
-        payload.luxury_evidence = formData.luxury_evidence;
+      if (formData.score_evidence) {
+        const raw = formData.score_evidence.trim();
+        payload.score_evidence = raw.startsWith('{') ? raw : JSON.stringify({ notes: raw });
       }
       if (formData.captain_comments) {
         payload.captain_comments = formData.captain_comments;
@@ -280,34 +281,34 @@ export function CreatePOIForm({ onSuccess, onCancel }: CreatePOIFormProps) {
           </div>
         </div>
 
-        {/* Luxury Score & Confidence */}
+        {/* Luxury Score & Confidence (canonical) */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold text-lexa-navy mb-2">
-              Luxury Score (0-10)
+              Luxury Score Base (0-10)
             </label>
             <input
               type="number"
               step="0.1"
               min="0"
               max="10"
-              value={formData.luxury_score}
-              onChange={(e) => setFormData({ ...formData, luxury_score: e.target.value })}
+              value={formData.luxury_score_base}
+              onChange={(e) => setFormData({ ...formData, luxury_score_base: e.target.value })}
               placeholder="e.g., 9.5"
               className="w-full px-4 py-2 border-2 border-zinc-200 rounded-lg focus:border-lexa-gold focus:outline-none"
             />
           </div>
           <div>
             <label className="block text-sm font-semibold text-lexa-navy mb-2">
-              Confidence (0-1)
+              Confidence Score (0-1)
             </label>
             <input
               type="number"
               step="0.1"
               min="0"
               max="1"
-              value={formData.luxury_confidence}
-              onChange={(e) => setFormData({ ...formData, luxury_confidence: e.target.value })}
+              value={formData.confidence_score}
+              onChange={(e) => setFormData({ ...formData, confidence_score: e.target.value })}
               placeholder="e.g., 0.95"
               className="w-full px-4 py-2 border-2 border-zinc-200 rounded-lg focus:border-lexa-gold focus:outline-none"
             />
@@ -328,14 +329,14 @@ export function CreatePOIForm({ onSuccess, onCancel }: CreatePOIFormProps) {
           />
         </div>
 
-        {/* Luxury Evidence */}
+        {/* Score Evidence (JSON) */}
         <div>
           <label className="block text-sm font-semibold text-lexa-navy mb-2">
-            Luxury Evidence
+            Score Evidence (JSON)
           </label>
           <textarea
-            value={formData.luxury_evidence}
-            onChange={(e) => setFormData({ ...formData, luxury_evidence: e.target.value })}
+            value={formData.score_evidence}
+            onChange={(e) => setFormData({ ...formData, score_evidence: e.target.value })}
             rows={2}
             placeholder="Why this luxury score? What makes it special?"
             className="w-full px-4 py-2 border-2 border-zinc-200 rounded-lg focus:border-lexa-gold focus:outline-none"

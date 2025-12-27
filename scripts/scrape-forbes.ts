@@ -148,9 +148,9 @@ async function storeForbesPOI(session: neo4j.Session, poi: ForbesPOI, luxuryScor
         name: $name
       })
       SET p.type = $type,
-          p.luxury_score = $luxuryScore,
-          p.luxury_confidence = 0.95,
-          p.luxury_evidence = $evidence,
+          p.luxury_score_base = $luxuryScore,
+          p.confidence_score = 0.95,
+          p.score_evidence = $evidence_json,
           p.forbes_rating = $rating,
           p.website = $url,
           p.city = $city,
@@ -164,7 +164,10 @@ async function storeForbesPOI(session: neo4j.Session, poi: ForbesPOI, luxuryScor
       name,
       type,
       luxuryScore: neo4j.int(luxuryScore),
-      evidence: `Forbes Travel Guide ${rating} award winner - verified ultra-luxury`,
+      evidence_json: JSON.stringify({
+        source: 'forbes_scrape',
+        legacy_text: `Forbes Travel Guide ${rating} award winner - verified ultra-luxury`,
+      }),
       rating,
       url: url || null,
       city: cityName,

@@ -146,10 +146,11 @@ async function checkNeo4j(paulUserId: string | null) {
       console.log(`✅ Found ${poisByPaul.records.length} POIs contributed/enriched by Paul:`);
       poisByPaul.records.slice(0, 10).forEach((record, i) => {
         const p = record.get('p').properties;
+        const score = p.luxury_score_verified ?? p.luxury_score_base ?? p.luxury_score ?? p.luxuryScore ?? null;
         console.log(`   ${i + 1}. ${p.name || 'Unnamed'}`);
         console.log(`      Type: ${p.type || 'unknown'}`);
         console.log(`      Destination: ${p.destination_name || 'unknown'}`);
-        console.log(`      Luxury Score: ${p.luxury_score || 'N/A'}`);
+        console.log(`      Luxury Score: ${score ?? 'N/A'}`);
         console.log('');
       });
       

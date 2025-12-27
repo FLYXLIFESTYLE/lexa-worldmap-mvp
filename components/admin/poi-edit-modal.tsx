@@ -9,9 +9,16 @@ interface POIDetail {
   destination_name: string | null;
   lat: number;
   lon: number;
-  luxury_score: number | null;
-  luxury_confidence: number | null;
-  luxury_evidence: string | null;
+  // Canonical fields
+  luxury_score_base?: number | null;
+  luxury_score_verified?: number | null;
+  confidence_score?: number | null;
+  score_evidence?: string | null; // JSON string
+
+  // Legacy (deprecated; may exist)
+  luxury_score?: number | null;
+  luxury_confidence?: number | null;
+  luxury_evidence?: string | null;
   source: string;
   source_id: string;
   updated_at: string | null;
@@ -68,9 +75,9 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     type: '',
-    luxury_score: '',
-    luxury_confidence: '',
-    luxury_evidence: '',
+    luxury_score_base: '',
+    confidence_score: '',
+    score_evidence: '',
     captain_comments: '',
   });
 
@@ -94,12 +101,15 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
         setPoi(data.poi);
 
         // Initialize form with current values
+        const base = data.poi.luxury_score_base ?? data.poi.luxury_score ?? '';
+        const conf = data.poi.confidence_score ?? data.poi.luxury_confidence ?? '';
+        const evidence = data.poi.score_evidence ?? (data.poi.luxury_evidence ? JSON.stringify({ legacy_text: data.poi.luxury_evidence }) : '');
         setFormData({
           name: data.poi.name || '',
           type: data.poi.type || '',
-          luxury_score: data.poi.luxury_score?.toString() || '',
-          luxury_confidence: data.poi.luxury_confidence?.toString() || '',
-          luxury_evidence: data.poi.luxury_evidence || '',
+          luxury_score_base: base?.toString?.() || '',
+          confidence_score: conf?.toString?.() || '',
+          score_evidence: evidence || '',
           captain_comments: data.poi.captain_comments || '',
         });
 
@@ -181,7 +191,7 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
         throw new Error(errorData.error || 'Failed to verify POI');
       }
 
-      setFormData((prev) => ({ ...prev, luxury_confidence: '1' }));
+      setFormData((prev) => ({ ...prev, confidence_score: '1' }));
       await refreshPoi();
       onSaved();
       setSuccessMessage('Verified. Confidence set to 100%.');
@@ -231,14 +241,21 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
 
       if (formData.name !== poi?.name) updates.name = formData.name;
       if (formData.type !== poi?.type) updates.type = formData.type || null;
-      if (formData.luxury_score !== poi?.luxury_score?.toString()) {
-        updates.luxury_score = formData.luxury_score ? parseFloat(formData.luxury_score) : null;
+      const currentBase = (poi?.luxury_score_base ?? poi?.luxury_score ?? null)?.toString?.() || '';
+      const currentConf = (poi?.confidence_score ?? poi?.luxury_confidence ?? null)?.toString?.() || '';
+      const currentEvidence = poi?.score_evidence ?? (poi?.luxury_evidence ? JSON.stringify({ legacy_text: poi.luxury_evidence }) : '');
+
+      if (formData.luxury_score_base !== currentBase) {
+        updates.luxury_score_base = formData.luxury_score_base ? parseFloat(formData.luxury_score_base) : null;
       }
-      if (formData.luxury_confidence !== poi?.luxury_confidence?.toString()) {
-        updates.luxury_confidence = formData.luxury_confidence ? parseFloat(formData.luxury_confidence) : null;
+      if (formData.confidence_score !== currentConf) {
+        updates.confidence_score = formData.confidence_score ? parseFloat(formData.confidence_score) : null;
       }
-      if (formData.luxury_evidence !== poi?.luxury_evidence) {
-        updates.luxury_evidence = formData.luxury_evidence || null;
+      if (formData.score_evidence !== currentEvidence) {
+        const raw = (formData.score_evidence || '').trim();
+        if (!raw) updates.score_evidence = null;
+        else if (raw.startsWith('{')) updates.score_evidence = raw; // assume JSON
+        else updates.score_evidence = JSON.stringify({ notes: raw });
       }
       if (formData.captain_comments !== poi?.captain_comments) {
         updates.captain_comments = formData.captain_comments || null;
@@ -638,48 +655,48 @@ export function POIEditModal({ poiId, onClose, onSaved }: POIEditModalProps) {
             />
           </div>
 
-          {/* Luxury Score & Confidence */}
+          {/* Luxury Score & Confidence (canonical) */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-lexa-navy mb-2">
-                Luxury Score (0-10)
+                Luxury Score Base (0-10)
               </label>
               <input
                 type="number"
                 step="0.1"
                 min="0"
                 max="10"
-                value={formData.luxury_score}
-                onChange={(e) => setFormData({ ...formData, luxury_score: e.target.value })}
+                value={formData.luxury_score_base}
+                onChange={(e) => setFormData({ ...formData, luxury_score_base: e.target.value })}
                 className="w-full px-4 py-2 border-2 border-zinc-200 rounded-lg focus:border-lexa-gold focus:outline-none"
               />
             </div>
             <div>
               <label className="block text-sm font-semibold text-lexa-navy mb-2">
-                Confidence (0-1)
+                Confidence Score (0-1)
               </label>
               <input
                 type="number"
                 step="0.1"
                 min="0"
                 max="1"
-                value={formData.luxury_confidence}
-                onChange={(e) => setFormData({ ...formData, luxury_confidence: e.target.value })}
+                value={formData.confidence_score}
+                onChange={(e) => setFormData({ ...formData, confidence_score: e.target.value })}
                 className="w-full px-4 py-2 border-2 border-zinc-200 rounded-lg focus:border-lexa-gold focus:outline-none"
               />
             </div>
           </div>
 
-          {/* Luxury Evidence */}
+          {/* Score Evidence (JSON) */}
           <div>
             <label className="block text-sm font-semibold text-lexa-navy mb-2">
-              Luxury Evidence
+              Score Evidence (JSON)
             </label>
             <textarea
-              value={formData.luxury_evidence}
-              onChange={(e) => setFormData({ ...formData, luxury_evidence: e.target.value })}
+              value={formData.score_evidence}
+              onChange={(e) => setFormData({ ...formData, score_evidence: e.target.value })}
               rows={3}
-              placeholder="Why this score? What makes it luxurious?"
+              placeholder='{"notes":"Why this score? What makes it luxurious?"}'
               className="w-full px-4 py-2 border-2 border-zinc-200 rounded-lg focus:border-lexa-gold focus:outline-none"
             />
           </div>

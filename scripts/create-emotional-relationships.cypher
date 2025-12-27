@@ -9,7 +9,7 @@
 // 1. Joy & Excitement (beaches, festivals, adventures)
 MATCH (p:poi)
 WHERE p.name =~ '(?i).*(beach|spiaggia|plage|playa|festa|festival|adventure|diving|sailing).*'
-   OR p.luxury_score > 70
+   OR coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 7
 MATCH (e:Emotion {name: 'joy'})
 MERGE (p)-[r:EVOKES]->(e)
 ON CREATE SET r.confidence = 0.8, r.evidence = 'beach/luxury/adventure context';
@@ -31,7 +31,7 @@ ON CREATE SET r.confidence = 0.8, r.evidence = 'mountain/viewpoint/monument cont
 // 4. Romance (luxury hotels, fine dining, scenic locations)
 MATCH (p:poi)
 WHERE p.name =~ '(?i).*(grand hotel|luxury|romantic|villa|castello|sunset|moonlight|vineyard).*'
-   OR p.luxury_score > 80
+   OR coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 8
 MATCH (e:Emotion {name: 'romance'})
 MERGE (p)-[r:EVOKES]->(e)
 ON CREATE SET r.confidence = 0.75, r.evidence = 'luxury/romantic context';
@@ -55,7 +55,7 @@ ON CREATE SET r.confidence = 0.8, r.evidence = 'adventure activity context';
 // 2. Desire for Luxury
 MATCH (p:poi)
 WHERE p.name =~ '(?i).*(grand|luxury|exclusive|villa|yacht|michelin|gourmet|caviar|champagne).*'
-   OR p.luxury_score > 85
+   OR coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 8.5
 MATCH (d:Desire {name: 'luxury'})
 MERGE (p)-[r:AMPLIFIES_DESIRE]->(d)
 ON CREATE SET r.confidence = 0.9, r.evidence = 'luxury indicators';
@@ -86,7 +86,7 @@ ON CREATE SET r.confidence = 0.8, r.evidence = 'educational context';
 // 1. Fear of Missing Out (exclusive venues, time-limited experiences)
 MATCH (p:poi)
 WHERE p.name =~ '(?i).*(exclusive|limited|private|VIP|members only|secret).*'
-   OR p.luxury_score > 90
+   OR coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 9
 MATCH (f:Fear {name: 'missing_out'})
 MERGE (p)-[r:MITIGATES_FEAR]->(f)
 ON CREATE SET r.confidence = 0.7, r.evidence = 'exclusive/rare context';
@@ -94,7 +94,7 @@ ON CREATE SET r.confidence = 0.7, r.evidence = 'exclusive/rare context';
 // 2. Fear of Disappointment (highly rated, established venues)
 MATCH (p:poi)
 WHERE p.name =~ '(?i).*(awarded|starred|certified|heritage|unesco|famous|renowned).*'
-   OR p.luxury_score > 80
+   OR coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 8
 MATCH (f:Fear {name: 'disappointment'})
 MERGE (p)-[r:MITIGATES_FEAR]->(f)
 ON CREATE SET r.confidence = 0.75, r.evidence = 'quality indicators';
@@ -102,7 +102,7 @@ ON CREATE SET r.confidence = 0.75, r.evidence = 'quality indicators';
 // 3. Fear of Discomfort (luxury, comfort amenities)
 MATCH (p:poi)
 WHERE p.name =~ '(?i).*(comfort|luxury|spa|wellness|5 star|premium|deluxe|suite).*'
-   OR p.luxury_score > 75
+   OR coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 7.5
 MATCH (f:Fear {name: 'discomfort'})
 MERGE (p)-[r:MITIGATES_FEAR]->(f)
 ON CREATE SET r.confidence = 0.8, r.evidence = 'comfort/luxury amenities';

@@ -4,7 +4,8 @@
  */
 
 interface POI {
-  luxury_score?: number;
+  luxury_score_base?: number;
+  luxury_score_verified?: number;
   description?: string;
   website?: string;
   rating?: number;
@@ -29,7 +30,8 @@ export function calculateEnrichmentPriority(poi: POI): number {
   let priority = 0;
 
   // High luxury score = high priority (0-100 points)
-  priority += poi.luxury_score || 0;
+  const score = poi.luxury_score_verified ?? poi.luxury_score_base ?? 0;
+  priority += score;
 
   // Missing critical fields = higher priority
   if (!poi.description) priority += 50;

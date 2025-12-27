@@ -127,7 +127,7 @@ async function generateCypherQuery(
 
 DATABASE SCHEMA:
 Nodes:
-- poi (Point of Interest): name, type, destination_name, lat, lon, luxury_score (0-10), luxury_confidence (0-1), source, captain_comments
+- poi (Point of Interest): name, type, destination_name, lat, lon, luxury_score_base (0-10), luxury_score_verified (0-10), confidence_score (0-1), source, captain_comments
 - destination: name, region, country, description
 - theme: name, description
 - activity_type: name, description
@@ -164,28 +164,28 @@ IMPORTANT RULES:
 EXAMPLES:
 
 Q: "Show me luxury POIs in St. Tropez"
-A: MATCH (p:poi) WHERE (toLower(p.destination_name) CONTAINS 'st. tropez' OR toLower(p.destination_name) CONTAINS 'st tropez' OR toLower(p.destination_name) CONTAINS 'saint tropez') AND p.luxury_score IS NOT NULL RETURN p.name, p.type, p.luxury_score, p.destination_name, p.lat, p.lon ORDER BY p.luxury_score DESC LIMIT 50
+A: MATCH (p:poi) WHERE (toLower(p.destination_name) CONTAINS 'st. tropez' OR toLower(p.destination_name) CONTAINS 'st tropez' OR toLower(p.destination_name) CONTAINS 'saint tropez') AND coalesce(p.luxury_score_verified, p.luxury_score_base) IS NOT NULL RETURN p.name, p.type, coalesce(p.luxury_score_verified, p.luxury_score_base) as luxury_score, p.destination_name, p.lat, p.lon ORDER BY luxury_score DESC LIMIT 50
 
 Q: "How many POIs do we have worldwide?"
 A: MATCH (p:poi) RETURN count(p) as total_pois
 
 Q: "Show me beach clubs with luxury score above 8"
-A: MATCH (p:poi) WHERE (toLower(p.type) CONTAINS 'beach' OR toLower(p.name) CONTAINS 'beach club') AND p.luxury_score > 8 RETURN p.name, p.destination_name, p.luxury_score, p.luxury_confidence ORDER BY p.luxury_score DESC LIMIT 50
+A: MATCH (p:poi) WHERE (toLower(p.type) CONTAINS 'beach' OR toLower(p.name) CONTAINS 'beach club') AND coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 8 RETURN p.name, p.destination_name, coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) as luxury_score, coalesce(p.confidence_score, p.luxury_confidence) as confidence_score ORDER BY luxury_score DESC LIMIT 50
 
 Q: "Show me 10 POIs in Croatia"
-A: MATCH (p:poi) WHERE toLower(p.destination_name) CONTAINS 'croatia' OR toLower(p.destination_name) CONTAINS 'dubrovnik' OR toLower(p.destination_name) CONTAINS 'split' OR toLower(p.destination_name) CONTAINS 'hvar' RETURN p.name, p.type, p.destination_name, COALESCE(p.luxury_score, 0) as luxury_score ORDER BY luxury_score DESC LIMIT 10
+A: MATCH (p:poi) WHERE toLower(p.destination_name) CONTAINS 'croatia' OR toLower(p.destination_name) CONTAINS 'dubrovnik' OR toLower(p.destination_name) CONTAINS 'split' OR toLower(p.destination_name) CONTAINS 'hvar' RETURN p.name, p.type, p.destination_name, COALESCE(coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore), 0) as luxury_score ORDER BY luxury_score DESC LIMIT 10
 
 Q: "What destinations have the most POIs?"
 A: MATCH (p:poi) WHERE p.destination_name IS NOT NULL WITH p.destination_name as destination, count(p) as poi_count ORDER BY poi_count DESC LIMIT 20 RETURN destination, poi_count
 
 Q: "Find snorkeling spots worldwide"
-A: MATCH (p:poi)-[:SUPPORTS_ACTIVITY]->(a:activity_type) WHERE toLower(a.name) CONTAINS 'snorkel' RETURN p.name, p.destination_name, COALESCE(p.luxury_score, 0) as luxury_score, p.lat, p.lon ORDER BY luxury_score DESC LIMIT 100
+A: MATCH (p:poi)-[:SUPPORTS_ACTIVITY]->(a:activity_type) WHERE toLower(a.name) CONTAINS 'snorkel' RETURN p.name, p.destination_name, COALESCE(coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore), 0) as luxury_score, p.lat, p.lon ORDER BY luxury_score DESC LIMIT 100
 
 Q: "Show me POIs that evoke joy"
-A: MATCH (p:poi)-[:EVOKES]->(e:Emotion) WHERE toLower(e.name) CONTAINS 'joy' RETURN p.name, p.type, p.destination_name, COALESCE(p.luxury_score, 0) as luxury_score, e.name as emotion ORDER BY luxury_score DESC LIMIT 50
+A: MATCH (p:poi)-[:EVOKES]->(e:Emotion) WHERE toLower(e.name) CONTAINS 'joy' RETURN p.name, p.type, p.destination_name, COALESCE(coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore), 0) as luxury_score, e.name as emotion ORDER BY luxury_score DESC LIMIT 50
 
 Q: "Find POIs that amplify desire for luxury"
-A: MATCH (p:poi)-[:AMPLIFIES_DESIRE]->(d:Desire) WHERE toLower(d.name) CONTAINS 'luxury' RETURN p.name, p.type, p.destination_name, COALESCE(p.luxury_score, 0) as luxury_score, d.name as desire ORDER BY luxury_score DESC LIMIT 50
+A: MATCH (p:poi)-[:AMPLIFIES_DESIRE]->(d:Desire) WHERE toLower(d.name) CONTAINS 'luxury' RETURN p.name, p.type, p.destination_name, COALESCE(coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore), 0) as luxury_score, d.name as desire ORDER BY luxury_score DESC LIMIT 50
 
 Now generate a Cypher query for the user's question. Return ONLY the Cypher query, nothing else.`;
 

@@ -52,7 +52,7 @@ RETURN count(p) as pois_without_type;
 
 // 6. POIs WITHOUT LUXURY SCORE (CAN'T CREATE THEME RELATIONSHIPS)
 MATCH (p:poi)
-WHERE p.luxury_score IS NULL
+WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NULL
 RETURN count(p) as pois_without_score;
 
 // 7. BREAKDOWN BY IMPORT (OLD VS NEW DATA)

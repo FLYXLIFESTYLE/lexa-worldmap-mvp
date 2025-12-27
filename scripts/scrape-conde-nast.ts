@@ -149,9 +149,9 @@ async function storeCondeNastPOI(session: neo4j.Session, poi: CondeNastPOI, awar
         name: $name
       })
       SET p.type = $type,
-          p.luxury_score = $luxuryScore,
-          p.luxury_confidence = 0.92,
-          p.luxury_evidence = $evidence,
+          p.luxury_score_base = $luxuryScore,
+          p.confidence_score = 0.92,
+          p.score_evidence = $evidence_json,
           p.conde_nast_award = $award,
           p.description = $description,
           p.website = $url,
@@ -166,7 +166,10 @@ async function storeCondeNastPOI(session: neo4j.Session, poi: CondeNastPOI, awar
       name,
       type,
       luxuryScore: neo4j.int(luxuryScore),
-      evidence: `Condé Nast Traveler ${award} winner - expert-curated luxury selection`,
+      evidence_json: JSON.stringify({
+        source: 'conde_nast_scrape',
+        legacy_text: `Condé Nast Traveler ${award} winner - expert-curated luxury selection`,
+      }),
       award,
       description: description || null,
       url: url || null,

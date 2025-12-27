@@ -51,7 +51,8 @@ async function verifyDataQuality() {
     // POIs with luxury scores
     const scoredResult = await session.run(`
       MATCH (p:poi)
-      WHERE p.luxury_score IS NOT NULL AND p.luxury_score > 0
+      WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
+        AND coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 0
       RETURN count(p) as scored
     `);
     const scored = scoredResult.records[0].get('scored').toNumber();

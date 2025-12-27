@@ -53,8 +53,8 @@ interface GooglePlaceDetails {
 // Luxury scoring logic based on Google data
 function calculateLuxuryScore(place: GooglePlaceDetails): {
   luxury_score: number;
-  luxury_confidence: number;
-  luxury_evidence: string;
+  confidence_score: number;
+  score_evidence: string; // JSON string
 } {
   let score = 5.0; // Base score
   let confidence = 0.5;
@@ -131,8 +131,17 @@ function calculateLuxuryScore(place: GooglePlaceDetails): {
 
   return {
     luxury_score: Math.round(score * 10) / 10,
-    luxury_confidence: Math.round(confidence * 100) / 100,
-    luxury_evidence: evidence.join('; '),
+    confidence_score: Math.round(confidence * 100) / 100,
+    score_evidence: JSON.stringify({
+      source: 'google_places',
+      rules: evidence,
+      inputs: {
+        rating: place.rating ?? null,
+        user_ratings_total: place.user_ratings_total ?? null,
+        price_level: place.price_level ?? null,
+        types: place.types ?? null,
+      },
+    }),
   };
 }
 
@@ -187,9 +196,9 @@ async function updatePOIWithGoogleData(
           p.google_rating = $rating,
           p.google_reviews_count = $reviews_count,
           p.google_price_level = $price_level,
-          p.luxury_score = $luxury_score,
-          p.luxury_confidence = $luxury_confidence,
-          p.luxury_evidence = $luxury_evidence,
+          p.luxury_score_base = $luxury_score_base,
+          p.confidence_score = $confidence_score,
+          p.score_evidence = $score_evidence,
           p.enriched_at = datetime(),
           p.enriched_source = 'google_places'
       RETURN p
@@ -200,9 +209,9 @@ async function updatePOIWithGoogleData(
         rating: googleData.rating || null,
         reviews_count: googleData.user_ratings_total || null,
         price_level: googleData.price_level || null,
-        luxury_score: scoringData.luxury_score,
-        luxury_confidence: scoringData.luxury_confidence,
-        luxury_evidence: scoringData.luxury_evidence,
+        luxury_score_base: scoringData.luxury_score,
+        confidence_score: scoringData.confidence_score,
+        score_evidence: scoringData.score_evidence,
       }
     );
   } finally {
@@ -236,12 +245,12 @@ async function enrichPOIs() {
     await driver.verifyConnectivity();
     console.log('✅ Connected to Neo4j\n');
 
-    // Get POIs that need enrichment (no luxury_score or google_place_id)
+    // Get POIs that need enrichment (no canonical luxury score or no google_place_id)
     const session = driver.session();
     const result = await session.run(
       `
       MATCH (p:poi)
-      WHERE (p.luxury_score IS NULL OR p.google_place_id IS NULL)
+      WHERE (coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NULL OR p.google_place_id IS NULL)
         AND p.name IS NOT NULL
         AND p.lat IS NOT NULL
         AND p.lon IS NOT NULL
@@ -285,7 +294,7 @@ async function enrichPOIs() {
           const scoringData = calculateLuxuryScore(googleData);
           await updatePOIWithGoogleData(driver, poi.poi_uid, googleData, scoringData);
           
-          console.log(`  ✅ Enriched! Score: ${scoringData.luxury_score}/10 | Confidence: ${scoringData.luxury_confidence}`);
+          console.log(`  ✅ Enriched! Score: ${scoringData.luxury_score}/10 | Confidence: ${scoringData.confidence_score}`);
           enriched++;
         } else {
           notFound++;

@@ -41,7 +41,8 @@ async function getUnprocessedOSMPOIs(limit: number): Promise<any[]> {
     const result = await session.run(`
       MATCH (p:poi)
       WHERE p.source = 'osm'
-        AND (p.luxury_score IS NULL OR p.luxury_score = 0)
+        AND (coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NULL
+             OR coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) = 0)
         AND p.enrichment_status IS NULL
         AND p.lat IS NOT NULL
         AND p.lon IS NOT NULL
@@ -100,9 +101,11 @@ async function getEnrichmentStats() {
       MATCH (p:poi {source: 'osm'})
       RETURN 
         count(*) as total,
-        count(CASE WHEN p.luxury_score IS NOT NULL AND p.luxury_score > 0 THEN 1 END) as enriched,
+        count(CASE WHEN coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
+                    AND coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 0 THEN 1 END) as enriched,
         count(CASE WHEN p.enrichment_status = 'failed' THEN 1 END) as failed,
-        count(CASE WHEN p.luxury_score IS NULL OR p.luxury_score = 0 THEN 1 END) as remaining
+        count(CASE WHEN coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NULL
+                    OR coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) = 0 THEN 1 END) as remaining
     `);
     
     const record = result.records[0];

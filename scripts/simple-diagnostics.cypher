@@ -13,14 +13,14 @@ RETURN count(p) as unnamed_pois;
 
 // 3. POIs WITHOUT LUXURY SCORES
 MATCH (p:poi)
-WHERE p.luxury_score IS NULL
+WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NULL
 RETURN count(p) as missing_scores;
 
 // 4. POIs WITH LUXURY SCORES
 MATCH (p:poi)
-WHERE p.luxury_score IS NOT NULL
+WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
 RETURN count(p) as have_scores,
-       avg(p.luxury_score) as avg_score;
+       avg(coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore)) as avg_score;
 
 // 5. SAMPLE UNNAMED POIs (if any exist)
 MATCH (p:poi)
@@ -40,12 +40,12 @@ CALL {
 }
 CALL {
   MATCH (p:poi)
-  WHERE p.luxury_score IS NULL
+  WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NULL
   RETURN count(p) as unscored
 }
 CALL {
   MATCH (p:poi)
-  WHERE p.luxury_score IS NOT NULL
+  WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
   RETURN count(p) as scored
 }
 RETURN 

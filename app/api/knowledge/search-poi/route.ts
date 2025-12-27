@@ -18,8 +18,9 @@ interface SearchResult {
   destination_name: string | null;
   lat: number;
   lon: number;
-  luxury_score: number | null;
-  luxury_confidence: number | null;
+  luxury_score_base: number | null;
+  luxury_score_verified: number | null;
+  confidence_score: number | null;
   source: string;
   last_updated: string | null;
 }
@@ -90,8 +91,9 @@ export async function GET(req: NextRequest) {
                p.destination_name as destination_name,
                p.lat as lat,
                p.lon as lon,
-               p.luxury_score as luxury_score,
-               p.luxury_confidence as luxury_confidence,
+               coalesce(p.luxury_score_verified, null) as luxury_score_verified,
+               coalesce(p.luxury_score_base, p.luxury_score, p.luxuryScore) as luxury_score_base,
+               coalesce(p.confidence_score, p.luxury_confidence) as confidence_score,
                p.source as source,
                p.updated_at as last_updated
         LIMIT $limit
@@ -106,11 +108,18 @@ export async function GET(req: NextRequest) {
         destination_name: record.get('destination_name'),
         lat: record.get('lat'),
         lon: record.get('lon'),
-        luxury_score: record.get('luxury_score'),
-        luxury_confidence: record.get('luxury_confidence'),
+        luxury_score_base: record.get('luxury_score_base'),
+        luxury_score_verified: record.get('luxury_score_verified'),
+        confidence_score: record.get('confidence_score'),
         source: record.get('source'),
         last_updated: record.get('last_updated'),
       }));
+
+      const normalizeScore0to10 = (v: unknown): number | null => {
+        if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+        // If legacy 0-100 slipped in, normalize down to 0-10.
+        return v > 10 ? Math.round((v / 10) * 10) / 10 : Math.round(v * 10) / 10;
+      };
 
       const ranked = candidates
         .map((p) => {
@@ -126,12 +135,20 @@ export async function GET(req: NextRequest) {
           else if (qNorm && typeNorm.includes(qNorm)) score = 4;
           else if (qNorm && nameNorm) score = 10 + levenshtein.get(nameNorm, qNorm);
 
-          return { p, score };
+          return {
+            p: {
+              ...p,
+              luxury_score_base: normalizeScore0to10(p.luxury_score_base),
+              luxury_score_verified: normalizeScore0to10(p.luxury_score_verified),
+              confidence_score: typeof p.confidence_score === 'number' ? p.confidence_score : null,
+            },
+            score,
+          };
         })
         .sort((a, b) => {
           if (a.score !== b.score) return a.score - b.score;
-          const as = a.p.luxury_score ?? -1;
-          const bs = b.p.luxury_score ?? -1;
+          const as = a.p.luxury_score_verified ?? a.p.luxury_score_base ?? -1;
+          const bs = b.p.luxury_score_verified ?? b.p.luxury_score_base ?? -1;
           if (as !== bs) return bs - as;
           return (a.p.name || '').localeCompare(b.p.name || '');
         })

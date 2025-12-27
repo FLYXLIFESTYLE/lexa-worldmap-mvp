@@ -149,9 +149,9 @@ async function storeWorlds50BestPOI(session: neo4j.Session, poi: Worlds50BestPOI
         name: $name
       })
       SET p.type = $type,
-          p.luxury_score = 10,
-          p.luxury_confidence = 0.99,
-          p.luxury_evidence = $evidence,
+          p.luxury_score_base = 10,
+          p.confidence_score = 0.99,
+          p.score_evidence = $evidence_json,
           p.worlds_50_best_rank = $rank,
           p.worlds_50_best_award = $award,
           p.chef = $chef,
@@ -167,7 +167,12 @@ async function storeWorlds50BestPOI(session: neo4j.Session, poi: Worlds50BestPOI
     `, {
       name,
       type,
-      evidence: `${award} #${rank} - globally recognized excellence`,
+      evidence_json: JSON.stringify({
+        source: 'worlds_50_best_scrape',
+        legacy_text: `${award} #${rank} - globally recognized excellence`,
+        rank,
+        award,
+      }),
       rank: neo4j.int(rank),
       award,
       chef: chef || null,

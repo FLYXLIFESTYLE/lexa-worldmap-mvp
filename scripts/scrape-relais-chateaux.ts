@@ -137,9 +137,9 @@ async function storeRelaisChateauxPOI(session: neo4j.Session, poi: RelaisChateau
         name: $name
       })
       SET p.type = $type,
-          p.luxury_score = 9,
-          p.luxury_confidence = 0.95,
-          p.luxury_evidence = 'Relais & Châteaux member - verified luxury hospitality',
+          p.luxury_score_base = 9,
+          p.confidence_score = 0.95,
+          p.score_evidence = $evidence_json,
           p.relais_chateaux_member = true,
           p.description = $description,
           p.website = $url,
@@ -153,6 +153,10 @@ async function storeRelaisChateauxPOI(session: neo4j.Session, poi: RelaisChateau
     `, {
       name,
       type,
+      evidence_json: JSON.stringify({
+        source: 'relais_chateaux_scrape',
+        legacy_text: 'Relais & Châteaux member - verified luxury hospitality',
+      }),
       description: description || null,
       url: url || null,
       city: cityName,

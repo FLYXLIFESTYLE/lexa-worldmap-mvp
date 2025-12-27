@@ -28,7 +28,8 @@ async function checkEnrichmentHistory() {
     console.log('📍 ARABIAN GULF (UAE) - 10,474 enriched:');
     const arabianGulf = await session.run(`
       MATCH (p:poi)-[:LOCATED_IN]->(d:destination {name: 'Arabian Gulf (UAE)'})
-      WHERE p.luxury_score IS NOT NULL AND p.luxury_score > 0
+      WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
+        AND coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 0
       RETURN 
         p.enriched_source as source,
         count(*) as count,
@@ -52,13 +53,14 @@ async function checkEnrichmentHistory() {
     console.log('\n📍 AMALFI COAST - 5,086 enriched (100%!):');
     const amalfiCoast = await session.run(`
       MATCH (p:poi)-[:LOCATED_IN]->(d:destination {name: 'Amalfi Coast'})
-      WHERE p.luxury_score IS NOT NULL AND p.luxury_score > 0
+      WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
+        AND coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 0
       RETURN 
         p.enriched_source as source,
         count(*) as count,
         min(p.enriched_at) as first_enriched,
         max(p.enriched_at) as last_enriched,
-        avg(p.luxury_score) as avg_score
+        avg(coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore)) as avg_score
       ORDER BY count DESC
     `);
     
@@ -79,13 +81,14 @@ async function checkEnrichmentHistory() {
     console.log('\n📊 ALL ENRICHMENT SOURCES:');
     const allSources = await session.run(`
       MATCH (p:poi)
-      WHERE p.luxury_score IS NOT NULL AND p.luxury_score > 0
+      WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
+        AND coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 0
       RETURN 
         p.enriched_source as source,
         count(*) as count,
         min(p.enriched_at) as first_enriched,
         max(p.enriched_at) as last_enriched,
-        avg(p.luxury_score) as avg_score
+        avg(coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore)) as avg_score
       ORDER BY count DESC
     `);
     
@@ -105,8 +108,8 @@ async function checkEnrichmentHistory() {
     console.log('\n📈 QUALITY ANALYSIS:');
     const qualityAnalysis = await session.run(`
       MATCH (p:poi)
-      WHERE p.luxury_score IS NOT NULL
-      WITH p.luxury_score as score
+      WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
+      WITH coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) as score
       RETURN 
         CASE 
           WHEN score >= 8 THEN 'High Luxury (8-10)'

@@ -40,7 +40,9 @@ async function estimateEnrichmentCosts() {
       MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
       WITH d.name as destination,
            count(p) as total_pois,
-           sum(CASE WHEN p.luxury_score IS NOT NULL AND p.luxury_score > 0 THEN 1 ELSE 0 END) as enriched_pois
+           sum(CASE WHEN coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NOT NULL
+                     AND coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) > 0
+                    THEN 1 ELSE 0 END) as enriched_pois
       RETURN destination,
              total_pois,
              enriched_pois,

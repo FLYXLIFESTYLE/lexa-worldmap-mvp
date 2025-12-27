@@ -10,8 +10,9 @@ interface POISearchResult {
   destination_name: string | null;
   lat: number;
   lon: number;
-  luxury_score: number | null;
-  luxury_confidence: number | null;
+  luxury_score_base: number | null;
+  luxury_score_verified: number | null;
+  confidence_score: number | null;
   source: string;
 }
 
@@ -141,14 +142,14 @@ export function POISearch({ onSelectPOI, placeholder = 'Search POIs (e.g., Club5
                   </div>
                 </div>
                 <div className="ml-4 text-right">
-                  {poi.luxury_score !== null && (
+                  {(poi.luxury_score_verified ?? poi.luxury_score_base) !== null && (
                     <div className="text-sm font-semibold text-lexa-gold">
-                      ★ {poi.luxury_score.toFixed(1)}
+                      ★ {(poi.luxury_score_verified ?? poi.luxury_score_base)?.toFixed(1)}
                     </div>
                   )}
-                  {poi.luxury_confidence !== null && (
+                  {poi.confidence_score !== null && (
                     <div className="text-xs text-zinc-500">
-                      {(poi.luxury_confidence * 100).toFixed(0)}% conf
+                      {(poi.confidence_score * 100).toFixed(0)}% conf
                     </div>
                   )}
                 </div>

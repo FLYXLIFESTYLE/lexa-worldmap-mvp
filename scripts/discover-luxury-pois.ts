@@ -92,8 +92,8 @@ function determinePOIType(types: string[]): string {
 
 function calculateLuxuryScore(place: DiscoveredPlace): {
   luxury_score: number;
-  luxury_confidence: number;
-  luxury_evidence: string;
+  confidence_score: number;
+  score_evidence: string; // JSON string
 } {
   let score = 5.0;
   let confidence = 0.4; // Lower confidence for discovered POIs (needs captain verification)
@@ -138,8 +138,16 @@ function calculateLuxuryScore(place: DiscoveredPlace): {
 
   return {
     luxury_score: Math.round(score * 10) / 10,
-    luxury_confidence: Math.round(confidence * 100) / 100,
-    luxury_evidence: evidence.join('; '),
+    confidence_score: Math.round(confidence * 100) / 100,
+    score_evidence: JSON.stringify({
+      source: 'google_places_discovery',
+      rules: evidence,
+      inputs: {
+        rating: place.rating ?? null,
+        user_ratings_total: place.user_ratings_total ?? null,
+        price_level: place.price_level ?? null,
+      },
+    }),
   };
 }
 
@@ -234,9 +242,9 @@ async function addPOIToDatabase(driver: any, place: DiscoveredPlace, destination
         destination_name: $destination_name,
         lat: $lat,
         lon: $lon,
-        luxury_score: $luxury_score,
-        luxury_confidence: $luxury_confidence,
-        luxury_evidence: $luxury_evidence,
+        luxury_score_base: $luxury_score_base,
+        confidence_score: $confidence_score,
+        score_evidence: $score_evidence,
         google_place_id: $place_id,
         google_rating: $rating,
         google_reviews_count: $reviews_count,
@@ -264,9 +272,9 @@ async function addPOIToDatabase(driver: any, place: DiscoveredPlace, destination
         destination_name: destination,
         lat: place.lat,
         lon: place.lon,
-        luxury_score: scoring.luxury_score,
-        luxury_confidence: scoring.luxury_confidence,
-        luxury_evidence: scoring.luxury_evidence,
+        luxury_score_base: scoring.luxury_score,
+        confidence_score: scoring.confidence_score,
+        score_evidence: scoring.score_evidence,
         place_id: place.place_id,
         rating: place.rating || null,
         reviews_count: place.user_ratings_total || null,

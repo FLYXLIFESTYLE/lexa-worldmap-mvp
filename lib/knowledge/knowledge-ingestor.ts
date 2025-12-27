@@ -113,9 +113,9 @@ async function ingestPOI(
       p.poi_uid = randomUUID(),
       p.type = $type,
       p.description = $description,
-      p.luxury_score = $luxury_score,
-      p.luxury_confidence = $luxury_confidence,
-      p.luxury_evidence = $luxury_evidence,
+      p.luxury_score_base = $luxury_score_base,
+      p.confidence_score = $confidence_score,
+      p.score_evidence = $score_evidence,
       p.source = $source,
       p.source_id = $source_id,
       p.source_title = $source_title,
@@ -128,9 +128,9 @@ async function ingestPOI(
         WHEN p.description IS NULL THEN $description 
         ELSE p.description 
       END,
-      p.luxury_score = CASE
-        WHEN $luxury_score > coalesce(p.luxury_score, 0) THEN $luxury_score
-        ELSE p.luxury_score
+      p.luxury_score_base = CASE
+        WHEN $luxury_score_base > coalesce(p.luxury_score_base, p.luxury_score, p.luxuryScore, 0) THEN $luxury_score_base
+        ELSE p.luxury_score_base
       END,
       p.updated_at = datetime()
     RETURN p, 
@@ -139,9 +139,15 @@ async function ingestPOI(
     name: poi.name,
     type: poi.type,
     description: poi.description || null,
-    luxury_score: scoring.luxury_score,
-    luxury_confidence: scoring.confidence,
-    luxury_evidence: scoring.evidence.join('; '),
+    luxury_score_base: scoring.luxury_score,
+    confidence_score: scoring.confidence,
+    score_evidence: JSON.stringify({
+      source: sourceMetadata.source,
+      rules: scoring.evidence,
+      inputs: {
+        keywords: poi.luxuryIndicators || [],
+      },
+    }),
     source: sourceMetadata.source,
     source_id: sourceMetadata.sourceId,
     source_title: sourceMetadata.sourceTitle || null,

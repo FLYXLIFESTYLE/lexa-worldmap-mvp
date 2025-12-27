@@ -51,9 +51,10 @@ interface POIInput {
 
 interface EnrichedPOI extends POIInput {
   poi_uid: string;
-  luxury_score: number;
-  luxury_confidence: number;
-  luxury_evidence: string;
+  luxury_score_base: number;
+  luxury_score_verified?: number | null;
+  confidence_score: number;
+  score_evidence: string; // JSON string
   description?: string;
   rating?: number;
   price_level?: number;
@@ -268,7 +269,7 @@ POI Details:
 - Type: ${poi.type || 'unknown'}
 - Description: ${poi.description || 'none'}
 - Highlights: ${poi.website_highlights?.join(', ') || 'none'}
-- Luxury Score: ${poi.luxury_score || 'unknown'}
+- Luxury Score: ${poi.luxury_score_base || 'unknown'}
 
 Return ONLY valid JSON:
 {
@@ -353,9 +354,10 @@ async function createOrUpdatePOI(session: neo4j.Session, poi: EnrichedPOI): Prom
           p.type = $type,
           p.lat = $lat,
           p.lon = $lon,
-          p.luxury_score = $luxury_score,
-          p.luxury_confidence = $luxury_confidence,
-          p.luxury_evidence = $luxury_evidence,
+          p.luxury_score_base = $luxury_score_base,
+          p.luxury_score_verified = $luxury_score_verified,
+          p.confidence_score = $confidence_score,
+          p.score_evidence = $score_evidence,
           p.description = $description,
           p.rating = $rating,
           p.price_level = $price_level,
@@ -374,9 +376,10 @@ async function createOrUpdatePOI(session: neo4j.Session, poi: EnrichedPOI): Prom
       type: poi.type || null,
       lat: poi.lat || null,
       lon: poi.lon || null,
-      luxury_score: neo4j.int(poi.luxury_score),
-      luxury_confidence: poi.luxury_confidence,
-      luxury_evidence: poi.luxury_evidence,
+      luxury_score_base: poi.luxury_score_base,
+      luxury_score_verified: poi.luxury_score_verified ?? null,
+      confidence_score: poi.confidence_score,
+      score_evidence: poi.score_evidence,
       description: poi.description || null,
       rating: poi.rating || null,
       price_level: poi.price_level ? neo4j.int(poi.price_level) : null,
@@ -508,9 +511,12 @@ export async function processPOI(input: POIInput): Promise<EnrichedPOI | null> {
     // Step 3: Calculate luxury score
     console.log(`  💎 Calculating luxury score...`);
     const scoring = calculateLuxuryScore(enriched);
-    enriched.luxury_score = scoring.score;
-    enriched.luxury_confidence = scoring.confidence;
-    enriched.luxury_evidence = scoring.evidence;
+    enriched.luxury_score_base = scoring.score;
+    enriched.confidence_score = scoring.confidence;
+    enriched.score_evidence = JSON.stringify({
+      source: 'master_pipeline_rules',
+      rules: Array.isArray(scoring.evidence) ? scoring.evidence : [String(scoring.evidence)],
+    });
     
     // Step 4: Infer activities & emotions
     console.log(`  🎭 Inferring activities & emotions...`);
@@ -524,7 +530,7 @@ export async function processPOI(input: POIInput): Promise<EnrichedPOI | null> {
     console.log(`  💾 Storing in Neo4j with relationships...`);
     await createOrUpdatePOI(session, enriched as EnrichedPOI);
     
-    console.log(`  ✅ Complete! Luxury score: ${enriched.luxury_score}`);
+    console.log(`  ✅ Complete! Luxury score: ${enriched.luxury_score_base}`);
     console.log(`     Activities: ${enriched.activities?.join(', ') || 'none'}`);
     console.log(`     Emotions: ${enriched.emotions?.join(', ') || 'none'}`);
     

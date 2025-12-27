@@ -25,8 +25,9 @@ export async function GET() {
     // Get luxury score distribution
     const luxuryDistribution = await session.run(`
       MATCH (p:poi)
-      WHERE p.luxury_score IS NOT NULL
-      WITH p.luxury_score as score
+      WITH coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) as rawScore
+      WHERE rawScore IS NOT NULL
+      WITH CASE WHEN rawScore > 10 THEN rawScore ELSE rawScore * 10 END as score
       RETURN 
         count(CASE WHEN score >= 90 THEN 1 END) as ultra_luxury,
         count(CASE WHEN score >= 80 AND score < 90 THEN 1 END) as high_luxury,
@@ -45,12 +46,14 @@ export async function GET() {
     // Get top luxury POIs
     const topPOIs = await session.run(`
       MATCH (p:poi)
-      WHERE p.luxury_score IS NOT NULL
+      WITH p, coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) as rawScore
+      WHERE rawScore IS NOT NULL
+      WITH p, CASE WHEN rawScore > 10 THEN rawScore ELSE rawScore * 10 END as score
       RETURN p.name as name, 
-             p.luxury_score as score, 
+             score as score, 
              p.type as type,
              p.destination_name as destination
-      ORDER BY p.luxury_score DESC
+      ORDER BY score DESC
       LIMIT 10
     `);
 
@@ -74,7 +77,7 @@ export async function GET() {
     // Get unscored POI count
     const unscoredResult = await session.run(`
       MATCH (p:poi)
-      WHERE p.luxury_score IS NULL
+      WHERE coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NULL
       RETURN count(p) as unscored
     `);
     const unscored = unscoredResult.records[0].get('unscored').toNumber();

@@ -18,6 +18,13 @@ interface CreatePOIRequest {
   destination_name: string;
   lat: number;
   lon: number;
+  // Canonical
+  luxury_score_base?: number;
+  luxury_score_verified?: number;
+  confidence_score?: number;
+  score_evidence?: string; // JSON string
+
+  // Legacy (accepted but mapped)
   luxury_score?: number;
   luxury_confidence?: number;
   luxury_evidence?: string;
@@ -75,6 +82,15 @@ export async function POST(req: NextRequest) {
     const poi_uid = `manual:${uuidv4()}`;
     const now = new Date().toISOString();
 
+    const luxuryScoreBase =
+      poiData.luxury_score_base ?? poiData.luxury_score ?? null;
+    const confidenceScore =
+      poiData.confidence_score ?? poiData.luxury_confidence ?? null;
+    const scoreEvidence =
+      poiData.score_evidence ?? (poiData.luxury_evidence ? JSON.stringify({ legacy_text: poiData.luxury_evidence }) : null);
+    const luxuryScoreVerified =
+      poiData.luxury_score_verified ?? (confidenceScore !== null && confidenceScore >= 0.99 ? luxuryScoreBase : null);
+
     const driver = getNeo4jDriver();
     const session = driver.session();
 
@@ -89,9 +105,10 @@ export async function POST(req: NextRequest) {
           destination_name: $destination_name,
           lat: $lat,
           lon: $lon,
-          luxury_score: $luxury_score,
-          luxury_confidence: $luxury_confidence,
-          luxury_evidence: $luxury_evidence,
+          luxury_score_base: $luxury_score_base,
+          luxury_score_verified: $luxury_score_verified,
+          confidence_score: $confidence_score,
+          score_evidence: $score_evidence,
           captain_comments: $captain_comments,
           description: $description,
           source: 'manual',
@@ -111,9 +128,10 @@ export async function POST(req: NextRequest) {
           destination_name: poiData.destination_name,
           lat: poiData.lat,
           lon: poiData.lon,
-          luxury_score: poiData.luxury_score || null,
-          luxury_confidence: poiData.luxury_confidence || null,
-          luxury_evidence: poiData.luxury_evidence || null,
+          luxury_score_base: luxuryScoreBase,
+          luxury_score_verified: luxuryScoreVerified,
+          confidence_score: confidenceScore,
+          score_evidence: scoreEvidence,
           captain_comments: poiData.captain_comments || null,
           description: poiData.description || null,
           created_at: now,

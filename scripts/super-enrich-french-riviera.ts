@@ -59,8 +59,8 @@ interface GooglePlaceData {
 
 interface LuxuryScoring {
   luxury_score: number;
-  luxury_confidence: number;
-  luxury_evidence: string;
+  confidence_score: number;
+  score_evidence: string; // JSON string
 }
 
 interface EmotionalRelationships {
@@ -168,8 +168,17 @@ function calculateLuxuryScore(googleData: GooglePlaceData): LuxuryScoring {
 
   return {
     luxury_score: Math.round(normalizedScore * 10) / 10,
-    luxury_confidence: Math.round(confidence * 10) / 10,
-    luxury_evidence: evidence.join(' | ')
+    confidence_score: Math.round(confidence * 10) / 10,
+    score_evidence: JSON.stringify({
+      source: 'google_places',
+      rules: evidence,
+      inputs: {
+        rating: googleData.rating ?? null,
+        user_ratings_total: googleData.user_ratings_total ?? null,
+        price_level: googleData.price_level ?? null,
+        types: googleData.types ?? null,
+      },
+    })
   };
 }
 
@@ -397,7 +406,8 @@ async function superEnrichFrenchRiviera() {
       `
       MATCH (p:poi)
       WHERE (${destinationFilter})
-        AND (p.luxury_score IS NULL OR p.luxury_score = 0)
+        AND (coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) IS NULL
+             OR coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) = 0)
         AND p.lat IS NOT NULL
         AND p.lon IS NOT NULL
         AND (p.enrichment_attempted IS NULL OR p.enrichment_attempted = false)
@@ -472,9 +482,9 @@ async function superEnrichFrenchRiviera() {
               p.google_rating = $rating,
               p.google_reviews_count = $reviews_count,
               p.google_price_level = $price_level,
-              p.luxury_score = $luxury_score,
-              p.luxury_confidence = $luxury_confidence,
-              p.luxury_evidence = $luxury_evidence,
+              p.luxury_score_base = $luxury_score_base,
+              p.confidence_score = $confidence_score,
+              p.score_evidence = $score_evidence,
               p.google_website = $website,
               p.google_phone = $phone,
               p.google_address = $address,
@@ -491,9 +501,9 @@ async function superEnrichFrenchRiviera() {
             rating: googleData.rating || null,
             reviews_count: googleData.user_ratings_total || null,
             price_level: googleData.price_level || null,
-            luxury_score: scoring.luxury_score,
-            luxury_confidence: scoring.luxury_confidence,
-            luxury_evidence: scoring.luxury_evidence,
+            luxury_score_base: scoring.luxury_score,
+            confidence_score: scoring.confidence_score,
+            score_evidence: scoring.score_evidence,
             website: googleData.website || null,
             phone: googleData.formatted_phone_number || null,
             address: googleData.formatted_address || null,

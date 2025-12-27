@@ -34,7 +34,7 @@ class POIRecommendationService:
         client_weights: ArchetypeWeights,
         destination: str = "French Riviera",
         activity_types: Optional[List[str]] = None,
-        min_luxury_score: float = 0.7,
+        min_luxury_score: float = 7.0,
         min_fit_score: float = 0.75,
         limit: int = 20
     ) -> List[Dict]:
@@ -52,11 +52,15 @@ class POIRecommendationService:
         Returns:
             List of POI dictionaries with fit scores
         """
+        # Backward compatible: some callers may still pass 0-1 instead of 0-10.
+        if min_luxury_score <= 1.0:
+            min_luxury_score = min_luxury_score * 10.0
+
         # Build Cypher query for personality matching
         query = """
         MATCH (poi:poi)-[:OFFERS]->(a:activity_type)
         WHERE poi.destination_name = $destination
-          AND poi.luxury_score >= $min_luxury_score
+          AND coalesce(poi.luxury_score_verified, poi.luxury_score_base, poi.luxury_score, poi.luxuryScore) >= $min_luxury_score
           AND poi.personality_romantic IS NOT NULL
           AND NOT a.name IN ['Standard Experience', 'General Luxury Experience']
         """
@@ -91,8 +95,8 @@ class POIRecommendationService:
                poi.google_rating AS rating,
                poi.google_reviews_count AS reviews,
                poi.google_website AS website,
-               poi.luxury_score AS luxury,
-               poi.luxury_evidence AS evidence,
+               coalesce(poi.luxury_score_verified, poi.luxury_score_base, poi.luxury_score, poi.luxuryScore) AS luxury,
+               coalesce(poi.score_evidence, poi.luxury_evidence) AS evidence,
                a.name AS activity,
                emotions,
                archetypes,
@@ -134,7 +138,7 @@ class POIRecommendationService:
                 "reviews": record.get("reviews"),
                 "website": record.get("website"),
                 "luxury_score": record["luxury"],
-                "luxury_evidence": record.get("evidence"),
+                "score_evidence": record.get("evidence"),
                 "activity": record["activity"],
                 "emotions_evoked": record["emotions"],
                 "archetypes": record["archetypes"],
@@ -160,7 +164,7 @@ class POIRecommendationService:
         self,
         desired_emotions: List[str],
         destination: str = "French Riviera",
-        min_luxury_score: float = 0.7,
+        min_luxury_score: float = 7.0,
         limit: int = 20
     ) -> List[Dict]:
         """
@@ -175,11 +179,14 @@ class POIRecommendationService:
         Returns:
             List of POI dictionaries
         """
+        if min_luxury_score <= 1.0:
+            min_luxury_score = min_luxury_score * 10.0
+
         query = """
         MATCH (poi:poi)-[:OFFERS]->(a:activity_type)-[:EVOKES]->(e:EmotionalTag)
         MATCH (a)-[:APPEALS_TO]->(ca:ClientArchetype)
         WHERE poi.destination_name = $destination
-          AND poi.luxury_score >= $min_luxury_score
+          AND coalesce(poi.luxury_score_verified, poi.luxury_score_base, poi.luxury_score, poi.luxuryScore) >= $min_luxury_score
           AND e.name IN $desired_emotions
           AND NOT a.name IN ['Standard Experience', 'General Luxury Experience']
         
@@ -193,7 +200,7 @@ class POIRecommendationService:
         RETURN poi.name AS name,
                poi.google_rating AS rating,
                poi.google_reviews_count AS reviews,
-               poi.luxury_score AS luxury,
+               coalesce(poi.luxury_score_verified, poi.luxury_score_base, poi.luxury_score, poi.luxuryScore) AS luxury,
                a.name AS activity,
                emotions_evoked,
                archetypes,
