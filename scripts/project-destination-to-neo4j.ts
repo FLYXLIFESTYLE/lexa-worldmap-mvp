@@ -52,6 +52,24 @@ function requireEnv(name: string): string {
   return v;
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function isRetriableNeo4jError(err: any): boolean {
+  // Neo4j Aura can occasionally drop connections during big batch jobs.
+  // These are safe to retry.
+  const code = err?.code ?? err?.constructor?.name ?? '';
+  const msg = String(err?.message ?? '');
+  return (
+    code === 'ServiceUnavailable' ||
+    code === 'SessionExpired' ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('Failed to connect to server') ||
+    msg.includes('Connection was closed')
+  );
+}
+
 function textifyCategories(categories: any): string {
   if (!categories) return '';
   try {
@@ -251,8 +269,14 @@ async function main() {
   const neo4jUser = requireEnv('NEO4J_USER');
   const neo4jPassword = requireEnv('NEO4J_PASSWORD');
 
-  const driver = neo4j.driver(neo4jUri, neo4j.auth.basic(neo4jUser, neo4jPassword));
-  const session = driver.session();
+  const driver = neo4j.driver(neo4jUri, neo4j.auth.basic(neo4jUser, neo4jPassword), {
+    // More forgiving defaults for long-running batch scripts on Aura
+    connectionAcquisitionTimeout: 60_000,
+    maxTransactionRetryTime: 60_000,
+    maxConnectionPoolSize: 20,
+    maxConnectionLifetime: 10 * 60_000,
+  });
+  let session = driver.session({ defaultAccessMode: neo4j.session.WRITE });
 
   try {
     const { data: dest, error: destErr } = await supabaseAdmin
@@ -262,9 +286,11 @@ async function main() {
       .maybeSingle();
     if (destErr) throw new Error(destErr.message);
     if (!dest) throw new Error(`Destination not found in Supabase: ${destinationName}`);
+    if (!dest.bbox) throw new Error(`Destination "${destinationName}" has no bbox in Supabase (destinations_geo.bbox).`);
 
     const destId = String(dest.id);
     const destName = String(dest.name);
+    const bbox = dest.bbox as { minLon: number; minLat: number; maxLon: number; maxLat: number };
 
     // Load ALL entities for destination (Supabase/PostgREST defaults to 1000 rows if not paginated)
     const rows: any[] = [];
@@ -273,7 +299,11 @@ async function main() {
       const { data: page, error: pageErr } = await supabaseAdmin
         .from('experience_entities')
         .select('id, kind, name, lat, lon, tags, categories, website, phone, instagram, luxury_score_base, confidence_score')
-        .eq('destination_id', destId)
+        // IMPORTANT: membership is bbox-based (an entity can belong to multiple destinations)
+        .gte('lat', bbox.minLat)
+        .lte('lat', bbox.maxLat)
+        .gte('lon', bbox.minLon)
+        .lte('lon', bbox.maxLon)
         .range(offset, offset + pageSize - 1);
       if (pageErr) throw new Error(pageErr.message);
       if (!page || page.length === 0) break;
@@ -296,14 +326,21 @@ async function main() {
     let upserted = 0;
     let themed = 0;
 
-    // Process in batches to keep transactions small
-    const batchSize = 200;
+    // Process in batches to keep transactions small.
+    // Smaller batch size reduces Neo4j connection drops on big datasets.
+    const batchSize = 100;
+    const maxBatchRetries = 5;
+
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize);
 
-      const tx = session.beginTransaction();
-      try {
-        for (const e of batch) {
+      // Retry the whole batch if the connection drops.
+      for (let attempt = 0; attempt <= maxBatchRetries; attempt++) {
+        let tx: neo4j.Transaction | null = null;
+        try {
+          tx = session.beginTransaction();
+
+          for (const e of batch) {
           const canonicalId = String(e.id);
           const name = String(e.name ?? '');
           const lat = typeof e.lat === 'number' ? e.lat : null;
@@ -347,7 +384,8 @@ async function main() {
             await tx.run(
               `
               MATCH (p:poi {canonical_id: $canonical_id})
-              MATCH (t:theme_category {name: $theme_name})
+              MERGE (t:theme_category {name: $theme_name})
+              ON CREATE SET t.created_at = datetime()
               MERGE (p)-[r:FEATURED_IN]->(t)
               SET r.theme_fit = $theme_fit,
                   r.confidence = $confidence,
@@ -367,13 +405,39 @@ async function main() {
           }
         }
 
-        await tx.commit();
-      } catch (err) {
-        await tx.rollback();
-        throw err;
+          await tx.commit();
+          break; // success, stop retrying this batch
+        } catch (err: any) {
+          try {
+            await tx?.rollback();
+          } catch {
+            // ignore rollback errors
+          }
+
+          if (attempt === maxBatchRetries || !isRetriableNeo4jError(err)) {
+            throw err;
+          }
+
+          const delay = Math.min(15_000, 500 * Math.pow(2, attempt));
+          console.warn(
+            `⚠️ Neo4j transient error during projection (batch ${i}-${i + batch.length - 1}). ` +
+              `Retrying in ${delay}ms... (${attempt + 1}/${maxBatchRetries})`
+          );
+          await sleep(delay);
+
+          // Reopen session after retriable errors (Aura can expire sessions)
+          try {
+            await session.close();
+          } catch {
+            // ignore
+          }
+          session = driver.session({ defaultAccessMode: neo4j.session.WRITE });
+        }
       }
 
       console.log(`Progress: ${Math.min(rows.length, i + batchSize)}/${rows.length} projected`);
+      // small breathing room to reduce throttling / connection drops
+      await sleep(25);
     }
 
     console.log(`Done. Upserted POIs=${upserted}, theme_edges=${themed}`);

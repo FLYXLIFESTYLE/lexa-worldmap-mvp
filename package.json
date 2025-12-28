@@ -18,6 +18,7 @@
     "ingest:destination": "tsx scripts/ingest-destination.ts",
     "ingest:pilot10": "tsx scripts/ingest-pilot10-seq.ts",
     "ingest:seq": "tsx scripts/ingest-destinations-seq.ts",
+    "project:seq": "tsx scripts/project-destinations-seq.ts",
     "quality-check": "tsx scripts/run-quality-check.ts",
     "test-scoring": "tsx scripts/test-scoring.ts",
     "bulk-enrich": "tsx scripts/bulk-enrich.ts",
