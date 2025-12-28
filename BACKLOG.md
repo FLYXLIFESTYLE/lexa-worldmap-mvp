@@ -341,7 +341,11 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
 - [ ] **Operations Agent** (Complexity: Very High)
   - [ ] Connect user preferences with experiences
   - [ ] Understand "why they buy"
-  - [ ] Generate experience scripts automatically
+  - [ ] Generate experience scripts automatically (**DEFERRED / BACKLOG**)
+    - [ ] Use: Neo4j (themes/activities/emotions) + Supabase RAG packs (Destination Emotional Knowledge Packs, POI Experience Cards, Provider Playbooks)
+    - [ ] Output: structured “Experience Script” (moments + reasoning + alternates) not just POI lists
+    - [ ] Prereq: stable retrieval primitive (destination bbox + theme + intent) + basic activity/emotion edges
+    - [ ] See: `.cursor/plans/experience-first_rag_graph_dd1e8f31.plan.md`
   - [ ] See: User priority list in chat
 - [ ] **Monetization Features** (Complexity: High)
   - [ ] Upsell premium experiences

@@ -15,6 +15,7 @@
     "destinations:list": "tsx scripts/list-destinations-geo.ts",
     "destinations:seed": "tsx scripts/seed-destinations-geo.ts",
     "destinations:coverage": "tsx scripts/check-destination-coverage.ts",
+    "destinations:sources": "tsx scripts/report-destination-sources.ts",
     "ingest:destination": "tsx scripts/ingest-destination.ts",
     "ingest:pilot10": "tsx scripts/ingest-pilot10-seq.ts",
     "ingest:seq": "tsx scripts/ingest-destinations-seq.ts",
