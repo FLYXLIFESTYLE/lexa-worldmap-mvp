@@ -110,12 +110,22 @@ function computeThemeFit(entity: any, theme: ThemeName): { fit: number; evidence
 
   switch (theme) {
     case 'Romance & Intimacy': {
-      if (has('hotel') || has('resort')) fit = Math.max(fit, 0.6);
-      if (has('spa') || has('wellness')) fit = Math.max(fit, 0.65);
-      if (has('restaurant') || has('fine dining')) fit = Math.max(fit, 0.55);
-      if (has('viewpoint') || has('garden') || has('park')) fit = Math.max(fit, 0.6);
-      if (has('wine') || has('cocktail') || has('lounge')) fit = Math.max(fit, 0.5);
-      evidence.push('rule:romance_priors');
+      // Romance should not be “everything relaxing”.
+      // Prioritize: views, intimate dining, hotels, wine/cocktail lounges.
+      if (has('fine dining')) fit = Math.max(fit, 0.75);
+      if (has('restaurant')) fit = Math.max(fit, 0.65);
+      if (has('hotel') || has('resort')) fit = Math.max(fit, 0.65);
+      if (has('viewpoint') || has('scenic') || has('lookout')) fit = Math.max(fit, 0.75);
+      if (has('garden')) fit = Math.max(fit, 0.65);
+      if (has('wine') || has('cocktail') || has('champagne') || has('lounge')) fit = Math.max(fit, 0.6);
+
+      // De-emphasize common “beauty/service” businesses (better suited for Wellness).
+      if (has('hair') || has('coiffure') || has('nail') || has('salon') || has('beauty') || has('esthetic') || has('massage')) {
+        fit = Math.min(fit, 0.45);
+        evidence.push('penalty:beauty_service_not_romance');
+      }
+
+      evidence.push('rule:romance_priors_v2');
       break;
     }
     case 'Culinary Excellence': {
@@ -126,8 +136,9 @@ function computeThemeFit(entity: any, theme: ThemeName): { fit: number; evidence
       break;
     }
     case 'Wellness & Transformation': {
-      if (has('spa') || has('wellness') || has('yoga') || has('gym')) fit = Math.max(fit, 0.75);
-      evidence.push('rule:wellness_priors');
+      if (has('spa') || has('wellness') || has('yoga') || has('gym') || has('massage')) fit = Math.max(fit, 0.8);
+      if (has('beauty') || has('esthetic') || has('salon') || has('coiffure') || has('nail')) fit = Math.max(fit, 0.65);
+      evidence.push('rule:wellness_priors_v2');
       break;
     }
     case 'Water Sports & Marine': {
@@ -191,7 +202,7 @@ function topThemes(entity: any, k: number) {
     const { fit, evidence } = computeThemeFit(entity, t);
     return { theme: t, fit, evidence };
   })
-    .filter((x) => x.fit >= 0.45)
+    .filter((x) => x.fit >= 0.5)
     .sort((a, b) => b.fit - a.fit);
 
   return scored.slice(0, k);
@@ -223,14 +234,20 @@ async function main() {
     const destId = String(dest.id);
     const destName = String(dest.name);
 
-    // Load entities for destination (keep to a reasonable size for proof-of-process)
-    const { data: entities, error: entErr } = await supabaseAdmin
-      .from('experience_entities')
-      .select('id, kind, name, lat, lon, tags, categories, website, phone, instagram, luxury_score_base, confidence_score')
-      .eq('destination_id', destId);
-    if (entErr) throw new Error(entErr.message);
-
-    const rows = entities ?? [];
+    // Load ALL entities for destination (Supabase/PostgREST defaults to 1000 rows if not paginated)
+    const rows: any[] = [];
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data: page, error: pageErr } = await supabaseAdmin
+        .from('experience_entities')
+        .select('id, kind, name, lat, lon, tags, categories, website, phone, instagram, luxury_score_base, confidence_score')
+        .eq('destination_id', destId)
+        .range(offset, offset + pageSize - 1);
+      if (pageErr) throw new Error(pageErr.message);
+      if (!page || page.length === 0) break;
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
     console.log(`Loaded entities for ${destName}: ${rows.length}`);
 
     // Create destination node
