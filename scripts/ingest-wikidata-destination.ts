@@ -43,14 +43,24 @@ async function fetchDestinationByName(name: string) {
 }
 
 function sparqlForBBox(b: BBox) {
-  // Note: Wikidata uses lat,lon ordering in some geo helpers; we keep it explicit.
-  // We ask for “things with coordinates inside bbox” and basic labels.
+  // Important: use the geospatial index via `SERVICE wikibase:box` to avoid heavy scans / OOMs.
+  // NOTE: WKT Point is "lon lat".
+  const cornerWest = `Point(${b.minLon} ${b.maxLat})`;
+  const cornerEast = `Point(${b.maxLon} ${b.minLat})`;
+
   return `
-SELECT ?item ?itemLabel ?coord ?lat ?lon ?instanceOfLabel WHERE {
-  ?item wdt:P625 ?coord.
-  BIND(geof:latitude(?coord) AS ?lat).
-  BIND(geof:longitude(?coord) AS ?lon).
-  FILTER(?lat >= ${b.minLat} && ?lat <= ${b.maxLat} && ?lon >= ${b.minLon} && ?lon <= ${b.maxLon}).
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX bd: <http://www.bigdata.com/rdf#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+
+SELECT ?item ?itemLabel ?coord ?instanceOfLabel WHERE {
+  SERVICE wikibase:box {
+    ?item wdt:P625 ?coord.
+    bd:serviceParam wikibase:cornerWest "${cornerWest}"^^geo:wktLiteral.
+    bd:serviceParam wikibase:cornerEast "${cornerEast}"^^geo:wktLiteral.
+  }
   OPTIONAL { ?item wdt:P31 ?instanceOf. }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
 }
@@ -63,26 +73,52 @@ async function runSparql(query: string) {
   url.searchParams.set('format', 'json');
   url.searchParams.set('query', query);
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      // Wikidata asks for a descriptive UA.
-      'User-Agent': 'LEXA-Worldmap-MVP/1.0 (open-only ingestion; contact: dev@local)',
-      Accept: 'application/sparql-results+json',
-    },
-  });
+  const headers = {
+    // Wikidata asks for a descriptive UA.
+    'User-Agent': 'LEXA-Worldmap-MVP/1.0 (open-only ingestion; contact: dev@local)',
+    Accept: 'application/sparql-results+json',
+  } as const;
 
-  if (!res.ok) {
+  const retryable = new Set([429, 503, 504]);
+  const maxRetries = 5;
+  let lastErr: unknown = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url.toString(), { headers });
+
+    if (res.ok) return (await res.json()) as any;
+
     const txt = await res.text().catch(() => '');
-    throw new Error(`Wikidata SPARQL failed: ${res.status} ${res.statusText}\n${txt}`);
+    const err = new Error(`Wikidata SPARQL failed: ${res.status} ${res.statusText}\n${txt}`);
+    lastErr = err;
+
+    if (!retryable.has(res.status) || attempt === maxRetries) {
+      throw err;
+    }
+
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s...
+    const delayMs = Math.min(16000, 1000 * Math.pow(2, attempt));
+    console.log(`Wikidata SPARQL retryable error (${res.status}). Retrying in ${delayMs}ms... (${attempt + 1}/${maxRetries})`);
+    await new Promise((r) => setTimeout(r, delayMs));
   }
 
-  return (await res.json()) as any;
+  throw lastErr ?? new Error('Wikidata SPARQL failed (unknown error)');
 }
 
 function parseWikidataId(uri: string) {
   // e.g. http://www.wikidata.org/entity/Q123
   const parts = uri.split('/');
   return parts[parts.length - 1] || uri;
+}
+
+function parseCoordWkt(wkt: string): { lat: number; lon: number } | null {
+  // Wikidata returns geo literals like: "Point(7.2620 43.7102)"
+  const m = wkt.match(/Point\(\s*([-0-9.]+)\s+([-0-9.]+)\s*\)/i);
+  if (!m) return null;
+  const lon = Number(m[1]);
+  const lat = Number(m[2]);
+  if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
+  return { lat, lon };
 }
 
 async function main() {
@@ -103,16 +139,37 @@ async function main() {
 
   let createdEntities = 0;
   let createdSources = 0;
+  let skippedExisting = 0;
 
   for (const row of bindings) {
     const itemUri = row?.item?.value;
     const label = row?.itemLabel?.value;
-    const lat = row?.lat?.value ? Number(row.lat.value) : null;
-    const lon = row?.lon?.value ? Number(row.lon.value) : null;
+    const coordWkt = row?.coord?.value as string | undefined;
+    const coord = coordWkt ? parseCoordWkt(coordWkt) : null;
+    const lat = coord?.lat ?? null;
+    const lon = coord?.lon ?? null;
 
     if (!itemUri || !label || Number.isNaN(lat) || Number.isNaN(lon)) continue;
 
     const wikidataId = parseWikidataId(itemUri);
+
+    // Idempotency: if this source record already exists, skip without creating a new entity.
+    const { data: existingSource, error: existingErr } = await supabaseAdmin
+      .from('experience_entity_sources')
+      .select('id,entity_id')
+      .eq('source', 'wikidata')
+      .eq('source_id', wikidataId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingErr) {
+      throw new Error(`Failed to check existing source for ${wikidataId}: ${existingErr.message}`);
+    }
+
+    if (existingSource?.id) {
+      skippedExisting++;
+      continue;
+    }
 
     // 1) Create a canonical entity (one per source record for now; conflation comes later)
     const { data: entity, error: entityErr } = await supabaseAdmin
@@ -161,7 +218,9 @@ async function main() {
     createdSources++;
   }
 
-  console.log(`Done. Inserted entities=${createdEntities}, sources=${createdSources}`);
+  console.log(
+    `Done. Inserted entities=${createdEntities}, sources=${createdSources}, skipped_existing_sources=${skippedExisting}`
+  );
 }
 
 main().catch((err) => {

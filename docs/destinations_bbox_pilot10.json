@@ -1,0 +1,19 @@
+{
+  "destinations": [
+    { "name": "French Riviera", "kind": "region", "bbox": [6.5, 43.2, 7.5, 43.8], "metadata": { "group": "pilot10", "region": "Mediterranean" } },
+    { "name": "Amalfi Coast", "kind": "region", "bbox": [14.0, 40.5, 15.0, 40.8], "metadata": { "group": "pilot10", "region": "Mediterranean" } },
+    { "name": "Balearics", "kind": "region", "bbox": [1.0, 38.5, 4.5, 40.0], "metadata": { "group": "pilot10", "region": "Mediterranean" } },
+    { "name": "Cyclades", "kind": "region", "bbox": [24.0, 36.5, 26.0, 38.0], "metadata": { "group": "pilot10", "region": "Mediterranean" } },
+
+    { "name": "BVI", "kind": "region", "bbox": [-64.8, 18.3, -64.3, 18.8], "metadata": { "group": "pilot10", "region": "Caribbean" } },
+    { "name": "USVI", "kind": "region", "bbox": [-65.1, 17.6, -64.5, 18.4], "metadata": { "group": "pilot10", "region": "Caribbean" } },
+    { "name": "Bahamas", "kind": "region", "bbox": [-80.0, 20.5, -72.0, 27.0], "metadata": { "group": "pilot10", "region": "Caribbean" } },
+    { "name": "Dutch Antilles", "kind": "region", "bbox": [-70.0, 12.0, -68.0, 13.0], "metadata": { "group": "pilot10", "region": "Caribbean" } },
+    { "name": "French Antilles", "kind": "region", "bbox": [-61.8, 14.4, -61.0, 16.3], "metadata": { "group": "pilot10", "region": "Caribbean" } },
+
+    { "name": "Arabian Gulf (UAE)", "kind": "region", "bbox": [51.0, 22.5, 56.0, 26.0], "metadata": { "group": "pilot10", "region": "Middle East" } }
+  ]
+}
+
+
+
