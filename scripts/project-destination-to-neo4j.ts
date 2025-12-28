@@ -72,10 +72,21 @@ function textifyCategories(categories: any): string {
   }
 }
 
+function normalizeText(input: string): string {
+  // Lowercase + remove accents + keep alphanumerics/spaces.
+  // This makes matching work for e.g. "Beauté" -> "beaute", "Esthétique" -> "esthetique".
+  return input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 function computeLuxuryBase01(entity: any): { score: number; evidence: string[] } {
   const evidence: string[] = [];
   const tags: string[] = Array.isArray(entity?.tags) ? entity.tags : [];
-  const catText = (textifyCategories(entity?.categories) + ' ' + tags.join(' ')).toLowerCase();
+  const catText = normalizeText(textifyCategories(entity?.categories) + ' ' + tags.join(' '));
 
   // Very simple priors (proof-of-process, not final)
   let s = 0.45;
@@ -102,7 +113,7 @@ function computeLuxuryBase01(entity: any): { score: number; evidence: string[] }
 
 function computeThemeFit(entity: any, theme: ThemeName): { fit: number; evidence: string[] } {
   const tags: string[] = Array.isArray(entity?.tags) ? entity.tags : [];
-  const catText = (textifyCategories(entity?.categories) + ' ' + tags.join(' ') + ' ' + (entity?.name ?? '')).toLowerCase();
+  const catText = normalizeText(textifyCategories(entity?.categories) + ' ' + tags.join(' ') + ' ' + (entity?.name ?? ''));
   const evidence: string[] = [];
   let fit = 0.15;
 
@@ -120,12 +131,31 @@ function computeThemeFit(entity: any, theme: ThemeName): { fit: number; evidence
       if (has('wine') || has('cocktail') || has('champagne') || has('lounge')) fit = Math.max(fit, 0.6);
 
       // De-emphasize common “beauty/service” businesses (better suited for Wellness).
-      if (has('hair') || has('coiffure') || has('nail') || has('salon') || has('beauty') || has('esthetic') || has('massage')) {
+      const isBeautyService =
+        has('beauty') ||
+        has('beaute') ||
+        has('esthetique') ||
+        has('esthetic') ||
+        has('institut') ||
+        has('coiffure') ||
+        has('coiffeur') ||
+        has('hair') ||
+        has('salon') ||
+        has('barber') ||
+        has('nail') ||
+        has('ongle') ||
+        has('manucure') ||
+        has('pedicure') ||
+        has('massage') ||
+        has('head spa') ||
+        has('spa and hair');
+
+      if (isBeautyService) {
         fit = Math.min(fit, 0.45);
         evidence.push('penalty:beauty_service_not_romance');
       }
 
-      evidence.push('rule:romance_priors_v2');
+      evidence.push('rule:romance_priors_v3');
       break;
     }
     case 'Culinary Excellence': {
@@ -137,8 +167,10 @@ function computeThemeFit(entity: any, theme: ThemeName): { fit: number; evidence
     }
     case 'Wellness & Transformation': {
       if (has('spa') || has('wellness') || has('yoga') || has('gym') || has('massage')) fit = Math.max(fit, 0.8);
-      if (has('beauty') || has('esthetic') || has('salon') || has('coiffure') || has('nail')) fit = Math.max(fit, 0.65);
-      evidence.push('rule:wellness_priors_v2');
+      if (has('beauty') || has('beaute') || has('esthetique') || has('esthetic') || has('salon') || has('coiffure') || has('nail') || has('ongle')) {
+        fit = Math.max(fit, 0.65);
+      }
+      evidence.push('rule:wellness_priors_v3');
       break;
     }
     case 'Water Sports & Marine': {
