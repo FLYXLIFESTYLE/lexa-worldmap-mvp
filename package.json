@@ -9,6 +9,7 @@
     "lint": "eslint",
     "ingest:wikidata": "tsx scripts/ingest-wikidata-destination.ts",
     "ingest:overture": "tsx scripts/ingest-overture-geojson.ts",
+    "ingest:fsq": "tsx scripts/ingest-fsq-os-json.ts",
     "quality-check": "tsx scripts/run-quality-check.ts",
     "test-scoring": "tsx scripts/test-scoring.ts",
     "bulk-enrich": "tsx scripts/bulk-enrich.ts",
