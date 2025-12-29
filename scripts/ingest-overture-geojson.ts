@@ -59,6 +59,55 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function formatSupabaseError(err: any): string {
+  if (!err) return 'Unknown error (err is null/undefined)';
+  if (typeof err === 'string') return err;
+  const msg = err.message ?? err.error_description ?? err.hint ?? err.details;
+  try {
+    return msg ? String(msg) : JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
+
+async function withRetries<T>(
+  fn: () => Promise<T>,
+  opts: { label: string; maxRetries?: number; baseDelayMs?: number } = { label: 'op' }
+): Promise<T> {
+  const maxRetries = opts.maxRetries ?? 5;
+  const baseDelayMs = opts.baseDelayMs ?? 500;
+
+  let lastErr: any = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastErr = err;
+      const message = String(err?.message ?? '');
+      const retriable =
+        message.includes('fetch failed') ||
+        message.includes('ECONNRESET') ||
+        message.includes('ETIMEDOUT') ||
+        message.includes('timeout') ||
+        message.includes('429') ||
+        message.includes('502') ||
+        message.includes('503') ||
+        message.includes('504');
+
+      if (!retriable || attempt === maxRetries) throw err;
+
+      const delay = Math.min(15_000, baseDelayMs * Math.pow(2, attempt));
+      console.log(`⚠️  ${opts.label} failed (retriable). Retrying in ${delay}ms... (${attempt + 1}/${maxRetries})`);
+      await sleep(delay);
+    }
+  }
+  throw lastErr ?? new Error(`${opts.label} failed`);
+}
+
 type OvertureCandidate = {
   overtureId: string;
   name: string;
@@ -149,14 +198,13 @@ async function ingestOvertureBatch(params: {
     risk_flags: {},
   }));
 
-  const { data: inserted, error: insertErr } = await supabaseAdmin
-    .from('experience_entities')
-    .insert(entityRows)
-    .select('id, source_hints');
+  const { data: inserted, error: insertErr } = await withRetries(
+    async () =>
+      await supabaseAdmin.from('experience_entities').insert(entityRows).select('id, source_hints'),
+    { label: 'insert experience_entities batch' }
+  );
 
-  if (insertErr) {
-    throw new Error(`Failed to insert experience_entities batch: ${insertErr.message}`);
-  }
+  if (insertErr) throw new Error(`Failed to insert experience_entities batch: ${formatSupabaseError(insertErr)}`);
 
   const idByOvertureId = new Map<string, string>();
   for (const row of inserted ?? []) {
@@ -176,13 +224,12 @@ async function ingestOvertureBatch(params: {
     };
   });
 
-  const { error: srcErr } = await supabaseAdmin
-    .from('experience_entity_sources')
-    .upsert(sourceRows, { onConflict: 'source,source_id' });
+  const { error: srcErr } = await withRetries(
+    async () => await supabaseAdmin.from('experience_entity_sources').upsert(sourceRows, { onConflict: 'source,source_id' }),
+    { label: 'upsert experience_entity_sources batch' }
+  );
 
-  if (srcErr) {
-    throw new Error(`Failed to upsert experience_entity_sources batch: ${srcErr.message}`);
-  }
+  if (srcErr) throw new Error(`Failed to upsert experience_entity_sources batch: ${formatSupabaseError(srcErr)}`);
 
   return { insertedEntities: candidates.length, insertedSources: candidates.length };
 }
@@ -194,9 +241,23 @@ async function main() {
   const args = process.argv.slice(2);
   const destinationName = (args[0] ?? '').trim();
   const geojsonPath = (args[1] ?? '').trim();
+  const startBatchIdx = (() => {
+    const idx = args.findIndex((a) => a === '--startBatch');
+    if (idx === -1) return 0;
+    const v = Number(args[idx + 1]);
+    return Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+  })();
+  const batchSize = (() => {
+    const idx = args.findIndex((a) => a === '--batchSize');
+    if (idx === -1) return 25;
+    const v = Number(args[idx + 1]);
+    return Number.isFinite(v) && v >= 1 && v <= 100 ? Math.floor(v) : 25;
+  })();
 
   if (!destinationName || !geojsonPath) {
-    throw new Error('Usage: npm run ingest:overture -- "<Destination Name>" "<PathToGeoJSON>"');
+    throw new Error(
+      'Usage: npm run ingest:overture -- "<Destination Name>" "<PathToGeoJSON>" [--startBatch N] [--batchSize N]'
+    );
   }
 
   const dest = await fetchDestinationByName(destinationName);
@@ -223,31 +284,40 @@ async function main() {
     });
   }
 
-  const existing = await loadExistingOvertureSources(overtureIds);
-  console.log(`Existing overture sources already in DB: ${existing.size}`);
-
   let insertedEntities = 0;
   let insertedSources = 0;
   let skipped = 0;
 
-  const toInsert = candidatesAll.filter((c) => !existing.get(c.overtureId)?.entity_id);
-  skipped = candidatesAll.length - toInsert.length;
-
-  console.log(`Will ingest: ${toInsert.length} (skipped existing: ${skipped})`);
-
-  // Keep batches small to avoid request-size limits (raw GeoJSON payload can be large).
-  const batches = chunk(toInsert, 25);
+  // Process candidates directly in batches; each batch checks existing sources for its own IDs.
+  // This avoids a huge up-front "load existing" query (which can be thousands of requests on big files).
+  const batches = chunk(candidatesAll, batchSize);
   const totalBatches = batches.length;
 
+  console.log(`Total candidates: ${candidatesAll.length}. Processing in ${totalBatches} batches (size=${batchSize}).`);
+  if (startBatchIdx > 0) console.log(`Resuming from batch index: ${startBatchIdx} (0-based).`);
+
   for (let i = 0; i < batches.length; i++) {
+    if (i < startBatchIdx) continue;
     const batch = batches[i];
-    const res = await ingestOvertureBatch({ supabaseAdmin, destId: dest.id, candidates: batch });
-    insertedEntities += res.insertedEntities;
-    insertedSources += res.insertedSources;
+
+    // Idempotency: skip already-ingested Overture IDs in THIS batch.
+    const ids = batch.map((b) => b.overtureId);
+    const existingMap = await withRetries(() => loadExistingOvertureSources(ids), { label: 'load existing overture sources (batch)' });
+    const toInsert = batch.filter((c) => !existingMap.get(c.overtureId)?.entity_id);
+    const batchSkipped = batch.length - toInsert.length;
+    skipped += batchSkipped;
+
+    if (toInsert.length > 0) {
+      const res = await ingestOvertureBatch({ supabaseAdmin, destId: dest.id, candidates: toInsert });
+      insertedEntities += res.insertedEntities;
+      insertedSources += res.insertedSources;
+    }
 
     const done = i + 1;
     if (done === 1 || done % 10 === 0 || done === totalBatches) {
-      console.log(`Progress: ${done}/${totalBatches} batches (inserted=${insertedEntities})`);
+      console.log(
+        `Progress: ${done}/${totalBatches} batches (inserted=${insertedEntities}, skipped_existing=${skipped})`
+      );
     }
   }
 
