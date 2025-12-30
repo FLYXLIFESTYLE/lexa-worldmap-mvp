@@ -144,10 +144,10 @@ export default function ResendVerificationPage() {
                 </Link>
               </p>
               <p className="text-sm text-zinc-600">
-                Need a new account?{' '}
-                <Link href="/auth/signup" className="font-semibold text-lexa-navy hover:text-lexa-gold transition-colors">
-                  Sign up
-                </Link>
+                Need access?{' '}
+                <span className="font-semibold text-zinc-700">
+                  Ask your admin for an invite
+                </span>
               </p>
             </div>
           </div>

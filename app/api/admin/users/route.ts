@@ -5,6 +5,31 @@
 
 import { NextResponse } from 'next/server';
 import { createCaptainUser, listCaptainUsers, deactivateCaptainUser } from '@/lib/auth/create-captain-user';
+import { createClient } from '@/lib/supabase/server';
+
+async function requireAdmin() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { ok: false as const, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('captain_profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (profileError || !profile || profile.role !== 'admin') {
+    return { ok: false as const, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  }
+
+  return { ok: true as const, userId: user.id };
+}
 
 /**
  * GET /api/admin/users
@@ -12,7 +37,8 @@ import { createCaptainUser, listCaptainUsers, deactivateCaptainUser } from '@/li
  */
 export async function GET() {
   try {
-    // TODO: Add admin authentication check
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
     const users = await listCaptainUsers();
     return NextResponse.json({ users });
   } catch (error) {
@@ -30,7 +56,8 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   try {
-    // TODO: Add admin authentication check
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
     const body = await req.json();
     const { email, displayName, role, commissionRate } = body;
 
@@ -51,7 +78,7 @@ export async function POST(req: Request) {
     }
 
     // Validate role
-    const validRoles = ['internal', 'external_captain', 'yacht_crew', 'expert'];
+    const validRoles = ['admin', 'internal', 'external_captain', 'yacht_crew', 'expert'];
     if (!validRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role' },
@@ -93,7 +120,8 @@ export async function POST(req: Request) {
  */
 export async function DELETE(req: Request) {
   try {
-    // TODO: Add admin authentication check
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
 

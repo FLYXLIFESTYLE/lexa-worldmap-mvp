@@ -27,7 +27,7 @@ export default function AdminUsersPage() {
   const [newUser, setNewUser] = useState({
     email: '',
     displayName: '',
-    role: 'internal' as 'internal' | 'external_captain' | 'yacht_crew' | 'expert',
+    role: 'internal' as 'admin' | 'internal' | 'external_captain' | 'yacht_crew' | 'expert',
     commissionRate: '0.00',
   });
 
@@ -181,6 +181,7 @@ export default function AdminUsersPage() {
                   onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value as any }))}
                   className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-lexa-gold focus:border-transparent"
                 >
+                  <option value="admin">Admin</option>
                   <option value="internal">Internal Team</option>
                   <option value="external_captain">External Captain</option>
                   <option value="yacht_crew">Yacht Crew</option>

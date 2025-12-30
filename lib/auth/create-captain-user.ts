@@ -3,12 +3,12 @@
  * Admin function to create new captain users
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/client';
 
 export interface CreateCaptainUserParams {
   email: string;
   displayName: string;
-  role: 'internal' | 'external_captain' | 'yacht_crew' | 'expert';
+  role: 'admin' | 'internal' | 'external_captain' | 'yacht_crew' | 'expert';
   commissionRate?: number;
 }
 
@@ -21,12 +21,10 @@ export async function createCaptainUser(params: CreateCaptainUserParams): Promis
   userId?: string;
   error?: string;
 }> {
-  const supabase = await createClient();
-
   try {
     // Create user in Supabase Auth
     // Note: This requires service role key for admin operations
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: params.email,
       email_confirm: true, // Auto-confirm email
       user_metadata: {
@@ -43,7 +41,7 @@ export async function createCaptainUser(params: CreateCaptainUserParams): Promis
     }
 
     // Create captain profile
-    const { error: profileError } = await supabase
+    const { error: profileError } = await supabaseAdmin
       .from('captain_profiles')
       .insert({
         user_id: authData.user.id,
@@ -55,7 +53,7 @@ export async function createCaptainUser(params: CreateCaptainUserParams): Promis
     if (profileError) {
       console.error('Error creating captain profile:', profileError);
       // Try to delete the auth user since profile creation failed
-      await supabase.auth.admin.deleteUser(authData.user.id);
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return {
         success: false,
         error: 'Failed to create captain profile',
@@ -63,7 +61,7 @@ export async function createCaptainUser(params: CreateCaptainUserParams): Promis
     }
 
     // Send password reset email so user can set their password
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(params.email, {
+    const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(params.email, {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/set-password`,
     });
 
@@ -89,9 +87,7 @@ export async function createCaptainUser(params: CreateCaptainUserParams): Promis
  * List all captain users (admin function)
  */
 export async function listCaptainUsers(): Promise<any[]> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('captain_profiles')
     .select('*')
     .order('created_at', { ascending: false });
@@ -108,11 +104,9 @@ export async function listCaptainUsers(): Promise<any[]> {
  * Deactivate a captain user (admin function)
  */
 export async function deactivateCaptainUser(userId: string): Promise<boolean> {
-  const supabase = await createClient();
-
   try {
     // Delete user from auth (this will cascade to captain_profiles)
-    const { error } = await supabase.auth.admin.deleteUser(userId);
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (error) {
       console.error('Error deactivating user:', error);

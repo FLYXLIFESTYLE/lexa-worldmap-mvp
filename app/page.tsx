@@ -73,10 +73,10 @@ export default function LandingPage() {
         {/* CTA Buttons */}
         <div className="flex flex-col items-center gap-5 sm:flex-row sm:justify-center mb-20">
           <Link
-            href="/auth/signup"
+            href="/app"
             className="group relative overflow-hidden rounded-full bg-gradient-to-r from-lexa-gold to-yellow-600 px-10 py-5 text-lg font-semibold text-zinc-900 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-lexa-gold/50"
           >
-            <span className="relative z-10">Begin Your Journey</span>
+            <span className="relative z-10">Enter LEXA</span>
             <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-lexa-gold opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </Link>
           

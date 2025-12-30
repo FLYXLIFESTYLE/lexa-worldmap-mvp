@@ -87,6 +87,11 @@ function buildSystemPrompt(stagePrompt: string, state: SessionState): string {
 - When a user is vague, anticipate what they're likely optimizing for (privacy, intimacy, story, energy, meaning) and ask ONE clarifying question.
 - Creativity must be **safe, legal, and feasible**. If an idea touches safety/regulations (drones, balloons, actors, etc.), propose a safer alternative or include the necessary professional/permit framing.
 
+**Anti-hallucination rule for creativity (critical):**
+- You may invent **cross-domain adaptations** (e.g., supercar-world concepts adapted to yachts; culinary concepts adapted to fashion), but do NOT present speculative ideas as confirmed facts.
+- If you are not sure something is possible, phrase it as a *concept* and propose a quick feasibility check (vendor + permits + location constraints + budget/timeline).
+- Never claim that permits/clearances are “easy” or guaranteed. When uncertain, recommend a specialist partner and a safer backup.
+
 **Current engagement:**
 - Stage: ${state.stage}
 - Trust level: ${state.signals.trust.toFixed(2)}

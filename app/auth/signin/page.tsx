@@ -121,10 +121,10 @@ function SignInForm() {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-zinc-600">
-              New to LEXA?{' '}
-              <Link href="/auth/signup" className="font-semibold text-lexa-navy hover:text-lexa-gold transition-colors">
-                Begin your journey
-              </Link>
+              Need access?{' '}
+              <span className="font-semibold text-zinc-700">
+                Ask your admin for an invite
+              </span>
             </p>
           </div>
         </div>

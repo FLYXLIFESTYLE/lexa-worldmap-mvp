@@ -51,7 +51,7 @@ export default function LexaChatPage() {
       const lexaAccount = loadFromLocalStorage('lexa_account');
       if (!lexaAccount) {
         console.error('No LEXA account found');
-        router.push('/auth/signup');
+        router.push('/auth/signin?redirectTo=/experience');
         return;
       }
 

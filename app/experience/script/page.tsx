@@ -41,7 +41,7 @@ export default function ScriptPreviewPage() {
       // Load LEXA account
       const lexaAccount = loadFromLocalStorage('lexa_account');
       if (!lexaAccount) {
-        router.push('/auth/signup');
+        router.push('/auth/signin?redirectTo=/experience');
         return;
       }
 

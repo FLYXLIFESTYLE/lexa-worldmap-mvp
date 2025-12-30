@@ -9,7 +9,7 @@ export interface CaptainProfile {
   id: string;
   user_id: string;
   display_name: string;
-  role: 'internal' | 'external_captain' | 'yacht_crew' | 'expert';
+  role: 'admin' | 'internal' | 'external_captain' | 'yacht_crew' | 'expert';
   commission_rate: number;
   bank_info?: any;
   created_at: string;

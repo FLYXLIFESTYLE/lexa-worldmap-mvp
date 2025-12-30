@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   
   // Skip middleware for public routes
-  if (!path.startsWith('/app') && !path.startsWith('/api') && !path.startsWith('/admin')) {
+  if (!path.startsWith('/app') && !path.startsWith('/api') && !path.startsWith('/admin') && !path.startsWith('/knowledge')) {
     return NextResponse.next();
   }
 
@@ -61,6 +61,47 @@ export async function middleware(request: NextRequest) {
     url.pathname = '/auth/signin';
     url.searchParams.set('redirectTo', path);
     return NextResponse.redirect(url);
+  }
+
+  // Protect /knowledge routes (Brain Console area) - require captain profile
+  if (path.startsWith('/knowledge')) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth/signin';
+      url.searchParams.set('redirectTo', path);
+      return NextResponse.redirect(url);
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('captain_profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/unauthorized';
+      url.searchParams.set('from', path);
+      url.searchParams.set('error', profileError ? 'profile_fetch_error' : 'no_profile');
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // Protect /api/knowledge routes (Brain ingestion endpoints) - require captain profile
+  if (path.startsWith('/api/knowledge')) {
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('captain_profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
   }
 
   // Protect /admin routes - require captain profile
