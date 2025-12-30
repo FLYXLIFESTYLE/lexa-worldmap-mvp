@@ -72,7 +72,7 @@ export default function ChatPage() {
       
       // Add assistant message
       const assistantMsg: Message = {
-        id: `msg-${Date.now()}`,
+        id: data.assistantMessageId || `msg-${Date.now()}`,
         role: 'assistant',
         content: data.message,
         created_at: new Date().toISOString(),

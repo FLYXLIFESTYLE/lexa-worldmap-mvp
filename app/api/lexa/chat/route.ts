@@ -114,20 +114,29 @@ export async function POST(request: NextRequest) {
     }
     
     // 5. Insert user message (skip for synthetic start)
+    let userMessageId: string | null = null;
     if (!isSyntheticStart) {
-      await supabaseAdmin.from('lexa_messages').insert({
-        session_id: session.id,
-        user_id: userId,
-        role: 'user',
-        content: userMessage,
-        meta: {},
-      });
+      const { data: insertedUserMsg, error: userInsErr } = await supabaseAdmin
+        .from('lexa_messages')
+        .insert({
+          session_id: session.id,
+          user_id: userId,
+          role: 'user',
+          content: userMessage,
+          meta: {},
+        })
+        .select('id')
+        .single();
+
+      if (!userInsErr && insertedUserMsg?.id) userMessageId = insertedUserMsg.id;
+      if (userInsErr) console.warn('Failed to capture user message id:', userInsErr);
     }
     
     // 6. Process message based on current stage
     let assistantMessage: string;
     let updatedState: Partial<SessionState> = {};
     let ui: any = null;
+    let assistantMessageId: string | null = null;
     
     // Special handling for BRIEFING_COLLECT stage
     if (sessionState.stage === 'BRIEFING_COLLECT' || 
@@ -168,6 +177,24 @@ export async function POST(request: NextRequest) {
         });
         assistantMessage = claudeResponse.assistantMessage;
         // Keep state unchanged; next user message will be parsed deterministically.
+
+        // Log "uncertainty" event for learning (best-effort; safe if migration not applied yet)
+        try {
+          await supabaseAdmin.from('lexa_interaction_events').insert({
+            user_id: userId,
+            session_id: session.id,
+            event_type: 'uncertain_fallback_claude',
+            payload: {
+              stage: sessionState.stage,
+              intake_step: sessionState.briefing_progress?.intake_step ?? null,
+              logistics_step: sessionState.briefing_progress?.logistics_step ?? null,
+              user_message_id: userMessageId,
+              reason: 'user_question_during_intake',
+            },
+          });
+        } catch (e) {
+          console.warn('lexa_interaction_events insert skipped/failed:', e);
+        }
       }
     } else {
       // Use Claude for conversational stages
@@ -242,14 +269,21 @@ export async function POST(request: NextRequest) {
       console.warn('lexa_user_profiles upsert skipped/failed:', e);
     }
     
-    // 10. Insert assistant message
-    await supabaseAdmin.from('lexa_messages').insert({
-      session_id: session.id,
-      user_id: userId,
-      role: 'assistant',
-      content: assistantMessage,
-      meta: { stage: newState.stage, ui },
-    });
+    // 10. Insert assistant message (capture id so UI can submit thumbs up/down feedback)
+    const { data: insertedAssistantMsg, error: asstInsErr } = await supabaseAdmin
+      .from('lexa_messages')
+      .insert({
+        session_id: session.id,
+        user_id: userId,
+        role: 'assistant',
+        content: assistantMessage,
+        meta: { stage: newState.stage, ui },
+      })
+      .select('id')
+      .single();
+
+    if (!asstInsErr && insertedAssistantMsg?.id) assistantMessageId = insertedAssistantMsg.id;
+    if (asstInsErr) console.warn('Failed to capture assistant message id:', asstInsErr);
     
     // 11. Return response
     return NextResponse.json({
@@ -258,6 +292,8 @@ export async function POST(request: NextRequest) {
       stage: newState.stage,
       voiceEnabled: newState.client.voice_reply_enabled,
       ui,
+      userMessageId,
+      assistantMessageId,
     });
     
   } catch (error) {

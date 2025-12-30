@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import QuickReplyPanel from './quick-reply-panel';
 import type { LexaUiPayload } from '@/lib/lexa/types';
+import { ThumbsDown, ThumbsUp } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -60,6 +61,20 @@ export default function ChatTranscript({ messages, isLoading, onQuickReply }: Ch
 function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
+  const isAssistant = message.role === 'assistant';
+
+  const sendFeedback = async (rating: 1 | -1) => {
+    // Only works when message.id is a real UUID from Supabase (we now return assistantMessageId from API)
+    try {
+      await fetch('/api/lexa/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: message.id, rating }),
+      });
+    } catch {
+      // ignore
+    }
+  };
   
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} group`}>
@@ -72,6 +87,26 @@ function MessageBubble({ message }: { message: Message }) {
             : 'bg-white/5 text-zinc-100 shadow-md border border-white/10 hover:shadow-lg backdrop-blur-md'
         }`}
       >
+        {/* Feedback actions (assistant messages only) */}
+        {isAssistant && (
+          <div className="mb-2 flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              onClick={() => sendFeedback(1)}
+              className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-200 hover:border-lexa-gold/30 hover:bg-white/10"
+              aria-label="Thumbs up"
+            >
+              <ThumbsUp className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => sendFeedback(-1)}
+              className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-200 hover:border-lexa-gold/30 hover:bg-white/10"
+              aria-label="Thumbs down"
+            >
+              <ThumbsDown className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* Render content with line breaks and formatting */}
         <div className="prose prose-sm max-w-none prose-invert">
           {message.content.split('\n').map((line, i) => {
