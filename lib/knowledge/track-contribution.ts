@@ -4,6 +4,7 @@
  */
 
 import { getCaptainProfile } from '@/lib/auth/get-captain-profile';
+import { createClient } from '@/lib/supabase/server';
 
 export interface ContributionAttribution {
   contributedBy: string;
@@ -21,16 +22,40 @@ export async function getCurrentUserAttribution(
   sourceTitle?: string,
   sourceType?: string
 ): Promise<ContributionAttribution | null> {
+  // Prefer captain profile if present (for commission / expert attribution),
+  // but allow any authenticated user to contribute knowledge for MVP.
   const profile = await getCaptainProfile();
-  
-  if (!profile) {
-    console.error('No captain profile found for current user');
+  if (profile) {
+    return {
+      contributedBy: profile.user_id,
+      contributorName: profile.display_name,
+      contributionType,
+      sourceTitle,
+      sourceType,
+    };
+  }
+
+  // Fallback to authenticated Supabase user
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    console.error('No authenticated user for attribution:', userError);
     return null;
   }
-  
+
+  const contributorName =
+    user.user_metadata?.full_name ||
+    user.user_metadata?.name ||
+    user.email?.split('@')[0] ||
+    'Anonymous';
+
   return {
-    contributedBy: profile.user_id,
-    contributorName: profile.display_name,
+    contributedBy: user.id,
+    contributorName: String(contributorName),
     contributionType,
     sourceTitle,
     sourceType,
