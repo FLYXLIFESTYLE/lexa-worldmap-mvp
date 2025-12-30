@@ -10,7 +10,7 @@
  */
 
 import { SessionState, StageTransitionResult, Brief } from '../types';
-import { LEXA_THEMES_12, LEXA_THEME_UI, parseThemeSelection } from '../themes';
+import { LEXA_THEMES_12, LEXA_THEME_UI, LEXA_THEME_COPY, parseThemeSelection } from '../themes';
 import { searchDestinationEvents, searchWeather } from '@/lib/integrations/tavily-client';
 
 export async function processInitialQuestionsStage(
@@ -43,6 +43,17 @@ export async function processInitialQuestionsStage(
   }
 
   if (intakeStep === 'THEME_SELECT') {
+    if (userInput.trim() === '__custom_theme__') {
+      return {
+        nextStage: 'INITIAL_QUESTIONS',
+        updatedState: {
+          briefing_progress: setProgress({ intake_step: 'THEME_CUSTOM', intake_questions_asked: questionsAsked }),
+        },
+        message:
+          `Perfect.\n\nDescribe the experience in your own words — even if it feels messy.\n\nWhat do you want the story to feel like, and what do you absolutely *not* want?`,
+      };
+    }
+
     const selected = parseThemeSelection(userInput);
     if (selected.length === 0) {
       return {
@@ -63,6 +74,30 @@ export async function processInitialQuestionsStage(
         briefing_progress: setProgress({ intake_step: 'THEME_WHY', intake_questions_asked: 1 }),
       },
       message: themeWhyPrompt(selected),
+    };
+  }
+
+  if (intakeStep === 'THEME_CUSTOM') {
+    const custom = userInput.trim();
+    if (!custom) {
+      return {
+        nextStage: 'INITIAL_QUESTIONS',
+        updatedState: {
+          briefing_progress: setProgress({ intake_step: 'THEME_CUSTOM', intake_questions_asked: questionsAsked }),
+        },
+        message: `Take your time — a few words is enough.\n\nWhat do you want this to feel like?`,
+      };
+    }
+
+    // Store as primary theme text; we keep themes[] empty so it doesn't pretend to map to canonical ones yet.
+    return {
+      nextStage: 'INITIAL_QUESTIONS',
+      updatedState: {
+        brief: setBrief({ theme: custom, themes: [] }),
+        briefing_progress: setProgress({ intake_step: 'THEME_WHY', intake_questions_asked: 1 }),
+      },
+      message:
+        `Good. I have your direction.\n\nOne gentle question so I can design this accurately: why this theme, *now*?\nWhat do you want to feel — and what do you want to avoid?`,
     };
   }
 
@@ -574,14 +609,26 @@ function alternativesPrompt() {
 
 function themeUi(): StageTransitionResult['ui'] {
   return {
-    quickReplies: LEXA_THEMES_12.map((t) => ({
-      id: LEXA_THEME_UI[t].id,
-      label: t,
-      value: t,
-      kind: 'theme',
-      icon: LEXA_THEME_UI[t].icon,
-      accent: LEXA_THEME_UI[t].accent,
-    })),
+    quickReplies: [
+      ...LEXA_THEMES_12.map((t) => ({
+        id: LEXA_THEME_UI[t].id,
+        label: t,
+        value: t,
+        kind: 'theme' as const,
+        icon: LEXA_THEME_UI[t].icon,
+        accent: LEXA_THEME_UI[t].accent,
+        hook: LEXA_THEME_COPY[t].hook,
+        description: LEXA_THEME_COPY[t].description,
+      })),
+      {
+        id: 'custom_theme',
+        label: 'Describe your own theme',
+        value: '__custom_theme__',
+        kind: 'other' as const,
+        icon: 'Sparkles',
+        accent: 'gold' as const,
+      },
+    ],
     multiSelect: { enabled: true, max: 3, submitLabel: 'Continue' },
   };
 }

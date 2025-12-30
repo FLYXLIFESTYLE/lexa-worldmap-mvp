@@ -170,13 +170,18 @@ export default function ChatPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">
-                <span className="bg-gradient-to-r from-white via-lexa-gold to-white bg-clip-text text-transparent animate-gradient">
-                  LEXA
+              <div className="flex items-start gap-3">
+                <h1 className="text-3xl font-bold tracking-tight leading-none">
+                  <span className="bg-gradient-to-r from-white via-lexa-gold to-white bg-clip-text text-transparent animate-gradient">
+                    LEXA
+                  </span>
+                </h1>
+                <span className="mt-1 inline-flex items-center rounded-full bg-lexa-gold px-2.5 py-1 text-[10px] font-bold tracking-wider text-zinc-900 shadow-lg shadow-lexa-gold/30">
+                  BETA
                 </span>
-              </h1>
+              </div>
               <p className="text-xs font-medium text-zinc-300 uppercase tracking-widest mt-0.5">
-                Luxury Experience Concierge
+                Luxury Experience Assistant
               </p>
             </div>
             

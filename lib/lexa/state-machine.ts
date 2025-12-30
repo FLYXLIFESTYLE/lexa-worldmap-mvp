@@ -9,7 +9,7 @@ import {
   StageTransitionResult,
   DEFAULT_SESSION_STATE,
 } from './types';
-import { LEXA_THEMES_12, LEXA_THEME_UI } from './themes';
+import { LEXA_THEMES_12, LEXA_THEME_UI, LEXA_THEME_COPY } from './themes';
 
 // ============================================================================
 // STAGE TRANSITION LOGIC
@@ -165,16 +165,28 @@ function handleWelcomeStage(
       },
     },
     message:
-      `Welcome. I'm LEXA.\n\nI design the feeling behind the trip — not a list of places.\n\nTo begin, what kind of experience calls to you?\nTap up to three themes below.`,
+      `Welcome. I'm LEXA — your Luxury Experience Assistant.\n\nIf you tell me what you want to *feel*, I’ll shape a clear experience script with a hook, emotional direction, and signature highlights you can use yourself (or hand to your broker/agent).\n\nUse the buttons below, or simply speak in your own words.\n\nTo begin: what kind of experience calls to you?`,
     ui: {
-      quickReplies: LEXA_THEMES_12.map((t) => ({
-        id: LEXA_THEME_UI[t].id,
-        label: t,
-        value: t,
-        kind: 'theme',
-        icon: LEXA_THEME_UI[t].icon,
-        accent: LEXA_THEME_UI[t].accent,
-      })),
+      quickReplies: [
+        ...LEXA_THEMES_12.map((t) => ({
+          id: LEXA_THEME_UI[t].id,
+          label: t,
+          value: t,
+          kind: 'theme' as const,
+          icon: LEXA_THEME_UI[t].icon,
+          accent: LEXA_THEME_UI[t].accent,
+          hook: LEXA_THEME_COPY[t].hook,
+          description: LEXA_THEME_COPY[t].description,
+        })),
+        {
+          id: 'custom_theme',
+          label: 'Describe your own theme',
+          value: '__custom_theme__',
+          kind: 'other' as const,
+          icon: 'Sparkles',
+          accent: 'gold' as const,
+        },
+      ],
       multiSelect: { enabled: true, max: 3, submitLabel: 'Continue' },
     },
   };

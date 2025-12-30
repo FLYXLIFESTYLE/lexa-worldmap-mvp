@@ -146,7 +146,7 @@ export interface SessionState {
     fields_collected: string[]; // Track which fields have been collected
     suggestions_offered: boolean;
     retry_count: number; // For MIRROR stage retries
-    intake_step?: 'THEME_SELECT' | 'THEME_WHY' | 'MEMORY' | 'HOOK_CONFIRM' | 'LOGISTICS';
+    intake_step?: 'THEME_SELECT' | 'THEME_CUSTOM' | 'THEME_WHY' | 'MEMORY' | 'HOOK_CONFIRM' | 'LOGISTICS';
     intake_questions_asked?: number; // counts “big questions” asked before the hook (target: 3)
     logistics_step?: 'DURATION' | 'STRUCTURE' | 'WHEN' | 'WHERE' | 'BUDGET' | 'ALTERNATIVES' | 'DONE';
     seasonal_guidance_shown?: {
@@ -237,6 +237,9 @@ export interface LexaUiQuickReply {
   icon?: string;
   // optional styling hint (frontend maps to safe classes)
   accent?: 'gold' | 'navy' | 'rose' | 'emerald' | 'sky' | 'violet' | 'amber';
+  // optional theme copy
+  hook?: string;
+  description?: string;
 }
 
 export interface LexaUiMultiSelect {

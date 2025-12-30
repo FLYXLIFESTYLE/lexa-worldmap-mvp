@@ -119,8 +119,13 @@ export default function QuickReplyPanel({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {ui.quickReplies.map((b) => {
+          {(() => {
+            const themes = ui.quickReplies.filter((b) => b.kind === 'theme');
+            const otherActions = ui.quickReplies.filter((b) => b.kind !== 'theme');
+            return (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {themes.map((b) => {
               const isSelected = selected.has(b.value);
               const Icon = b.icon ? ICONS[b.icon] : null;
               return (
@@ -150,15 +155,40 @@ export default function QuickReplyPanel({
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-xs text-zinc-300/80">
-                        Tap to {isSelected ? 'remove' : 'select'}
-                      </p>
+                      {b.hook ? (
+                        <p className="mt-1 text-xs text-zinc-200/90 italic">{b.hook}</p>
+                      ) : (
+                        <p className="mt-1 text-xs text-zinc-300/80">Tap to {isSelected ? 'remove' : 'select'}</p>
+                      )}
+                      {b.description ? (
+                        <div className="mt-2 hidden group-hover:block">
+                          <p className="text-xs text-zinc-200/90 leading-relaxed">{b.description}</p>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </button>
               );
-            })}
-          </div>
+                  })}
+                </div>
+
+                {otherActions.length ? (
+                  <div className="pt-2">
+                    {otherActions.map((b) => (
+                      <button
+                        key={b.id}
+                        onClick={() => onSend(b.value)}
+                        disabled={disabled}
+                        className="w-full rounded-2xl border border-lexa-gold/25 bg-white/5 px-4 py-3 text-sm font-semibold text-lexa-gold transition-all hover:bg-lexa-gold/10 disabled:opacity-60"
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            );
+          })()}
         </div>
       ) : (
         /* Single-tap quick replies */
