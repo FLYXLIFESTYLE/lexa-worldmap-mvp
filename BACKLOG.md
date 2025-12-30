@@ -1,10 +1,59 @@
-# LEXA Feature & Improvement Backlog
+# LEXA Roadmap (Active) + Backlog (Archive)
 
-**Last Updated:** December 17, 2024
+**Last Updated:** December 30, 2025
 
-This backlog tracks feature ideas, improvements, enhancements, and tasks for LEXA. Items are categorized by priority and complexity.
+This file is now split into:
+- **Active roadmap** (what we’re actually doing next, in plain language)
+- **Archive** (older ideas and historical notes kept for reference)
 
 ---
+
+## ✅ Recently delivered (so captains know what’s already live)
+
+- [x] **Invite-only access (no public registration)**
+  - Only admins can create new captain/admin accounts.
+- [x] **Brain Console is protected**
+  - Knowledge ingestion tools are restricted to registered captains/admins.
+- [x] **Captain knowledge contribution tools**
+  - Upload files (scripts, itineraries, transcripts), ingest URLs, browse/edit POIs, and track upload history.
+- [x] **LEXA remembers and learns (foundation)**
+  - Conversations are stored; long-term user profile memory exists; feedback + learning signals are captured.
+- [x] **Experience-first conversation**
+  - LEXA starts with what the client wants to experience, not “where”. She adapts, asks one question at a time, and keeps it human.
+- [x] **Retrieval is live**
+  - LEXA can pull the best-matching places for a chosen destination + theme and explain “why these”.
+
+## 🚀 Right now (Testing & Learning Sprint)
+
+Goal: **Make LEXA extraordinary through real captain use**, while the destination database keeps expanding in the background.
+
+- [ ] **Captain testing loop (daily)**
+  - Captains + you chat with LEXA heavily, push her with real requests, and rate what works/doesn’t.
+- [ ] **Load the “idea library”**
+  - Upload proven scripts/itineraries, add URLs, and add POIs manually (the system learns patterns and raises the quality bar fast).
+- [ ] **Tune LEXA’s style + suggestions**
+  - Make her more empathetic, more anticipatory, and more “inventive by analogy” — without hallucinating.
+- [ ] **Expand the destination database in the background**
+  - Keep ingesting and connecting places for all 14 destinations (quietly, safely, without disrupting testing).
+
+## 🗓️ Next (Days & Weeks)
+
+- [ ] **Client accounts (the real memory)**
+  - Emotional profile + preferences saved per client, so every conversation becomes sharper over time.
+- [ ] **Better “experience blueprints”**
+  - From a strong theme + emotional arc → to a clearer, more structured experience script (still human and elegant, never generic).
+- [ ] **Quality controls**
+  - Better duplicates handling, stronger consistency, and clearer confidence in recommendations.
+- [ ] **Captain portal cleanup**
+  - Merge overlapping tools, simplify screens, make inputs/outputs clearer.
+
+## ✨ The WOW endgame (Target State)
+
+**Luxury Assets become experience lenses**: yachts, villas, jets, supercars, watches, art — not as “things”, but as **narrative devices** that amplify emotion and story. LEXA will connect a client’s inner desire to the right assets, places, and moments — and design an experience that feels inevitable.
+
+---
+
+## Archive (Legacy backlog snapshot — kept for reference)
 
 ## 🔴 High Priority (Do First)
 
@@ -254,13 +303,11 @@ This backlog tracks feature ideas, improvements, enhancements, and tasks for LEX
   - Edit profile settings
   - User reported: "No option to see my user profile"
 
-- [ ] **User Management for Captains** (Complexity: Medium, 3 hours) 🔴 HIGH PRIORITY
-  - Create admin page: `/admin/users`
-  - List all Captains/Contributors
-  - Add new users (invite system)
-  - Edit roles: Admin, Captain, Contributor (new role!)
-  - Deactivate/reactivate users
-  - User requested: "Need user management to add more captains"
+- [x] **User Management for Captains** (Complexity: Medium, 3 hours) ✅ COMPLETED - Dec 30, 2025
+  - Admin page: `/admin/users`
+  - Admin-only API: `/api/admin/users`
+  - Invite-only access (no public registration)
+  - Create/deactivate users with roles
 
 - [ ] **New Role: Contributor** (Complexity: Low, 1 hour) ⚠️
   - Less permissions than Captain
