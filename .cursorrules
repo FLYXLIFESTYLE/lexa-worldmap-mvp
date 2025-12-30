@@ -1,0 +1,91 @@
+# LEXA Project Intelligence & Memory Bank
+
+## Memory Bank System
+This project uses a Memory Bank system to maintain context across sessions. ALL memory bank files MUST be read at the start of EVERY task.
+
+### Memory Bank Location
+`memory-bank/` - Contains all project context files
+
+### Core Files (MUST READ ALL)
+1. `projectbrief.md` - Foundation and core requirements
+2. `productContext.md` - Why LEXA exists, problems it solves
+3. `activeContext.md` - Current work focus and recent changes
+4. `systemPatterns.md` - Architecture and technical decisions
+5. `techContext.md` - Technologies and setup
+6. `progress.md` - Status, what works, what's next
+
+## Project-Specific Patterns
+
+### Architecture Philosophy
+- **Emotional Intelligence First**: Every feature must consider emotional impact, not just functionality
+- **Graph-First Thinking**: Use Neo4j relationships for complex queries, not SQL joins
+- **Experience DNA Framework**: Story + Emotion + Trigger for every travel recommendation
+
+### Code Organization
+- `app/` - Next.js frontend (user-facing)
+- `components/` - Reusable React components
+- `lib/` - Shared utilities and API clients
+- `rag_system/` - Python FastAPI backend ("AIfred")
+- `docs/` - Extensive documentation (90+ files)
+- `memory-bank/` - Project context and intelligence
+
+### User Experience Patterns
+1. **Visual-First**: Always use images, cards, and visual hierarchy
+2. **Luxury Aesthetics**: Gold accents (#D4AF37), navy backgrounds, elegant typography
+3. **Progressive Disclosure**: Show complexity gradually, start simple
+4. **Emotional Language**: Avoid transactional language, use evocative descriptions
+
+### Data Patterns
+- **POI Structure**: Every POI must have: name, coordinates, luxury_score, theme relationships
+- **Theme Categories**: 12 core themes (Romance, Adventure, Wellness, etc.)
+- **Relationship Types**: `LOCATED_IN`, `HAS_THEME`, `SUPPORTS_ACTIVITY`
+- **Luxury Scoring**: 0-10 scale based on rating, price level, reviews, keywords
+
+### Communication Style with User
+- **User is a beginner**: Explain WHY and WHAT for every terminal command
+- **Always simplify**: Find the simplest path, never over-engineer
+- **Design globally**: All styles go in `global.css`, use Shadcn components
+- **TypeScript strict**: Always use proper types
+
+### Critical Paths
+1. **Theme Selection → Conversation → Experience Script** - This is the core flow
+2. **Neo4j Enrichment Pipeline** - Google Places → Luxury Scoring → Graph Storage
+3. **Admin Upload System** - Screenshot OCR → Parse → Neo4j Storage
+
+### Known Challenges
+- **Windows File Locks**: Sometimes `.next` folder needs manual deletion
+- **Port Conflicts**: Backend runs on 8010, frontend expects 8000 (configurable via .env.local)
+- **Stale Sessions**: Browser cache/cookies may need clearing after auth changes
+
+### Evolution Notes
+- **Started**: Generic travel chatbot
+- **Pivoted to**: Emotional experience design with "Experience DNA" methodology
+- **Current Focus**: POI enrichment, yacht destination data, pitch deck preparation
+- **Future**: Affiliate system, mobile app, multi-language support
+
+## Update Protocol
+When user says **"update memory bank"**, MUST review ALL memory bank files and update:
+- Always update `activeContext.md` and `progress.md`
+- Update other files only if significant changes occurred
+- Update this `.cursorrules` if new patterns discovered
+
+## Planning Mode
+Before major changes:
+1. Read ALL memory bank files
+2. Ask 4-6 clarifying questions
+3. Present comprehensive plan
+4. Get approval before executing
+
+## Development Workflow
+1. **Read Memory Bank** - Always start here
+2. **Check Current Context** - What's the immediate focus?
+3. **Make Changes** - Implement with proper error handling
+4. **Update Documentation** - Keep memory bank current
+5. **Commit Clearly** - Descriptive commit messages
+
+## Remember
+- User wants **functional pitch deck content**, not technical architecture
+- Focus on **what users get** and **why it's powerful**
+- LEXA is about **emotional intelligence**, not just data
+- Every feature should answer: "How does this create unforgettable experiences?"
+
