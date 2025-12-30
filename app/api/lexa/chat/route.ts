@@ -60,11 +60,10 @@ export async function POST(request: NextRequest) {
     }
     
     if (!userMessage || typeof userMessage !== 'string') {
-      return NextResponse.json(
-        { error: 'Message is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
+
+    const isSyntheticStart = userMessage.trim() === '__start__';
     
     // 4. Load or create session
     let session: any;
@@ -114,18 +113,21 @@ export async function POST(request: NextRequest) {
       sessionState = newState;
     }
     
-    // 5. Insert user message
-    await supabaseAdmin.from('lexa_messages').insert({
-      session_id: session.id,
-      user_id: userId,
-      role: 'user',
-      content: userMessage,
-      meta: {},
-    });
+    // 5. Insert user message (skip for synthetic start)
+    if (!isSyntheticStart) {
+      await supabaseAdmin.from('lexa_messages').insert({
+        session_id: session.id,
+        user_id: userId,
+        role: 'user',
+        content: userMessage,
+        meta: {},
+      });
+    }
     
     // 6. Process message based on current stage
     let assistantMessage: string;
     let updatedState: Partial<SessionState> = {};
+    let ui: any = null;
     
     // Special handling for BRIEFING_COLLECT stage
     if (sessionState.stage === 'BRIEFING_COLLECT' || 
@@ -143,9 +145,10 @@ export async function POST(request: NextRequest) {
       // Hybrid onboarding/intake:
       // - Deterministic state machine for reliability and consistent structure
       // - Claude fallback for unexpected user questions so it still feels "smart like ChatGPT"
-      const transition = await transitionStage(sessionState, userMessage);
+      const transition = await transitionStage(sessionState, isSyntheticStart ? '' : userMessage);
 
       assistantMessage = transition.message;
+      ui = transition.ui ?? null;
       updatedState = {
         ...updatedState,
         ...transition.updatedState,
@@ -245,7 +248,7 @@ export async function POST(request: NextRequest) {
       user_id: userId,
       role: 'assistant',
       content: assistantMessage,
-      meta: { stage: newState.stage },
+      meta: { stage: newState.stage, ui },
     });
     
     // 11. Return response
@@ -254,6 +257,7 @@ export async function POST(request: NextRequest) {
       sessionId: session.id,
       stage: newState.stage,
       voiceEnabled: newState.client.voice_reply_enabled,
+      ui,
     });
     
   } catch (error) {

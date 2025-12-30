@@ -9,7 +9,7 @@ import {
   StageTransitionResult,
   DEFAULT_SESSION_STATE,
 } from './types';
-import { formatThemeMenu } from './themes';
+import { LEXA_THEMES_12, LEXA_THEME_UI } from './themes';
 
 // ============================================================================
 // STAGE TRANSITION LOGIC
@@ -151,17 +151,12 @@ function handleWelcomeStage(
   state: SessionState,
   userInput: string
 ): StageTransitionResult {
-  const lowerInput = userInput.toLowerCase();
-  
-  // Check if user wants voice
-  const wantsVoice = lowerInput.includes('voice') || lowerInput.includes('speak');
-  
   return {
     nextStage: 'INITIAL_QUESTIONS',
     updatedState: {
       client: {
         ...state.client,
-        voice_reply_enabled: wantsVoice,
+        voice_reply_enabled: false, // MVP: text-only
       },
       briefing_progress: {
         ...state.briefing_progress,
@@ -170,8 +165,18 @@ function handleWelcomeStage(
       },
     },
     message:
-      `Welcome. I’m LEXA.\n\nBefore we talk destinations, choose **1–3 themes** (reply with numbers like "2, 4, 8"):\n` +
-      formatThemeMenu(),
+      `Welcome. I'm LEXA.\n\nI design the feeling behind the trip — not a list of places.\n\nTo begin, what kind of experience calls to you?\nTap up to three themes below.`,
+    ui: {
+      quickReplies: LEXA_THEMES_12.map((t) => ({
+        id: LEXA_THEME_UI[t].id,
+        label: t,
+        value: t,
+        kind: 'theme',
+        icon: LEXA_THEME_UI[t].icon,
+        accent: LEXA_THEME_UI[t].accent,
+      })),
+      multiSelect: { enabled: true, max: 3, submitLabel: 'Continue' },
+    },
   };
 }
 

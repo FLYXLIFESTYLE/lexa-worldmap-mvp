@@ -29,7 +29,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   };
   
   return (
-    <div className="relative border-t border-zinc-200/60 bg-white/80 backdrop-blur-lg p-6 shadow-lg">
+    <div className="relative border-t border-white/10 bg-black/20 backdrop-blur-xl p-6">
       {/* Decorative gradient line */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-lexa-gold to-transparent opacity-50" />
       
@@ -39,9 +39,9 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Share your thoughts..."
+            placeholder="Share what you want, in your own words..."
             disabled={disabled}
-            className="w-full resize-none rounded-xl border-2 border-zinc-200 bg-white px-5 py-4 text-zinc-900 placeholder-zinc-400 focus:border-lexa-gold focus:outline-none focus:ring-2 focus:ring-lexa-gold/20 disabled:opacity-50 transition-all shadow-sm"
+            className="w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-zinc-100 placeholder-zinc-400 focus:border-lexa-gold focus:outline-none focus:ring-2 focus:ring-lexa-gold/20 disabled:opacity-50 transition-all shadow-sm backdrop-blur-md"
             rows={1}
             style={{ minHeight: '60px', maxHeight: '200px' }}
           />
@@ -53,18 +53,18 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         <button
           onClick={handleSend}
           disabled={disabled || !input.trim()}
-          className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-lexa-navy to-zinc-900 px-8 py-4 font-semibold text-white transition-all hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          className="group relative overflow-hidden rounded-2xl bg-gradient-to-r from-lexa-gold to-yellow-600 px-8 py-4 font-semibold text-zinc-900 transition-all hover:shadow-xl hover:shadow-lexa-gold/30 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           style={{ height: '60px' }}
         >
           <span className="relative z-10">Send</span>
-          <div className="absolute inset-0 bg-gradient-to-r from-lexa-gold to-lexa-navy opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-lexa-gold opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </button>
       </div>
       
       {/* Helpful hint */}
       <div className="mx-auto max-w-3xl mt-3 flex items-center justify-between text-xs text-zinc-400">
         <span>Press Enter to send, Shift+Enter for new line</span>
-        <span className="text-lexa-gold">✨ Powered by Claude Sonnet 4.5</span>
+        <span className="text-lexa-gold">Powered by Claude Sonnet 4.5</span>
       </div>
     </div>
   );

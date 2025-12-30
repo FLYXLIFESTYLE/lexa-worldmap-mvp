@@ -10,7 +10,7 @@
  */
 
 import { SessionState, StageTransitionResult, Brief } from '../types';
-import { formatThemeMenu, parseThemeSelection } from '../themes';
+import { LEXA_THEMES_12, LEXA_THEME_UI, parseThemeSelection } from '../themes';
 import { searchDestinationEvents, searchWeather } from '@/lib/integrations/tavily-client';
 
 export async function processInitialQuestionsStage(
@@ -51,6 +51,7 @@ export async function processInitialQuestionsStage(
           briefing_progress: setProgress({ intake_step: 'THEME_SELECT', intake_questions_asked: questionsAsked }),
         },
         message: themeSelectPrompt(),
+        ui: themeUi(),
       };
     }
 
@@ -120,7 +121,8 @@ export async function processInitialQuestionsStage(
           micro_wow: { ...state.micro_wow, delivered: false, hook: null },
           script: { ...state.script, signature_moments: [] },
         },
-        message: `Understood. Let’s recalibrate—no ego, just accuracy.\n\nPick 1–3 themes again:\n${formatThemeMenu()}\n\nReply with numbers (e.g. "2, 4") or names.`,
+        message: `Understood. Let’s recalibrate — quietly and precisely.\n\nWhat kind of experience calls to you instead? (Tap up to three themes below.)`,
+        ui: themeUi(),
       };
     }
 
@@ -130,7 +132,13 @@ export async function processInitialQuestionsStage(
         updatedState: {
           briefing_progress: setProgress({ intake_step: 'HOOK_CONFIRM', intake_questions_asked: 3 }),
         },
-        message: `Quick check—does that direction feel right? Reply "yes" or "no".`,
+        message: `Quick check — does that direction feel right?`,
+        ui: {
+          quickReplies: [
+            { id: 'yes', label: 'Yes', value: 'yes', kind: 'yes_no', accent: 'gold' },
+            { id: 'no', label: 'Not quite', value: 'no', kind: 'yes_no', accent: 'navy' },
+          ],
+        },
       };
     }
 
@@ -140,6 +148,14 @@ export async function processInitialQuestionsStage(
         briefing_progress: setProgress({ intake_step: 'LOGISTICS', intake_questions_asked: 3, logistics_step: 'DURATION' }),
       },
       message: durationPrompt(),
+      ui: {
+        quickReplies: [
+          { id: 'wknd', label: 'Weekend', value: '3 days', kind: 'duration', accent: 'navy' },
+          { id: 'wk', label: '5–7 days', value: '7 days', kind: 'duration', accent: 'gold' },
+          { id: 'ten', label: '10 days', value: '10 days', kind: 'duration', accent: 'amber' },
+          { id: 'two', label: '2 weeks', value: '14 days', kind: 'duration', accent: 'emerald' },
+        ],
+      },
     };
   }
 
@@ -245,6 +261,14 @@ export async function processInitialQuestionsStage(
           briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'DURATION' }),
         },
         message: durationPrompt(),
+        ui: {
+          quickReplies: [
+            { id: 'wknd', label: 'Weekend', value: '3 days', kind: 'duration', accent: 'navy' },
+            { id: 'wk', label: '5–7 days', value: '7 days', kind: 'duration', accent: 'gold' },
+            { id: 'ten', label: '10 days', value: '10 days', kind: 'duration', accent: 'amber' },
+            { id: 'two', label: '2 weeks', value: '14 days', kind: 'duration', accent: 'emerald' },
+          ],
+        },
       };
     }
 
@@ -256,6 +280,13 @@ export async function processInitialQuestionsStage(
           briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'STRUCTURE' }),
         },
         message: structurePrompt(nextBrief.duration?.days),
+        ui: {
+          quickReplies: [
+            { id: 'curated', label: 'Curated', value: 'curated', kind: 'structure', accent: 'gold' },
+            { id: 'balanced', label: 'Balanced', value: 'balanced', kind: 'structure', accent: 'navy' },
+            { id: 'free', label: 'Mostly free', value: 'free', kind: 'structure', accent: 'emerald' },
+          ],
+        },
       };
     }
 
@@ -267,6 +298,14 @@ export async function processInitialQuestionsStage(
           briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'WHEN' }),
         },
         message: whenPrompt(nextBrief.duration?.days),
+        ui: {
+          quickReplies: [
+            { id: 'next', label: 'Next month', value: 'next month', kind: 'other', accent: 'gold' },
+            { id: 'spring', label: 'Spring', value: 'spring', kind: 'other', accent: 'emerald' },
+            { id: 'summer', label: 'Summer', value: 'summer', kind: 'other', accent: 'amber' },
+            { id: 'not_sure', label: 'Not sure yet', value: 'flexible', kind: 'other', accent: 'navy' },
+          ],
+        },
       };
     }
 
@@ -278,6 +317,14 @@ export async function processInitialQuestionsStage(
           briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'WHERE' }),
         },
         message: wherePrompt(nextBrief.when_at?.timeframe),
+        ui: {
+          quickReplies: [
+            { id: 'suggest', label: 'Suggest the best fit', value: 'please suggest', kind: 'other', accent: 'gold' },
+            { id: 'monaco', label: 'Monaco', value: 'Monaco', kind: 'other', accent: 'navy' },
+            { id: 'riviera', label: 'French Riviera', value: 'French Riviera', kind: 'other', accent: 'amber' },
+            { id: 'caribbean', label: 'Caribbean', value: 'Caribbean', kind: 'other', accent: 'sky' },
+          ],
+        },
       };
     }
 
@@ -289,6 +336,14 @@ export async function processInitialQuestionsStage(
           briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'BUDGET' }),
         },
         message: budgetPrompt(),
+        ui: {
+          quickReplies: [
+            { id: '10k', label: '€10k', value: 'budget: 10000 eur', kind: 'budget', accent: 'navy' },
+            { id: '20k', label: '€20k', value: 'budget: 20000 eur', kind: 'budget', accent: 'gold' },
+            { id: '50k', label: '€50k+', value: 'budget: 50000 eur', kind: 'budget', accent: 'amber' },
+            { id: 'unsure', label: 'Not sure', value: 'budget: not sure', kind: 'budget', accent: 'emerald' },
+          ],
+        },
       };
     }
 
@@ -300,6 +355,13 @@ export async function processInitialQuestionsStage(
           briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'ALTERNATIVES' }),
         },
         message: alternativesPrompt() + (realtimeNote ? `\n\n${realtimeNote}` : ''),
+        ui: {
+          quickReplies: [
+            { id: 'alt_yes', label: 'Yes, include', value: 'yes', kind: 'alternatives', accent: 'gold' },
+            { id: 'alt_needed', label: 'Only if needed', value: 'only if needed', kind: 'alternatives', accent: 'navy' },
+            { id: 'alt_no', label: 'No, I’ll ask live', value: 'no', kind: 'alternatives', accent: 'emerald' },
+          ],
+        },
       };
     }
 
@@ -334,16 +396,16 @@ Keep responses refined, emotionally intelligent, and concise.`;
 }
 
 function themeSelectPrompt() {
-  return `Before we talk destinations, I want to understand what you want to feel.\n\nChoose 1-3 themes:\n${formatThemeMenu()}\n\nReply with numbers (e.g. \"2, 4, 8\") or names (e.g. \"Wellness, Culinary\").`;
+  return `Before we talk destinations, I want to understand what you're truly craving.\n\nChoose up to three themes below — this is simply to set direction. You can refine it anytime.`;
 }
 
 function themeWhyPrompt(themes: string[]) {
   const t = themes.join(' + ');
-  return `Beautiful. ${t}.\n\nQuestion 2/3: what made you choose those — and what do you want to feel when you’re living this trip? (If there’s something you want to avoid, tell me that too.)`;
+  return `Beautiful. ${t}.\n\nOne gentle question so I can design this accurately: what made you choose those — and what do you want to feel when you’re living this trip?\n\n(If there’s something you want to avoid, tell me — it helps me protect the experience.)`;
 }
 
 function memoryPrompt() {
-  return `Question 3/3: tell me about the *best* moment from your last great holiday — the 60 seconds you still replay. What made it unforgettable?\n\n(Optional: what ruined a past trip, so I never repeat it?)`;
+  return `Last question — then you decide if I'm understanding you.\n\nTell me about the best moment from your last great holiday — the 60 seconds you still replay.\nWhat made it work?\n\n(If anything ever ruined a trip for you, mention it — I’ll design around it.)`;
 }
 
 function hookConfirmPrompt(params: { themes: string[]; hook: string; highlights: string[]; isTrial: boolean }) {
@@ -480,21 +542,21 @@ function extractDaysLoose(input: string): number | null {
 }
 
 function durationPrompt() {
-  return `To shape the rhythm properly, I need one practical detail.\n\nHow long do you want to enjoy this experience?\nFor example: 5-7 days, 10 days, 2 weeks.`;
+  return `Now we make it real.\n\nHow long do you want to enjoy this experience?\nI’m asking because the rhythm (and how “deep” it can feel) changes with time.`;
 }
 
 function whenPrompt(days?: number | null) {
   const hint = days ? ` (for ${days} days)` : '';
-  return `Thank you${hint}. Timing changes everything — weather, crowd energy, even what feels effortless.\n\nWhen would you like to travel? (month is enough)`;
+  return `Perfect${hint}.\n\nWhen would you like to travel? (a month or season is enough)\nI ask because timing changes weather, crowd energy, and what feels effortless.`;
 }
 
 function wherePrompt(month?: string | null) {
   const m = month ? ` for ${month}` : '';
-  return `Got it${m}. Now — do you already have a destination in mind, or would you like me to suggest the best fit for your themes?`;
+  return `Got it${m}.\n\nDo you already have a destination in mind — or would you like me to suggest the best fit for your themes?`;
 }
 
 function budgetPrompt() {
-  return `Last piece so I recommend in the right universe.\n\nWhat budget range should I design within? (Ballpark is fine — per week, per trip, or per night.)`;
+  return `One practical detail so I recommend in the right universe.\n\nWhat budget range should I design within? (Ballpark is fine — per week, per trip, or per night.)`;
 }
 
 function structurePrompt(days?: number | null) {
@@ -503,11 +565,25 @@ function structurePrompt(days?: number | null) {
     ? `For a short trip, some people love 1–2 beautifully curated moments — others want more unplanned time together.`
     : `Some people want a beautifully curated arc; others want wide open breathing room.`;
 
-  return `${example}\n\nDo you want this to feel more:\n- "curated" (a few planned highlights)\n- "balanced"\n- "free" (mostly flexible time)\n\nYou can always come back here and I can help you find great experiences that are actually available at that time.`;
+  return `${example}\n\nHow would you like it to feel — more curated, balanced, or mostly free?\n\n(And anytime you want: you can come back here and I’ll help you find options that are actually available at that time.)`;
 }
 
 function alternativesPrompt() {
   return `One more preference so I protect the experience.\n\nIf weather is unpredictable or plans change, would you like me to include a couple of bad-weather alternatives (and backups in general) that still match your themes?\n\nMy recommendation is **yes** (it keeps the trip smooth) — but you can also say **no** if you prefer to decide in the moment.\n\nReply: "yes", "no", or "only if needed".`;
+}
+
+function themeUi(): StageTransitionResult['ui'] {
+  return {
+    quickReplies: LEXA_THEMES_12.map((t) => ({
+      id: LEXA_THEME_UI[t].id,
+      label: t,
+      value: t,
+      kind: 'theme',
+      icon: LEXA_THEME_UI[t].icon,
+      accent: LEXA_THEME_UI[t].accent,
+    })),
+    multiSelect: { enabled: true, max: 3, submitLabel: 'Continue' },
+  };
 }
 
 function extractBudgetLoose(input: string): { amount: number; currency: string } | null {

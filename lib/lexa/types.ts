@@ -212,6 +212,42 @@ export interface StageTransitionResult {
   nextStage: ConversationStage;
   updatedState: Partial<SessionState>;
   message: string;
+  ui?: LexaUiPayload;
+}
+
+// ============================================================================
+// UI PAYLOAD (server-driven quick replies / theme cards)
+// ============================================================================
+
+export type LexaUiButtonKind =
+  | 'theme'
+  | 'yes_no'
+  | 'duration'
+  | 'structure'
+  | 'budget'
+  | 'alternatives'
+  | 'other';
+
+export interface LexaUiQuickReply {
+  id: string;
+  label: string;
+  value: string;
+  kind: LexaUiButtonKind;
+  // frontend uses this to render a license-free icon (lucide)
+  icon?: string;
+  // optional styling hint (frontend maps to safe classes)
+  accent?: 'gold' | 'navy' | 'rose' | 'emerald' | 'sky' | 'violet' | 'amber';
+}
+
+export interface LexaUiMultiSelect {
+  enabled: boolean;
+  max: number;
+  submitLabel?: string; // e.g. "Continue"
+}
+
+export interface LexaUiPayload {
+  quickReplies: LexaUiQuickReply[];
+  multiSelect?: LexaUiMultiSelect;
 }
 
 export interface ExtractedSignals {

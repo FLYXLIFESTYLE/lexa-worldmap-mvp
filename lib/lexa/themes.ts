@@ -24,6 +24,22 @@ export function formatThemeMenu(): string {
   return LEXA_THEMES_12.map((t, i) => `${i + 1}. ${t}`).join('\n');
 }
 
+// UI metadata for theme quick-reply cards (license-free icons via lucide on frontend)
+export const LEXA_THEME_UI: Record<LexaTheme, { id: string; icon: string; accent: 'gold' | 'navy' | 'rose' | 'emerald' | 'sky' | 'violet' | 'amber' }> = {
+  'Romance & Intimacy': { id: 'romance', icon: 'Heart', accent: 'rose' },
+  'Adventure & Exploration': { id: 'adventure', icon: 'Mountain', accent: 'amber' },
+  'Wellness & Transformation': { id: 'wellness', icon: 'Sparkles', accent: 'emerald' },
+  'Culinary Excellence': { id: 'culinary', icon: 'Utensils', accent: 'gold' },
+  'Cultural Immersion': { id: 'culture', icon: 'Landmark', accent: 'violet' },
+  'Pure Luxury & Indulgence': { id: 'luxury', icon: 'Crown', accent: 'gold' },
+  'Nature & Wildlife': { id: 'nature', icon: 'Leaf', accent: 'emerald' },
+  'Water Sports & Marine': { id: 'water', icon: 'Waves', accent: 'sky' },
+  'Art & Architecture': { id: 'art', icon: 'Palette', accent: 'violet' },
+  'Family Luxury': { id: 'family', icon: 'Users', accent: 'navy' },
+  'Celebration & Milestones': { id: 'celebration', icon: 'PartyPopper', accent: 'amber' },
+  'Solitude & Reflection': { id: 'solitude', icon: 'Moon', accent: 'navy' },
+};
+
 function normalize(s: string) {
   return s
     .toLowerCase()
