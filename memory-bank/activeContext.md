@@ -2,19 +2,23 @@
 
 **Last Updated**: December 31, 2025
 
-## Current Focus: Pitch Deck Preparation
+## Current Focus: Testing + Learning Sprint (with captains) + Pitch Deck
 
-### What We're Working On:
-Creating a comprehensive pitch deck summary for:
-1. **Investors** (Seed round: $1.5M)
-2. **Strategic Partners** (Yacht brokers, travel agents, tourism boards)
-3. **Press & Media**
+### What we're working on (now):
+1. **Captain testing loop** (daily)
+   - Captains + Chris actively chat with LEXA, push edge cases, and rate what works/doesn't.
+2. **Learning via real examples**
+   - Upload proven scripts/itineraries/transcripts/PDFs and ingest URLs.
+   - Add POIs manually when needed to raise the bar fast.
+3. **Expand POI coverage in the background**
+   - Continue ingestion/projection for all 14 destinations without disrupting testing.
+4. **Pitch deck prep**
+   - A functional, non-technical story for investors and strategic partners.
 
-### Key Requirement:
-**Functional summary** of what the system is capable of and what's planned.
-- NOT technical architecture
-- Focus on **what users get** and **why it's powerful**
-- Emphasize the **data-driven personalization RAG system**
+### Key requirement:
+**Functional summary** of what the system does and why it's powerful.
+- Avoid technical architecture in captain-facing/investor-facing materials
+- Focus on outcomes: emotional intelligence + explainable recommendations + learning loop
 
 ## Recent Major Changes
 
@@ -47,6 +51,11 @@ Creating a comprehensive pitch deck summary for:
    - Debug profile page for troubleshooting
    - Improved unauthorized page with sign-in flow
 
+5. **Invite-only access + Brain Console protection (NEW)**
+   - No open registration (signup page is invite-only)
+   - Admin-only user creation and role assignment
+   - Brain Console routes restricted to captains/admins
+
 ### November-December 2025 - Conversation Redesign
 
 **Major Pivot:**
@@ -75,6 +84,17 @@ User feedback: *"LEXA is focused too much on reading between the lines than actu
    - Frustration recovery
    - Documented in: `docs/LEXA_CONTEXT_MEMORY_SYSTEM.md`
 
+### Late December 2025 - Learning Loop Foundation + UI/Copy consistency
+
+1. **Learning loop**
+   - Captures feedback (thumbs up/down) and interaction events for improvement over time.
+   - Stores durable user memory (emotional profile + preferences) in Supabase.
+2. **Inventive but grounded**
+   - LEXA is guided to propose cross-domain ideas (by analogy) without claiming uncertain things as guaranteed.
+3. **Copy/typography consistency**
+   - Replaced long dash characters with normal hyphens in production UI and captain-facing docs.
+   - Updated landing page messaging to match "travel scripts" and avoid old phrasing.
+
 ### Earlier 2025 - Foundation & MVP
 
 **What Works:**
@@ -90,7 +110,7 @@ User feedback: *"LEXA is focused too much on reading between the lines than actu
 
 ### User-Facing (Live):
 - [x] Landing page with luxury branding
-- [x] Signup/signin with email verification
+- [x] Sign in (invite-only access; no public registration)
 - [x] Theme selection (visual cards)
 - [x] Interactive chat with LEXA (Claude-powered)
 - [x] Experience Script generation
@@ -103,7 +123,7 @@ User feedback: *"LEXA is focused too much on reading between the lines than actu
 - [x] Knowledge upload (transcripts, PDFs, URLs)
 - [x] POI search & edit
 - [x] Theme seeding & management
-- [x] User management
+- [x] User management (admin-only)
 - [x] Yacht destination upload with OCR
 - [x] Google Places enrichment scripts
 - [ ] POI collection automation (in progress)
@@ -120,16 +140,21 @@ User feedback: *"LEXA is focused too much on reading between the lines than actu
 
 ## Immediate Next Steps
 
-### 1. Complete Pitch Deck Summary ✅
-**Status**: In progress
-**What's Needed**:
-- Functional capabilities overview
-- What users get (travelers, brokers, agents, tourism boards)
-- Why the RAG system is powerful
-- Business model clarity
-- Market opportunity
-- Competitive advantages
-- Roadmap (6-month, 18-month)
+### 1. Testing + learning sprint (captains) ✅
+**Status**: Active now
+**What's needed**:
+- Daily captain usage and feedback
+- More real examples uploaded (scripts, itineraries, URLs)
+- Continue improving tone, clarity, and suggestion quality
+
+### 2. Complete pitch deck summary ✅
+**Status**: Active now
+**What's needed**:
+- Functional capabilities overview (no tech jargon)
+- Roadmap framing: testing/learning + scaling destinations in parallel
+
+### 3. POI collection automation (background scaling)
+**Status**: Planned
 
 ### 2. POI Collection Automation
 **Status**: Planned
@@ -194,18 +219,17 @@ All critical systems are functional. Ready to proceed with pitch deck and POI au
 **If you're reading this after a memory reset:**
 
 1. **Read ALL memory bank files first** (this is critical)
-2. **Current priority**: Pitch deck preparation for investors/partners
+2. **Current priorities**: Testing/learning sprint + pitch deck preparation
 3. **User wants**: Functional capabilities, not technical architecture
 4. **Key insight**: LEXA is about emotional intelligence, not just data
 5. **Communication style**: User is a complete beginner, explain everything simply
 6. **Design philosophy**: Visual-first, luxury aesthetics, emotional language
 
 **Recent conversation highlights:**
-- User requested comprehensive pitch deck summary
-- Focus on what users get and why it's powerful
-- Emphasize the RAG system's capabilities
-- Avoid technical architecture details
-- Make it investor/partner-ready
+- Lock Brain Console to captains/admins; no open registration
+- Improve LEXA creativity to be inventive by analogy, but grounded (no hallucinated feasibility)
+- Start the testing/learning phase with captains and heavy usage
+- Update landing page copy and remove long dash characters for consistency
 
 **What's working well:**
 - Theme-led conversation flow

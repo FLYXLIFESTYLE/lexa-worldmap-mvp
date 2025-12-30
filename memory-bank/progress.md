@@ -6,7 +6,7 @@
 - [x] Landing page with luxury branding (gold/navy theme)
 - [x] Beta badge on logo
 - [x] Luxury background component (reusable)
-- [x] Signup/signin pages with email verification
+- [x] Invite-only access (signup disabled; sign-in only)
 - [x] Email verification link fix (Supabase redirect URLs)
 - [x] Resend verification page
 - [x] Unauthorized page with sign-in flow
@@ -14,6 +14,7 @@
 - [x] Theme selection with 12 visual cards
 - [x] Demo chat interface (admin-only)
 - [x] Experience Script preview format
+- [x] Copy consistency updates (remove em-dash, update landing page messaging)
 
 ### Theme System
 - [x] 12 core theme categories defined
@@ -42,6 +43,7 @@
 - [x] POI search & edit interface
 - [x] Theme seeding page
 - [x] User management interface
+- [x] Admin-only user creation (no open registration)
 - [x] Yacht destination upload v2 (with OCR)
 - [x] Drag & drop functionality
 - [x] Ctrl+V paste for screenshots
@@ -57,6 +59,12 @@
 - [x] Health check endpoint
 - [x] Claude 3.5 Sonnet integration
 - [x] RAG system architecture
+
+### LEXA Brain + Learning Loop (MVP foundation)
+- [x] Captures conversation history (sessions + messages)
+- [x] Durable user memory table (emotional profile + preferences)
+- [x] Feedback capture (thumbs up/down) + interaction event logging (learning signals)
+- [x] Explainable retrieval endpoint (theme + destination -> ranked results with reasons)
 
 ### Scripts & Tools
 - [x] French Riviera enrichment script (`scripts/enrich-french-riviera.ts`)
@@ -94,6 +102,14 @@
 - [ ] Automatic relationship creation (POI → Theme → Destination)
 
 **Blockers**: None (Google Places API configured)
+
+#### 1b. Testing + learning sprint (captains)
+**Status**: Active now
+**Goal**: Improve LEXA by heavy real-world use and high-quality uploads while destination data expands in parallel.
+**Inputs**:
+- Captains + Chris chat with LEXA heavily
+- Upload scripts/itineraries/transcripts/PDFs and ingest URLs
+- Add POIs manually when needed
 
 #### 2. Upsell System
 **Status**: Planned
@@ -345,7 +361,7 @@ Based on pitch deck preparation and investor readiness:
 ## Success Criteria
 
 ### MVP Success (Current):
-- ✅ Users can sign up and use LEXA
+- ✅ Captains/admins can access the Brain Console (invite-only)
 - ✅ Theme selection works beautifully
 - ✅ Experience Scripts are generated
 - ✅ Admin can upload knowledge

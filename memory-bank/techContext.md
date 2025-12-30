@@ -69,7 +69,7 @@
 - PostgreSQL 15
 - pgvector extension for vector search
 - Row Level Security (RLS) enabled
-- Auth: Email/password (planned: OAuth)
+- Auth: Email/password (invite-only access; admin creates captain/admin users)
 - Storage: Public bucket for images (future)
 
 ### APIs & Services

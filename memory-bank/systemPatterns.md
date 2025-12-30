@@ -37,10 +37,11 @@
    ```
    /app
      /page.tsx - Landing page
-     /auth/signin, /auth/signup - Authentication
+     /auth/signin, /auth/signup - Authentication (signup is invite-only)
      /experience - User experience builder
      /demo/chat - Admin testing
      /admin - Admin portal
+     /knowledge - Brain Console (captains/admins only)
      /api - Next.js API routes (middleware)
    ```
 
@@ -353,7 +354,7 @@ async def global_exception_handler(request, exc):
 - Row Level Security in Supabase
 
 ### Authorization:
-- Role-based: `admin`, `agent`, `user`
+- Invite-only roles via `captain_profiles` (captain/admin access to Brain Console)
 - Middleware checks on protected routes
 - Captain profiles for admin access
 
