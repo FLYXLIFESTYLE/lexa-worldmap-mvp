@@ -9,6 +9,7 @@ import {
   StageTransitionResult,
   DEFAULT_SESSION_STATE,
 } from './types';
+import { formatThemeMenu } from './themes';
 
 // ============================================================================
 // STAGE TRANSITION LOGIC
@@ -162,8 +163,15 @@ function handleWelcomeStage(
         ...state.client,
         voice_reply_enabled: wantsVoice,
       },
+      briefing_progress: {
+        ...state.briefing_progress,
+        intake_step: 'THEME_SELECT',
+        intake_questions_asked: 0,
+      },
     },
-    message: `Perfect. Let's begin.`,
+    message:
+      `Welcome. I’m LEXA.\n\nBefore we talk destinations, choose **1–3 themes** (reply with numbers like "2, 4, 8"):\n` +
+      formatThemeMenu(),
   };
 }
 

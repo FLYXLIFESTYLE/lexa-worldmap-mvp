@@ -75,7 +75,8 @@ export interface Brief {
   // Core trio (at least ONE required before recommendations)
   when_at: WhenData | null;
   where_at: WhereData | null;
-  theme: string | null; // from Neo4j or user input
+  theme: string | null; // primary theme (legacy)
+  themes: string[]; // 1-3 themes chosen by the user (experience-first onboarding)
   
   // Required additional fields
   budget: BudgetData | null;
@@ -99,6 +100,13 @@ export interface SessionState {
     name: string | null;
     language: string;
     voice_reply_enabled: boolean;
+  };
+
+  travel_preferences?: {
+    // How structured should the trip feel?
+    planning_density?: 'curated' | 'balanced' | 'free';
+    // Should LEXA proactively include bad-weather / backup options?
+    include_alternatives?: boolean;
   };
   
   intent: {
@@ -138,6 +146,13 @@ export interface SessionState {
     fields_collected: string[]; // Track which fields have been collected
     suggestions_offered: boolean;
     retry_count: number; // For MIRROR stage retries
+    intake_step?: 'THEME_SELECT' | 'THEME_WHY' | 'MEMORY' | 'HOOK_CONFIRM' | 'LOGISTICS';
+    intake_questions_asked?: number; // counts “big questions” asked before the hook (target: 3)
+    logistics_step?: 'DURATION' | 'STRUCTURE' | 'WHEN' | 'WHERE' | 'BUDGET' | 'ALTERNATIVES' | 'DONE';
+    seasonal_guidance_shown?: {
+      destination: string;
+      month: string;
+    } | null;
   };
 }
 
@@ -222,6 +237,11 @@ export const DEFAULT_SESSION_STATE: SessionState = {
     language: 'en',
     voice_reply_enabled: false,
   },
+
+  travel_preferences: {
+    planning_density: undefined,
+    include_alternatives: undefined,
+  },
   
   intent: {
     mode: 'EXPERIENCE_SCRIPT',
@@ -232,6 +252,7 @@ export const DEFAULT_SESSION_STATE: SessionState = {
     when_at: null,
     where_at: null,
     theme: null,
+    themes: [],
     budget: null,
     duration: null,
     must_haves: [],
@@ -270,6 +291,7 @@ export const DEFAULT_SESSION_STATE: SessionState = {
     fields_collected: [],
     suggestions_offered: false,
     retry_count: 0,
+    seasonal_guidance_shown: null,
   },
 };
 

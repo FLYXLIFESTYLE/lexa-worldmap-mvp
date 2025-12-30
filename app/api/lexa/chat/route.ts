@@ -11,6 +11,8 @@ import { transitionStage, getNextStagePrompt } from '@/lib/lexa/state-machine';
 import { generateResponseWithRetry, checkRateLimit } from '@/lib/lexa/claude-client';
 import { processBriefingInput } from '@/lib/lexa/briefing-processor';
 import { createExperienceBriefFromState } from '@/lib/lexa/stages/handoff';
+import { profilePatchFromState, mergeProfileJson } from '@/lib/lexa/profile';
+import { formatThemeMenu } from '@/lib/lexa/themes';
 import {
   getWelcomeSystemPrompt,
   getDisarmSystemPrompt,
@@ -32,15 +34,22 @@ export async function POST(request: NextRequest) {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+
+    // Development-friendly fallback:
+    // In production we require auth; in dev we allow a test userId so you can iterate on conversation quickly.
+    const body = await request.json();
+    const { message: userMessage, sessionId, userId: devUserId } = body;
+
+    const isProd = process.env.NODE_ENV === 'production';
+    const DEV_USER_UUID = '00000000-0000-0000-0000-000000000001';
+    const looksLikeUuid = (s: unknown) =>
+      typeof s === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+    if ((authError || !user) && isProd) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
-    const userId = user.id; // UUID from Supabase Auth
+
+    const userId = user?.id ?? (looksLikeUuid(devUserId) ? devUserId : DEV_USER_UUID);
     
     // 2. Check rate limit
     if (!checkRateLimit()) {
@@ -49,10 +58,6 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
-    
-    // 3. Parse request body
-    const body = await request.json();
-    const { message: userMessage, sessionId } = body;
     
     if (!userMessage || typeof userMessage !== 'string') {
       return NextResponse.json(
@@ -134,6 +139,33 @@ export async function POST(request: NextRequest) {
       if (briefingResult.isComplete) {
         updatedState.stage = 'SCRIPT_DRAFT';
       }
+    } else if (sessionState.stage === 'WELCOME' || sessionState.stage === 'INITIAL_QUESTIONS') {
+      // Hybrid onboarding/intake:
+      // - Deterministic state machine for reliability and consistent structure
+      // - Claude fallback for unexpected user questions so it still feels "smart like ChatGPT"
+      const transition = await transitionStage(sessionState, userMessage);
+
+      assistantMessage = transition.message;
+      updatedState = {
+        ...updatedState,
+        ...transition.updatedState,
+        stage: transition.nextStage,
+      };
+
+      const likelyStuck =
+        sessionState.stage === 'INITIAL_QUESTIONS' &&
+        transition.nextStage === 'INITIAL_QUESTIONS';
+
+      if (likelyStuck && looksLikeUserQuestion(userMessage)) {
+        const systemPrompt = buildIntakeFallbackSystemPrompt(sessionState);
+        const claudeResponse = await generateResponseWithRetry({
+          sessionState,
+          userMessage,
+          systemPrompt,
+        });
+        assistantMessage = claudeResponse.assistantMessage;
+        // Keep state unchanged; next user message will be parsed deterministically.
+      }
     } else {
       // Use Claude for conversational stages
       const systemPrompt = getSystemPromptForStage(sessionState);
@@ -183,6 +215,29 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', session.id);
+
+    // 9b. Update durable user profile memory (best-effort)
+    try {
+      const patch = profilePatchFromState(newState);
+      const { data: existing } = await supabaseAdmin
+        .from('lexa_user_profiles')
+        .select('emotional_profile,preferences')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      await supabaseAdmin.from('lexa_user_profiles').upsert(
+        {
+          user_id: userId,
+          emotional_profile: mergeProfileJson(existing?.emotional_profile, patch.emotional_profile),
+          preferences: mergeProfileJson(existing?.preferences, patch.preferences),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch (e) {
+      // Don’t break chat if profile persistence fails (migration may not be applied yet).
+      console.warn('lexa_user_profiles upsert skipped/failed:', e);
+    }
     
     // 10. Insert assistant message
     await supabaseAdmin.from('lexa_messages').insert({
@@ -241,5 +296,67 @@ function getSystemPromptForStage(state: SessionState): string {
     default:
       return 'You are LEXA, a luxury travel experience designer.';
   }
+}
+
+function looksLikeUserQuestion(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (!t) return false;
+  if (t.includes('?')) return true;
+  // Common question starters
+  if (/^(what|why|how|when|where|which|can you|could you|do you|is it|are you)\b/.test(t)) return true;
+  // “Help” style
+  if (t.includes('help') || t.includes('explain')) return true;
+  return false;
+}
+
+function buildIntakeFallbackSystemPrompt(state: SessionState): string {
+  const intakeStep = state.briefing_progress.intake_step ?? 'THEME_SELECT';
+  const logisticsStep = state.briefing_progress.logistics_step ?? 'DURATION';
+
+  const selectedThemes =
+    state.brief?.themes?.length ? state.brief.themes : state.brief?.theme ? [state.brief.theme] : [];
+
+  const nextAsk =
+    intakeStep === 'THEME_SELECT'
+      ? `Ask them to choose 1–3 themes from this list:\n${formatThemeMenu()}`
+      : intakeStep === 'THEME_WHY'
+        ? `Ask: why those themes + what they want to feel (and what to avoid).`
+        : intakeStep === 'MEMORY'
+          ? `Ask: the best moment from their last great holiday (optional: worst).`
+          : intakeStep === 'HOOK_CONFIRM'
+            ? `Ask: does the direction feel right? (yes/no)`
+            : // LOGISTICS
+              logisticsStep === 'DURATION'
+              ? `Ask: how many days (give examples).`
+              : logisticsStep === 'STRUCTURE'
+                ? `Ask: curated vs balanced vs free (and reassure they can come back).`
+                : logisticsStep === 'WHEN'
+                  ? `Ask: when (month is enough) and why timing matters.`
+                  : logisticsStep === 'WHERE'
+                    ? `Ask: destination in mind or should LEXA suggest.`
+                    : logisticsStep === 'BUDGET'
+                      ? `Ask: budget range (ballpark is fine).`
+                      : logisticsStep === 'ALTERNATIVES'
+                        ? `Ask: consent for bad-weather alternatives; recommend yes softly.`
+                        : `Ask one concise next question.`;
+
+  const themeContext = selectedThemes.length ? `Current themes: ${selectedThemes.join(' · ')}` : '';
+
+  return `You are LEXA, a world-class concierge and experience designer.
+
+The user is in the structured intake flow, but they asked an unexpected question. Your job:
+1) Answer their question briefly and clearly (1–3 sentences).
+2) Then smoothly guide them back to the intake with ONE next question.
+
+Constraints:
+- Be warm, refined, and confident.
+- No interrogation tone.
+- Keep it short (under ~90 words).
+- Do not mention "system prompts" or "state machines".
+
+${themeContext}
+
+Next step you must guide toward:
+${nextAsk}`;
 }
 
