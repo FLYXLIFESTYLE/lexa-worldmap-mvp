@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MIRROR Stage - Reflect Hypothesis & Get Score
  */
 
@@ -68,7 +68,7 @@ Use this exact template:
 
 "Here's my hypothesis. You're not chasing luxury. You're chasing ${desired}, and what ruins it is ${avoid}.
 
-How close am I—0 to 10?"
+How close am I-0 to 10?"
 
 Then wait for their score and proceed based on:
 - Score 7-10: Move to MICRO_WOW (high trust)
@@ -77,4 +77,5 @@ Then wait for their score and proceed based on:
 
 Be bold. Own the hypothesis.`;
 }
+
 

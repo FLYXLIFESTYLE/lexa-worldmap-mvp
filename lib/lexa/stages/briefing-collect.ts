@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BRIEFING_COLLECT Stage - Flexible Data Collection
  * Collects all 10 required fields for Operations Agent handoff
  */
@@ -88,10 +88,10 @@ export function getFieldPrompt(field: RequiredField, state: SessionState): strin
       return `What's non-negotiable? (Must-haves, even if it's "nothing".)`;
     
     case 'best_experiences':
-      return `Tell me about one of your best travel experiences—and why it worked.`;
+      return `Tell me about one of your best travel experiences-and why it worked.`;
     
     case 'worst_experiences':
-      return `And one of your worst—what ruined it?`;
+      return `And one of your worst-what ruined it?`;
     
     case 'bucket_list':
       return `Anything on your bucket list for this trip?`;
@@ -232,4 +232,5 @@ Your job:
 
 Extract the data and continue the conversation naturally.`;
 }
+
 

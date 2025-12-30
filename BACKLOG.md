@@ -1,4 +1,4 @@
-# LEXA Roadmap (Active) + Backlog (Archive)
+﻿# LEXA Roadmap (Active) + Backlog (Archive)
 
 **Last Updated:** December 30, 2025
 
@@ -32,7 +32,7 @@ Goal: **Make LEXA extraordinary through real captain use**, while the destinatio
 - [ ] **Load the “idea library”**
   - Upload proven scripts/itineraries, add URLs, and add POIs manually (the system learns patterns and raises the quality bar fast).
 - [ ] **Tune LEXA’s style + suggestions**
-  - Make her more empathetic, more anticipatory, and more “inventive by analogy” — without hallucinating.
+  - Make her more empathetic, more anticipatory, and more “inventive by analogy” - without hallucinating.
 - [ ] **Expand the destination database in the background**
   - Keep ingesting and connecting places for all 14 destinations (quietly, safely, without disrupting testing).
 
@@ -49,11 +49,11 @@ Goal: **Make LEXA extraordinary through real captain use**, while the destinatio
 
 ## ✨ The WOW endgame (Target State)
 
-**Luxury Assets become experience lenses**: yachts, villas, jets, supercars, watches, art — not as “things”, but as **narrative devices** that amplify emotion and story. LEXA will connect a client’s inner desire to the right assets, places, and moments — and design an experience that feels inevitable.
+**Luxury Assets become experience lenses**: yachts, villas, jets, supercars, watches, art - not as “things”, but as **narrative devices** that amplify emotion and story. LEXA will connect a client’s inner desire to the right assets, places, and moments - and design an experience that feels inevitable.
 
 ---
 
-## Archive (Legacy backlog snapshot — kept for reference)
+## Archive (Legacy backlog snapshot - kept for reference)
 
 ## 🔴 High Priority (Do First)
 
@@ -758,5 +758,6 @@ Anyone can add ideas! Include:
   - Easy implementation with Tailwind dark: classes
   - Related: docs/UI_ENHANCEMENT_SUMMARY.md
 ```
+
 
 

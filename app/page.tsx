@@ -52,10 +52,10 @@ export default function LandingPage() {
         <div className="mx-auto mb-12 max-w-3xl space-y-4 px-6">
           <div className="text-zinc-300 text-base md:text-lg leading-relaxed">
             <p className="mb-4">
-              Experience curated travel that understands your emotions, anticipates your desires, and creates moments that resonate with who you truly are.
+              Experience curated travel scripts that amplify or revive your emotions and feeling of wealth, anticipates your desires, and creates moments and memories that resonate with who you truly are or finally want to be(come).
             </p>
             <p className="text-zinc-400 text-sm md:text-base">
-              No generic itineraries. No spray-gun recommendations. Just highly personalized luxury experiences designed for your unique emotional profile.
+              No checklist like itineraries of destination and activities, no list of generic places recommendations.
             </p>
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function LandingPage() {
           <div className="text-center space-y-3 p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-lexa-gold/30 transition-all">
             <div className="text-4xl mb-2">🎯</div>
             <h3 className="text-base font-bold text-lexa-gold uppercase tracking-wider">Precise</h3>
-            <p className="text-sm text-zinc-300 leading-relaxed">Every recommendation is intentional, never spray-gun</p>
+            <p className="text-sm text-zinc-300 leading-relaxed">Every recommendation is intentional - never generic lists</p>
           </div>
         </div>
         

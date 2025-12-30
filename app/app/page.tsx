@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Main Chat Interface - Protected Route
  */
 
@@ -126,7 +126,7 @@ export default function ChatPage() {
           id: 'welcome-fallback',
           role: 'assistant',
           content:
-            `Welcome. I'm LEXA.\n\nTell me what you're craving — and I'll shape the experience around it.`,
+            `Welcome. I'm LEXA.\n\nTell me what you're craving - and I'll shape the experience around it.`,
           created_at: new Date().toISOString(),
         },
       ]);
@@ -231,4 +231,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Experience Script Preview
  * Shows the final composed script with theme, hook, and highlights
  */
@@ -86,15 +86,15 @@ export default function ScriptPreviewPage() {
         // Fallback to mock data
         const mockScript: ScriptData = {
           themeName: `The ${builderState.theme.name} - ${builderState.destination.name}`,
-          inspiringHook: `Imagine the golden hour in ${builderState.destination.name}. The Mediterranean whispers secrets only you will hear. This isn't a vacation—it's a chapter you'll return to in your mind for years to come.`,
-          emotionalDescription: `This experience is designed for those who seek more than beauty—you're seeking *resonance*. Every moment is curated to help you feel deeply connected, profoundly present, and utterly free. No tours. No itineraries. Just a series of perfect moments that understand what you came here to feel.`,
+          inspiringHook: `Imagine the golden hour in ${builderState.destination.name}. The Mediterranean whispers secrets only you will hear. This isn't a vacation-it's a chapter you'll return to in your mind for years to come.`,
+          emotionalDescription: `This experience is designed for those who seek more than beauty-you're seeking *resonance*. Every moment is curated to help you feel deeply connected, profoundly present, and utterly free. No tours. No itineraries. Just a series of perfect moments that understand what you came here to feel.`,
           signatureHighlights: [
-            `🥂 **Private sunset aperitivo** at a cliffside villa known only to locals—Champagne, silence, and the Mediterranean at your feet`,
+            `🥂 **Private sunset aperitivo** at a cliffside villa known only to locals-Champagne, silence, and the Mediterranean at your feet`,
             `🍽️ **Chef's table at Le Louis XV** (3 Michelin stars) - An 8-course journey where each dish tells a story`,
-            `⛵ **Morning yacht charter** to hidden coves—swim in water so clear it feels like flying`,
+            `⛵ **Morning yacht charter** to hidden coves-swim in water so clear it feels like flying`,
             `🎨 **Private gallery viewing** at a contemporary art space, followed by meeting the artist over wine`,
             `💆 **Thermes Marins spa ritual** - 3-hour deep tissue and marine therapy designed to release what you're holding`,
-            `🌅 **Final evening: private rooftop dinner** in Monaco—live jazz trio, handwritten menu, stars above`,
+            `🌅 **Final evening: private rooftop dinner** in Monaco-live jazz trio, handwritten menu, stars above`,
           ],
           destination: builderState.destination.name,
           month: builderState.time.month?.charAt(0).toUpperCase() + builderState.time.month?.slice(1),
@@ -297,4 +297,5 @@ export default function ScriptPreviewPage() {
     </div>
   );
 }
+
 

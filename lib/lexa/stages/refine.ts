@@ -1,4 +1,4 @@
-/**
+﻿/**
  * REFINE Stage - Max 3 Edits
  */
 
@@ -50,7 +50,7 @@ Ask these questions ONE at a time:
 
 1. "What should feel more private?"
 2. "More intensity or more calm?"
-3. "Is this a memory for you—or a legacy for someone else?"
+3. "Is this a memory for you-or a legacy for someone else?"
 
 If they say "done" / "perfect" / "ready" at any point, move to HANDOFF.
 
@@ -58,4 +58,5 @@ After 3 refinements, automatically move to HANDOFF with: "We've refined this 3 t
 
 Keep adjustments surgical. Bold but humble.`;
 }
+
 

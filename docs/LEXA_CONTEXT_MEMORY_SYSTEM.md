@@ -1,4 +1,4 @@
-# LEXA Context Memory & Tracking System
+﻿# LEXA Context Memory & Tracking System
 # Prevents repetition and builds on previous answers
 
 ## CONTEXT TRACKING STRUCTURE
@@ -59,7 +59,7 @@ After each client message, extract and store:
 - Sensory details: "the smell of...", "the taste of...", "the sound of..."
 
 **Example:**
-Client: "The best trip was when we had that private dinner overlooking the Amalfi Coast. The lemon scent mixed with sea air—I still remember it."
+Client: "The best trip was when we had that private dinner overlooking the Amalfi Coast. The lemon scent mixed with sea air-I still remember it."
 
 **Extract:**
 ```python
@@ -250,13 +250,13 @@ def generate_next_question(context: ConversationContext) -> str:
     # STAGE 1: WOW (Questions 1-3)
     if context.current_stage == "wow":
         if context.questions_asked == 0:
-            return "Tell me about a moment from a trip that lives in you forever. Not the place—the moment. What do you still feel when you remember it?"
+            return "Tell me about a moment from a trip that lives in you forever. Not the place-the moment. What do you still feel when you remember it?"
         
         elif context.questions_asked == 1:
-            return "And the opposite: what ruined a trip for you? Not logistics—but a feeling. Crowded? Performative? Too structured? What made you think 'never again'?"
+            return "And the opposite: what ruined a trip for you? Not logistics-but a feeling. Crowded? Performative? Too structured? What made you think 'never again'?"
         
         elif context.questions_asked == 2:
-            return "If this experience had one 'foodgasm' moment—one scene you'd replay forever—what would it be? A taste? A view? A feeling of complete freedom?"
+            return "If this experience had one 'foodgasm' moment-one scene you'd replay forever-what would it be? A taste? A view? A feeling of complete freedom?"
     
     # CHECKPOINT
     if context.current_stage == "checkpoint":
@@ -271,15 +271,15 @@ def generate_next_question(context: ConversationContext) -> str:
         
         # Priority 2: Get sensory details if sparse
         if len(context.sensory_triggers) < 2:
-            return "When you imagine that perfect moment—what are you sensing? A smell, a taste, a sound? What's the detail that makes it visceral?"
+            return "When you imagine that perfect moment-what are you sensing? A smell, a taste, a sound? What's the detail that makes it visceral?"
         
         # Priority 3: Understand rhythm if not clear
         if not context.rhythm_preference:
-            return "Do you want early magic—sunrise moments and fresh mornings? Or late luxury—long dinners and midnight swims?"
+            return "Do you want early magic-sunrise moments and fresh mornings? Or late luxury-long dinners and midnight swims?"
         
         # Priority 4: Check for hidden needs
         if not context.story_arc:
-            return "Is there something this experience is marking? A celebration, a reconnection, a reset? Or is it simpler—just pure, unapologetic luxury?"
+            return "Is there something this experience is marking? A celebration, a reconnection, a reset? Or is it simpler-just pure, unapologetic luxury?"
         
         # Default: Explore their best past experience more
         if context.best_past_experiences and len(context.best_past_experiences) > 0:
@@ -319,11 +319,11 @@ def generate_synthesis_statement(context: ConversationContext) -> str:
     
     return f"""Here's what I'm hearing:
 
-You're chasing {feelings}. You want experiences that stick—not in your camera roll, but in your body. The kind of moments you replay when you need to remember what alive feels like.
+You're chasing {feelings}. You want experiences that stick-not in your camera roll, but in your body. The kind of moments you replay when you need to remember what alive feels like.
 
 What you DON'T want: {avoids}. No performance. No rushing. Just presence.
 
-I already have some ideas forming—experiences that match what you're seeking."""
+I already have some ideas forming-experiences that match what you're seeking."""
 
 
 def generate_experience_dna_statement(context: ConversationContext) -> str:
@@ -369,7 +369,7 @@ def handle_client_frustration(message: str, context: ConversationContext) -> str
         # Find what they're frustrated about
         relevant_info = extract_what_they_already_said(message, context)
         
-        return f"""You're absolutely right—my apologies. You said {relevant_info}. Let me design with that.
+        return f"""You're absolutely right-my apologies. You said {relevant_info}. Let me design with that.
 
 {generate_next_meaningful_action(context)}"""
     
@@ -400,7 +400,7 @@ def extract_what_they_already_said(message: str, context: ConversationContext) -
 
 def generate_next_meaningful_action(context: ConversationContext) -> str:
     """
-    After apology, do something useful—don't ask another question
+    After apology, do something useful-don't ask another question
     """
     
     if context.ready_for_synthesis:
@@ -476,4 +476,5 @@ Context tracking is working if:
 3. We use their past answers to inform future questions
 4. We progress through stages naturally
 5. We synthesize their DNA accurately from accumulated info
+
 

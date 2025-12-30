@@ -1,4 +1,4 @@
-# Experience DNA Design Framework
+﻿# Experience DNA Design Framework
 # The Science of Unforgettable Moments
 
 ## THE PHILOSOPHY
@@ -16,7 +16,7 @@
 ### 1. STORY 📖
 **Humans are wired for narrative**
 
-Cave paintings weren't just art—they were stories. Our brains remember narratives, not facts.
+Cave paintings weren't just art-they were stories. Our brains remember narratives, not facts.
 
 **In travel design:**
 - Every experience needs an arc: Beginning → Peak → Resolution
@@ -65,7 +65,7 @@ Not "We ate at a 3-star restaurant" but "I felt pure joy"
 ### 3. TRIGGER 🎯
 **The sensory anchor**
 
-This is the "foodgasm" element—the sensory detail that brings it all back.
+This is the "foodgasm" element-the sensory detail that brings it all back.
 
 **The Five Senses as Memory Anchors:**
 
@@ -122,8 +122,8 @@ That moment when you taste something so perfect, so transcendent, that:
 
 ### Applying to Experiences
 
-Every experience needs its "foodgasm moment"—the peak scene that:
-- Is sensory (not just visual—all five senses)
+Every experience needs its "foodgasm moment"-the peak scene that:
+- Is sensory (not just visual-all five senses)
 - Creates a visceral response
 - Gets encoded deeply
 - Can be triggered later
@@ -133,7 +133,7 @@ Every experience needs its "foodgasm moment"—the peak scene that:
 "We had dinner"
 
 **But:**
-"That table on the cliff, the sun setting into the sea, the smell of grilled octopus and lemons, the sound of waves below, that moment when you tasted the wine and everything else disappeared—that's what I'll remember forever."
+"That table on the cliff, the sun setting into the sea, the smell of grilled octopus and lemons, the sound of waves below, that moment when you tasted the wine and everything else disappeared-that's what I'll remember forever."
 
 ---
 
@@ -182,7 +182,7 @@ EXPERIENCE DNA: Chris & Wife
 
 STORY:
 "Reconnection after months of distance"
-A weekend where nothing else exists—just presence, luxury, and her.
+A weekend where nothing else exists-just presence, luxury, and her.
 
 EMOTION:
 Intimate devotion mixed with sensory luxury
@@ -208,7 +208,7 @@ The sound of waves with no other noise
 - The emotional unlock: [What this moment gives them]
 
 **ACT 3: THE AFTERGLOW (The Return)**
-- The gift: [What they take home—not a souvenir, but a change]
+- The gift: [What they take home-not a souvenir, but a change]
 - The trigger they carry: [How they'll access this feeling later]
 - The story: [What they'll tell others]
 
@@ -286,7 +286,7 @@ For each destination, catalog:
 **Best Locations:** Mountains, remote beaches, desert landscapes
 
 ### THE CELEBRATION
-**Story:** "Marking this moment—we made it happen"
+**Story:** "Marking this moment-we made it happen"
 **Emotion:** Joy + awe + pride
 **Triggers:** Champagne toasts, sunset peaks, shared laughter
 **Best Locations:** Cities with energy, vineyards, coastal glamour
@@ -298,7 +298,7 @@ For each destination, catalog:
 **Best Locations:** Active destinations, uncharted places, wild coastlines
 
 ### THE DEVOTION
-**Story:** "This is for you/us/them—pure gift"
+**Story:** "This is for you/us/them-pure gift"
 **Emotion:** Love + beauty + attention
 **Triggers:** Details that say "I thought of you," curated perfection
 **Best Locations:** Romantic classics with intimate moments
@@ -366,4 +366,5 @@ For every experience designed:
 What will trigger the memory?
 
 **That's your Experience DNA.**
+
 

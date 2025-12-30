@@ -1,8 +1,8 @@
-## Implementation Status (LEXA)
+﻿## Implementation Status (LEXA)
 
 This file summarizes what is implemented **now**, what is **partially done**, and what is **still pending / backlog**.
 
-### 1) Original TODO list — status
+### 1) Original TODO list - status
 
 - **Integrate “Luxury You Can’t Buy” system prompt + enforce two-mode output contract**
   - **Done**: `rag_system/core/ailessia/personality_mirror.py` now uses a LEXA luxury system prompt and calls Anthropic Messages API when configured.
@@ -36,7 +36,7 @@ This file summarizes what is implemented **now**, what is **partially done**, an
     - Improved ordering + tone
     - Added **fast-intake** mode when `_signals.dislikes_questions` or `_signals.has_urgency` is true
 
-### 2) Neo4j quality improvements — status
+### 2) Neo4j quality improvements - status
 
 - **Fixed missing chain links**
   - **Done**:
@@ -50,7 +50,7 @@ This file summarizes what is implemented **now**, what is **partially done**, an
 - **Google Places enrichment**
   - **Postponed** (budget constraint)
 
-### 3) Unstructured intake (Option 3) — status
+### 3) Unstructured intake (Option 3) - status
 
 - **Implemented**
   - Migration: `rag_system/supabase/migrations/005_unstructured_intake_and_artifacts.sql`
@@ -61,17 +61,18 @@ This file summarizes what is implemented **now**, what is **partially done**, an
 - **Important**
   - These endpoints will return a Supabase error until you apply migration **005** in Supabase.
 
-### 4) “Merged findings” docs — status
+### 4) “Merged findings” docs - status
 
 We can only verify findings that exist in this repo.
 
 - **Found in this repo**
-  - `docs/EXECUTIVE_SUMMARY_WOW_ENHANCEMENT.md` — currently **empty** in this workspace.
+  - `docs/EXECUTIVE_SUMMARY_WOW_ENHANCEMENT.md` - currently **empty** in this workspace.
 
 - **Not found in this repo**
   - `docs/LEXA_CONVERSATION_QUALITY_IMPROVEMENTS.md`
   - `LEXA_CONVERSATION_QUALITY_FINDINGS.md`
 
 To fully verify “all findings resolved”, please re-add those two missing files into `docs/` (or paste them here), and restore the content of the executive summary file.
+
 
 

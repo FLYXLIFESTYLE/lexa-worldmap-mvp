@@ -1,4 +1,4 @@
-# LEXA Theme-Led Conversation & Experience Script Format
+﻿# LEXA Theme-Led Conversation & Experience Script Format
 # Complete Implementation Guide
 
 ## PART 1: THEME CATEGORIES AS CONVERSATION OPENER
@@ -228,9 +228,9 @@ interface ThemeCategoryCard {
 
 **LEXA's Opening:**
 ```
-Welcome. I'm LEXA—I don't plan trips, I design emotional experiences.
+Welcome. I'm LEXA-I don't plan trips, I design emotional experiences.
 
-Every unforgettable journey has a theme—a feeling that defines it. 
+Every unforgettable journey has a theme-a feeling that defines it. 
 
 What are you drawn to?
 ```
@@ -239,7 +239,7 @@ What are you drawn to?
 
 **After Selection:**
 ```
-"[Theme Name]" — I can already see this taking shape.
+"[Theme Name]" - I can already see this taking shape.
 
 Now, let me understand what this really means to you...
 
@@ -314,10 +314,10 @@ After the conversation, LEXA presents the Experience Script with these elements:
 **Examples:**
 
 **Romance:**
-> "There's a table set for two where the cliffs meet the sea. By the time you sit down, the world will have disappeared—nothing left but candlelight, the sound of waves, and the way she looks at you like she's seeing you for the first time in months. This is where you remember why."
+> "There's a table set for two where the cliffs meet the sea. By the time you sit down, the world will have disappeared-nothing left but candlelight, the sound of waves, and the way she looks at you like she's seeing you for the first time in months. This is where you remember why."
 
 **Adventure:**
-> "The helicopter lifts off at dawn. Below, the mountains are still sleeping, but you're already gone—chasing the kind of moment that makes your heart pound and your hands shake and reminds you what it feels like to be wildly, impossibly alive."
+> "The helicopter lifts off at dawn. Below, the mountains are still sleeping, but you're already gone-chasing the kind of moment that makes your heart pound and your hands shake and reminds you what it feels like to be wildly, impossibly alive."
 
 **Wellness:**
 > "Imagine waking without an alarm. No agenda. No urgency. Just the slow unfurling of a day designed entirely around one thing: you coming back to yourself."
@@ -335,17 +335,17 @@ After the conversation, LEXA presents the Experience Script with these elements:
 ```
 **The Story:**
 
-You've been moving fast. Too fast. Work, logistics, the relentless hum of daily life—it's left no space for the quiet moments that matter. This weekend isn't about escaping. It's about returning. To her. To you. To the version of your relationship that gets buried under calendars and to-do lists.
+You've been moving fast. Too fast. Work, logistics, the relentless hum of daily life-it's left no space for the quiet moments that matter. This weekend isn't about escaping. It's about returning. To her. To you. To the version of your relationship that gets buried under calendars and to-do lists.
 
 **The Transformation:**
 
 Day one: You arrive and immediately slow down. The spa treatment she's been craving. The wine you don't rush through. The conversation that goes deeper than "how was your day?" You remember what presence feels like.
 
-Day two: The peak. That private dinner where the view is almost as stunning as watching her across the table, completely at ease. The moment you both realize—this is what we've been missing. Not places. Not things. Just this.
+Day two: The peak. That private dinner where the view is almost as stunning as watching her across the table, completely at ease. The moment you both realize-this is what we've been missing. Not places. Not things. Just this.
 
 **What You Take Home:**
 
-When you leave, it's not souvenirs you're carrying. It's a reset. A recalibration. The feeling comes home with you—in the scent of her perfume, in that song from dinner, in the way you now prioritize quiet mornings together. This weekend doesn't end when you leave. It rewrites how you show up for each other.
+When you leave, it's not souvenirs you're carrying. It's a reset. A recalibration. The feeling comes home with you-in the scent of her perfume, in that song from dinner, in the way you now prioritize quiet mornings together. This weekend doesn't end when you leave. It rewrites how you show up for each other.
 ```
 
 ---
@@ -374,7 +374,7 @@ When you leave, it's not souvenirs you're carrying. It's a reset. A recalibratio
 - 🧘 **Morning Meditation by Water** - Silence, sunrise, and nothing to do
 - 💆 **Signature Treatment** - The massage/ritual that unlocks what you've been holding
 - 🥗 **Nourishment as Art** - Meals that feel like medicine for body and soul
-- 🌊 **Healing Sounds** - Ocean, birds, nothing electric—just nature
+- 🌊 **Healing Sounds** - Ocean, birds, nothing electric-just nature
 - 📓 **Space to Think** - Time with nothing scheduled, nowhere to be
 
 **Format Rules:**
@@ -486,22 +486,22 @@ CREATE INDEX idx_experience_scripts_status ON experience_scripts(status);
 ---
 
 **2. THE HOOK:**
-There's a table set for two where the cliffs meet the sea. By the time you sit down, the world will have disappeared—nothing left but candlelight, the sound of waves, and the way she looks at you like she's seeing you for the first time in months. This is where you remember why. This is where work can't reach you. This is where it's just you, her, and the luxury of undivided attention.
+There's a table set for two where the cliffs meet the sea. By the time you sit down, the world will have disappeared-nothing left but candlelight, the sound of waves, and the way she looks at you like she's seeing you for the first time in months. This is where you remember why. This is where work can't reach you. This is where it's just you, her, and the luxury of undivided attention.
 
 ---
 
 **3. EMOTIONAL DESCRIPTION:**
 
 **The Story:**
-You've been moving fast. Too fast. Work, logistics, the relentless hum of daily life—it's left no space for the quiet moments that matter. This weekend isn't about escaping. It's about returning. To her. To you. To the version of your relationship that gets buried under calendars and to-do lists.
+You've been moving fast. Too fast. Work, logistics, the relentless hum of daily life-it's left no space for the quiet moments that matter. This weekend isn't about escaping. It's about returning. To her. To you. To the version of your relationship that gets buried under calendars and to-do lists.
 
 **The Transformation:**
-Day one: You arrive mid-afternoon. No rush. She begins with a treatment she's been craving—rose oils, warm stones, the kind of pampering that makes stress feel like a distant memory. You have time to breathe. That evening, dinner is intimate, candlelit, and unhurried. The kind of meal where courses arrive like scenes in a film, and nothing feels rushed.
+Day one: You arrive mid-afternoon. No rush. She begins with a treatment she's been craving-rose oils, warm stones, the kind of pampering that makes stress feel like a distant memory. You have time to breathe. That evening, dinner is intimate, candlelit, and unhurried. The kind of meal where courses arrive like scenes in a film, and nothing feels rushed.
 
-Day two: The peak. A private experience—somewhere she feels seen, not surrounded. Maybe a secluded vineyard tasting where the winemaker opens something rare, or a hidden garden terrace where lunch is served just for two. The afternoon is yours to wander, rest, or simply be still together. And then, the signature moment: a sunset scene designed for memory—a cliffside aperitivo, a private boat at golden hour, or a terrace where the sky does the work. Followed by your finest meal of the weekend. Not the loudest restaurant—the right one.
+Day two: The peak. A private experience-somewhere she feels seen, not surrounded. Maybe a secluded vineyard tasting where the winemaker opens something rare, or a hidden garden terrace where lunch is served just for two. The afternoon is yours to wander, rest, or simply be still together. And then, the signature moment: a sunset scene designed for memory-a cliffside aperitivo, a private boat at golden hour, or a terrace where the sky does the work. Followed by your finest meal of the weekend. Not the loudest restaurant-the right one.
 
 **What You Take Home:**
-When you leave, it's not souvenirs you're carrying. It's a reset. A recalibration. The scent of salt air and roses. The taste of that champagne at sunset. The sound of waves with no other noise. These become triggers—sensory anchors that bring you back to this feeling whenever you need it. This weekend doesn't end when you leave. It rewrites how you show up for each other.
+When you leave, it's not souvenirs you're carrying. It's a reset. A recalibration. The scent of salt air and roses. The taste of that champagne at sunset. The sound of waves with no other noise. These become triggers-sensory anchors that bring you back to this feeling whenever you need it. This weekend doesn't end when you leave. It rewrites how you show up for each other.
 
 ---
 
@@ -513,11 +513,11 @@ When you leave, it's not souvenirs you're carrying. It's a reset. A recalibratio
 
 🌅 **Sunrise Moments** - Coffee on your private terrace before the world wakes up, no agenda, just presence
 
-🍷 **Wine & Intimacy** - Not at a crowded bar, but somewhere you can actually talk—a vineyard, a hidden terrace, a moment designed for conversation
+🍷 **Wine & Intimacy** - Not at a crowded bar, but somewhere you can actually talk-a vineyard, a hidden terrace, a moment designed for conversation
 
 🌊 **Beachside Serenity** - Private beach club where the only sound is waves, the only task is deciding when to order the next cocktail
 
-💝 **The Thoughtful Surprise** - A small gesture—a handwritten note, a gift, a moment—that says "this weekend is yours"
+💝 **The Thoughtful Surprise** - A small gesture-a handwritten note, a gift, a moment-that says "this weekend is yours"
 
 ---
 
@@ -545,4 +545,5 @@ Based on your DNA: French Riviera or Italian Coast, ideally May or September (pe
 ---
 
 This is your complete blueprint for theme-led conversations and professional experience scripts! 🎯
+
 

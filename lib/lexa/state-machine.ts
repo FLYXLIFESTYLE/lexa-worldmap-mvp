@@ -1,4 +1,4 @@
-/**
+﻿/**
  * LEXA UI Agent - Core State Machine
  * Deterministic conversation flow with 10+ stages
  */
@@ -165,7 +165,7 @@ function handleWelcomeStage(
       },
     },
     message:
-      `Welcome. I'm LEXA — your Luxury Experience Assistant.\n\nIf you tell me what you want to *feel*, I’ll shape a clear experience script with a hook, emotional direction, and signature highlights you can use yourself (or hand to your broker/agent).\n\nUse the buttons below, or simply speak in your own words.\n\nTo begin: what kind of experience calls to you?`,
+      `Welcome. I'm LEXA - your Luxury Experience Assistant.\n\nIf you tell me what you want to *feel*, I’ll shape a clear experience script with a hook, emotional direction, and signature highlights you can use yourself (or hand to your broker/agent).\n\nUse the buttons below, or simply speak in your own words.\n\nTo begin: what kind of experience calls to you?`,
     ui: {
       quickReplies: [
         ...LEXA_THEMES_12.map((t) => ({
@@ -432,7 +432,7 @@ function getDisarmPrompt(state: SessionState): string {
   }
   
   if (state.emotions.current_state === 'tired' || state.emotions.current_state === 'burned_out') {
-    return `When did luxury last work on you—what did it give you emotionally?`;
+    return `When did luxury last work on you-what did it give you emotionally?`;
   }
   
   return `What feeling do you want more than anything right now?`;
@@ -444,7 +444,7 @@ function getMirrorPrompt(state: SessionState): string {
   
   return `Here's my hypothesis. You're not chasing luxury. You're chasing ${desired}, and what ruins it is ${avoid}.
 
-How close am I—0 to 10?`;
+How close am I-0 to 10?`;
 }
 
 function getMicroWowPrompt(state: SessionState): string {
@@ -493,7 +493,7 @@ function getRefinePrompt(state: SessionState): string {
 
 More intensity or more calm?
 
-Is this a memory for you—or a legacy for someone else?`;
+Is this a memory for you-or a legacy for someone else?`;
 }
 
 function getHandoffPrompt(state: SessionState): string {
@@ -524,4 +524,5 @@ export function initializeSession(userId: string): SessionState {
     },
   };
 }
+
 

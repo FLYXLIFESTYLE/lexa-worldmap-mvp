@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminNav from '@/components/admin/admin-nav';
@@ -88,7 +88,7 @@ export default function PoiCollectionPage() {
   const queue = (job?.progress?.queue || []) as CollectorQueueItem[];
   const currentIndex = (job?.progress?.current_index || 0) as number;
   const currentItem = queue[currentIndex] || null;
-  const currentDestinationLabel = currentItem ? `${currentItem.name} (${currentItem.kind}, ${currentItem.radius_km}km)` : '—';
+  const currentDestinationLabel = currentItem ? `${currentItem.name} (${currentItem.kind}, ${currentItem.radius_km}km)` : '-';
   const nextRetryAt = job?.progress?.next_retry_at ? new Date(job.progress.next_retry_at).getTime() : null;
   const msUntilRetry = nextRetryAt ? Math.max(0, nextRetryAt - Date.now()) : null;
 
@@ -270,8 +270,8 @@ export default function PoiCollectionPage() {
               ) : null}
             </div>
             <div className="text-sm text-zinc-300">
-              <span className="text-zinc-500">State:</span> <span className="font-semibold">{state || job?.status || '—'}</span>
-              {job?.progress?.reason ? <span className="text-zinc-400"> — {job.progress.reason}</span> : null}
+              <span className="text-zinc-500">State:</span> <span className="font-semibold">{state || job?.status || '-'}</span>
+              {job?.progress?.reason ? <span className="text-zinc-400"> - {job.progress.reason}</span> : null}
             </div>
           </div>
 
@@ -440,7 +440,7 @@ export default function PoiCollectionPage() {
                 </div>
                 <div className="text-zinc-300">
                   <span className="text-zinc-500">State:</span> <span className="font-semibold">{state || job?.status}</span>
-                  {job?.progress?.reason ? <span className="text-zinc-400"> — {job.progress.reason}</span> : null}
+                  {job?.progress?.reason ? <span className="text-zinc-400"> - {job.progress.reason}</span> : null}
                 </div>
                 <div className="text-zinc-300">
                   <span className="text-zinc-500">Progress:</span> {currentIndex}/{queue.length}
@@ -499,5 +499,6 @@ export default function PoiCollectionPage() {
     </div>
   );
 }
+
 
 

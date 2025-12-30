@@ -1,4 +1,4 @@
-# Landing Page Final Fixes - December 22, 2025
+﻿# Landing Page Final Fixes - December 22, 2025
 
 ## Issues Addressed
 
@@ -104,7 +104,7 @@ export default function LuxuryBackground() {
 **Before (Third Bullet):**
 ```
 Lifetime tracking: When you book through LEXA, your assigned broker earns 
-commission for life—fair recognition for the relationship.
+commission for life-fair recognition for the relationship.
 ```
 
 **After (Third Bullet):**
@@ -292,4 +292,5 @@ Now that the visual experience is perfect, we're ready to focus on:
    - Emotional profile visualization
 
 **Ready when you are!** 🚀
+
 

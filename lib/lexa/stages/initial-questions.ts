@@ -1,4 +1,4 @@
-/**
+﻿/**
  * INITIAL_QUESTIONS Stage (Experience-first concierge intake)
  *
  * Flow:
@@ -50,7 +50,7 @@ export async function processInitialQuestionsStage(
           briefing_progress: setProgress({ intake_step: 'THEME_CUSTOM', intake_questions_asked: questionsAsked }),
         },
         message:
-          `Perfect.\n\nDescribe the experience in your own words — even if it feels messy.\n\nWhat do you want the story to feel like, and what do you absolutely *not* want?`,
+          `Perfect.\n\nDescribe the experience in your own words - even if it feels messy.\n\nWhat do you want the story to feel like, and what do you absolutely *not* want?`,
       };
     }
 
@@ -85,7 +85,7 @@ export async function processInitialQuestionsStage(
         updatedState: {
           briefing_progress: setProgress({ intake_step: 'THEME_CUSTOM', intake_questions_asked: questionsAsked }),
         },
-        message: `Take your time — a few words is enough.\n\nWhat do you want this to feel like?`,
+        message: `Take your time - a few words is enough.\n\nWhat do you want this to feel like?`,
       };
     }
 
@@ -97,7 +97,7 @@ export async function processInitialQuestionsStage(
         briefing_progress: setProgress({ intake_step: 'THEME_WHY', intake_questions_asked: 1 }),
       },
       message:
-        `Good. I have your direction.\n\nOne gentle question so I can design this accurately: why this theme, *now*?\nWhat do you want to feel — and what do you want to avoid?`,
+        `Good. I have your direction.\n\nOne gentle question so I can design this accurately: why this theme, *now*?\nWhat do you want to feel - and what do you want to avoid?`,
     };
   }
 
@@ -156,7 +156,7 @@ export async function processInitialQuestionsStage(
           micro_wow: { ...state.micro_wow, delivered: false, hook: null },
           script: { ...state.script, signature_moments: [] },
         },
-        message: `Understood. Let’s recalibrate — quietly and precisely.\n\nWhat kind of experience calls to you instead? (Tap up to three themes below.)`,
+        message: `Understood. Let’s recalibrate - quietly and precisely.\n\nWhat kind of experience calls to you instead? (Tap up to three themes below.)`,
         ui: themeUi(),
       };
     }
@@ -167,7 +167,7 @@ export async function processInitialQuestionsStage(
         updatedState: {
           briefing_progress: setProgress({ intake_step: 'HOOK_CONFIRM', intake_questions_asked: 3 }),
         },
-        message: `Quick check — does that direction feel right?`,
+        message: `Quick check - does that direction feel right?`,
         ui: {
           quickReplies: [
             { id: 'yes', label: 'Yes', value: 'yes', kind: 'yes_no', accent: 'gold' },
@@ -408,7 +408,7 @@ export async function processInitialQuestionsStage(
         briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'DONE' }),
       },
       message:
-        `Perfect. I have enough to start designing this properly.\n\nReassurance: if weather shifts or something is sold out, come back in the moment — I'll adapt your plan with options that still match your themes.\n\nIf you want, one last nuance: do you want this to feel more private and quiet, more social and vibrant, or more ultra-indulgent?` +
+        `Perfect. I have enough to start designing this properly.\n\nReassurance: if weather shifts or something is sold out, come back in the moment - I'll adapt your plan with options that still match your themes.\n\nIf you want, one last nuance: do you want this to feel more private and quiet, more social and vibrant, or more ultra-indulgent?` +
         (realtimeNote ? `\n\n${realtimeNote}` : ''),
     };
   }
@@ -431,21 +431,21 @@ Keep responses refined, emotionally intelligent, and concise.`;
 }
 
 function themeSelectPrompt() {
-  return `Before we talk destinations, I want to understand what you're truly craving.\n\nChoose up to three themes below — this is simply to set direction. You can refine it anytime.`;
+  return `Before we talk destinations, I want to understand what you're truly craving.\n\nChoose up to three themes below - this is simply to set direction. You can refine it anytime.`;
 }
 
 function themeWhyPrompt(themes: string[]) {
   const t = themes.join(' + ');
-  return `Beautiful. ${t}.\n\nOne gentle question so I can design this accurately: what made you choose those — and what do you want to feel when you’re living this trip?\n\n(If there’s something you want to avoid, tell me — it helps me protect the experience.)`;
+  return `Beautiful. ${t}.\n\nOne gentle question so I can design this accurately: what made you choose those - and what do you want to feel when you’re living this trip?\n\n(If there’s something you want to avoid, tell me - it helps me protect the experience.)`;
 }
 
 function memoryPrompt() {
-  return `Last question — then you decide if I'm understanding you.\n\nTell me about the best moment from your last great holiday — the 60 seconds you still replay.\nWhat made it work?\n\n(If anything ever ruined a trip for you, mention it — I’ll design around it.)`;
+  return `Last question - then you decide if I'm understanding you.\n\nTell me about the best moment from your last great holiday - the 60 seconds you still replay.\nWhat made it work?\n\n(If anything ever ruined a trip for you, mention it - I’ll design around it.)`;
 }
 
 function hookConfirmPrompt(params: { themes: string[]; hook: string; highlights: string[]; isTrial: boolean }) {
   const intro = params.isTrial
-    ? `You can decide after this: if I don't feel like your concierge, you can walk away — no pressure.`
+    ? `You can decide after this: if I don't feel like your concierge, you can walk away - no pressure.`
     : '';
 
   const themeLine = params.themes.length ? `Themes: ${params.themes.join(' · ')}` : '';
@@ -467,7 +467,7 @@ function hookConfirmPrompt(params: { themes: string[]; hook: string; highlights:
 }
 
 function logisticsPrompt() {
-  return `Good. Now we make it real.\n\nTell me:\n1) How many days?\n2) When do you want to go (month or dates)?\n3) Any destinations you’re drawn to — or should I suggest the best fit?\n\nReply in one message; bullets are fine.`;
+  return `Good. Now we make it real.\n\nTell me:\n1) How many days?\n2) When do you want to go (month or dates)?\n3) Any destinations you’re drawn to - or should I suggest the best fit?\n\nReply in one message; bullets are fine.`;
 }
 
 function looksLikeYes(input: string) {
@@ -522,7 +522,7 @@ function extractAvoid(input: string): string[] {
 
 function buildHook(themes: string[], desiredFeelings: string[]) {
   const t = themes.slice(0, 2).join(' + ') || 'your taste';
-  const f = desiredFeelings[0] ? ` — built around ${desiredFeelings[0]}` : '';
+  const f = desiredFeelings[0] ? ` - built around ${desiredFeelings[0]}` : '';
   return `An experience designed for ${t}${f}: intimate, intentional, and unmistakably “you.”`;
 }
 
@@ -530,11 +530,11 @@ function buildSignatureHighlights(themes: string[], desiredFeelings: string[]) {
   const t = themes.map((x) => x.toLowerCase()).join(' ');
   const out: string[] = [];
 
-  if (t.includes('water') || t.includes('marine')) out.push('A private water moment at the perfect light — no crowds, no noise.');
+  if (t.includes('water') || t.includes('marine')) out.push('A private water moment at the perfect light - no crowds, no noise.');
   if (t.includes('culinary')) out.push('A single, unforgettable meal: chef’s story, local ingredients, and a table you won’t find online.');
-  if (t.includes('wellness')) out.push('A reset ritual you can feel in your nervous system — slow mornings, body care, and silence.');
+  if (t.includes('wellness')) out.push('A reset ritual you can feel in your nervous system - slow mornings, body care, and silence.');
   if (t.includes('romance')) out.push('A “just us” scene: a view, a drink, and time that doesn’t rush you.');
-  if (t.includes('art') || t.includes('architecture')) out.push('A private culture window — one place, one story, one detail you’ll remember.');
+  if (t.includes('art') || t.includes('architecture')) out.push('A private culture window - one place, one story, one detail you’ll remember.');
   if (t.includes('adventure') || t.includes('exploration')) out.push('A controlled edge: something thrilling, but designed to feel safe and elevated.');
 
   out.push('A signature arrival moment that instantly shifts you into holiday mode.');
@@ -587,24 +587,24 @@ function whenPrompt(days?: number | null) {
 
 function wherePrompt(month?: string | null) {
   const m = month ? ` for ${month}` : '';
-  return `Got it${m}.\n\nDo you already have a destination in mind — or would you like me to suggest the best fit for your themes?`;
+  return `Got it${m}.\n\nDo you already have a destination in mind - or would you like me to suggest the best fit for your themes?`;
 }
 
 function budgetPrompt() {
-  return `One practical detail so I recommend in the right universe.\n\nWhat budget range should I design within? (Ballpark is fine — per week, per trip, or per night.)`;
+  return `One practical detail so I recommend in the right universe.\n\nWhat budget range should I design within? (Ballpark is fine - per week, per trip, or per night.)`;
 }
 
 function structurePrompt(days?: number | null) {
   const short = days !== null && days !== undefined && days <= 4;
   const example = short
-    ? `For a short trip, some people love 1–2 beautifully curated moments — others want more unplanned time together.`
+    ? `For a short trip, some people love 1–2 beautifully curated moments - others want more unplanned time together.`
     : `Some people want a beautifully curated arc; others want wide open breathing room.`;
 
-  return `${example}\n\nHow would you like it to feel — more curated, balanced, or mostly free?\n\n(And anytime you want: you can come back here and I’ll help you find options that are actually available at that time.)`;
+  return `${example}\n\nHow would you like it to feel - more curated, balanced, or mostly free?\n\n(And anytime you want: you can come back here and I’ll help you find options that are actually available at that time.)`;
 }
 
 function alternativesPrompt() {
-  return `One more preference so I protect the experience.\n\nIf weather is unpredictable or plans change, would you like me to include a couple of bad-weather alternatives (and backups in general) that still match your themes?\n\nMy recommendation is **yes** (it keeps the trip smooth) — but you can also say **no** if you prefer to decide in the moment.\n\nReply: "yes", "no", or "only if needed".`;
+  return `One more preference so I protect the experience.\n\nIf weather is unpredictable or plans change, would you like me to include a couple of bad-weather alternatives (and backups in general) that still match your themes?\n\nMy recommendation is **yes** (it keeps the trip smooth) - but you can also say **no** if you prefer to decide in the moment.\n\nReply: "yes", "no", or "only if needed".`;
 }
 
 function themeUi(): StageTransitionResult['ui'] {
@@ -710,7 +710,8 @@ function seasonalGuidance(destination: string, month: string): { type: 'caution'
   return {
     type: 'caution',
     message:
-      `One quick concierge note: ${destination} in ${month} can feel quieter — some places reduce hours and the energy is more off-season.\n\nIf you're choosing it intentionally, I'm in. But if what you want is sun + effortless water moments, would you rather I suggest a better-fit region for ${month} (e.g. Caribbean), or do you want ${destination} for a specific reason?`,
+      `One quick concierge note: ${destination} in ${month} can feel quieter - some places reduce hours and the energy is more off-season.\n\nIf you're choosing it intentionally, I'm in. But if what you want is sun + effortless water moments, would you rather I suggest a better-fit region for ${month} (e.g. Caribbean), or do you want ${destination} for a specific reason?`,
   };
 }
+
 

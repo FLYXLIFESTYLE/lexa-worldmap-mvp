@@ -1,4 +1,4 @@
-# OSM Data Improvement Strategy for Luxury Travel POIs
+﻿# OSM Data Improvement Strategy for Luxury Travel POIs
 
 **Problem Statement**: High-profile luxury venues like Club 55 in St. Tropez are missing from our database, indicating significant gaps in luxury POI coverage from OpenStreetMap (OSM) data.
 
@@ -329,7 +329,7 @@ Use ChatNeo4j to run these queries:
 5. **AI-Enhanced**: Intelligent scoring and recommendations
 
 **Ultimate Outcome**:
-When a captain needs to find the best beach club, restaurant, or spa anywhere in the world, LEXA has the answer—with insider knowledge and confidence.
+When a captain needs to find the best beach club, restaurant, or spa anywhere in the world, LEXA has the answer-with insider knowledge and confidence.
 
 ---
 
@@ -344,4 +344,5 @@ When a captain needs to find the best beach club, restaurant, or spa anywhere in
 ---
 
 **Remember**: Quality over quantity. One correctly scored, captain-verified luxury POI is worth more than 100 generic OSM entries.
+
 

@@ -1,4 +1,4 @@
-# LEXA Conversation Implementation Guide
+﻿# LEXA Conversation Implementation Guide
 # How to Build This in the RAG System
 
 ## OVERVIEW
@@ -401,11 +401,11 @@ class QuestionGenerator:
     
     # The 3 WOW questions (always the same)
     WOW_QUESTIONS = [
-        "Tell me about a moment from a trip that lives in you forever. Not the place—the moment. What do you still feel when you remember it?",
+        "Tell me about a moment from a trip that lives in you forever. Not the place-the moment. What do you still feel when you remember it?",
         
-        "And the opposite: what ruined a trip for you? Not logistics—but a feeling. Crowded? Performative? Too structured? What made you think 'never again'?",
+        "And the opposite: what ruined a trip for you? Not logistics-but a feeling. Crowded? Performative? Too structured? What made you think 'never again'?",
         
-        "If this experience had one 'foodgasm' moment—one scene you'd replay forever—what would it be? A taste? A view? A feeling of complete freedom?"
+        "If this experience had one 'foodgasm' moment-one scene you'd replay forever-what would it be? A taste? A view? A feeling of complete freedom?"
     ]
     
     def generate(self, context: ConversationContext) -> str:
@@ -449,11 +449,11 @@ class QuestionGenerator:
         
         return f"""Here's what I'm hearing:
 
-You're chasing {feelings}. You want experiences that stick—not in your camera roll, but in your body. The kind of moments you replay when you need to remember what alive feels like.
+You're chasing {feelings}. You want experiences that stick-not in your camera roll, but in your body. The kind of moments you replay when you need to remember what alive feels like.
 
 What you DON'T want: {avoids}. No performance. No rushing. Just presence.
 
-I already have some ideas forming—experiences that match what you're seeking.
+I already have some ideas forming-experiences that match what you're seeking.
 
 Does this feel right, or am I missing something?"""
     
@@ -466,18 +466,18 @@ Does this feel right, or am I missing something?"""
         
         # Priority 2: Get more sensory details
         if len(context.sensory_triggers) < 2:
-            return "When you imagine that perfect moment—what are you sensing? A smell, a taste, a sound? What's the detail that makes it visceral?"
+            return "When you imagine that perfect moment-what are you sensing? A smell, a taste, a sound? What's the detail that makes it visceral?"
         
         # Priority 3: Rhythm preference
         if not context.rhythm_preference:
-            return "Do you want early magic—sunrise moments and fresh mornings? Or late luxury—long dinners and midnight swims?"
+            return "Do you want early magic-sunrise moments and fresh mornings? Or late luxury-long dinners and midnight swims?"
         
         # Priority 4: Story arc
         if not context.story_arc:
-            return "Is there something this experience is marking? A celebration, a reconnection, a reset? Or is it simpler—just pure, unapologetic luxury?"
+            return "Is there something this experience is marking? A celebration, a reconnection, a reset? Or is it simpler-just pure, unapologetic luxury?"
         
         # Default: Explore past experience
-        return "What's the best trip you've ever taken? Not where—but why. What made it unforgettable?"
+        return "What's the best trip you've ever taken? Not where-but why. What made it unforgettable?"
     
     def _generate_synthesis(self, context: ConversationContext) -> str:
         """Experience DNA statement"""
@@ -498,7 +498,7 @@ Does this land?"""
     def _generate_script(self, context: ConversationContext) -> str:
         """Three-act experience script"""
         # This would be a longer template
-        return """Here's your experience script—the DNA of what will stay with you forever:
+        return """Here's your experience script-the DNA of what will stay with you forever:
 
 [ACT 1: ARRIVAL]
 [ACT 2: THE PEAK]
@@ -693,4 +693,5 @@ Track metrics:
 ---
 
 This is your implementation roadmap. Ready to build? 🚀
+
 

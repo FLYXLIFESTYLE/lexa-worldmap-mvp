@@ -1,4 +1,4 @@
-## Render Backend Deploy (FastAPI) — LEXA
+﻿## Render Backend Deploy (FastAPI) - LEXA
 
 You should deploy **only the backend** to Render. Keep the frontend on Vercel.
 
@@ -49,5 +49,6 @@ NEXT_PUBLIC_API_URL=https://<your-render-backend>.onrender.com
 
 - `GET /api/health`
 - `POST /api/lexa/account/create`
+
 
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DISARM Stage - Surface Hidden Dissatisfaction
  */
 
@@ -55,7 +55,7 @@ export function getDisarmSystemPrompt(state: SessionState): string {
   if (skepticism > 0.5 || arrogance > 0.5) {
     questionToAsk = `"What would make even a perfect experience feel pointless to you?"`;
   } else if (state.emotions.current_state === 'tired' || state.emotions.current_state === 'burned_out') {
-    questionToAsk = `"When did luxury last work on you—what did it give you emotionally?"`;
+    questionToAsk = `"When did luxury last work on you-what did it give you emotionally?"`;
   } else {
     questionToAsk = `"What feeling do you want more than anything right now?"`;
   }
@@ -73,4 +73,5 @@ From their response, extract:
 
 Be bold but humble. Listen deeply.`;
 }
+
 

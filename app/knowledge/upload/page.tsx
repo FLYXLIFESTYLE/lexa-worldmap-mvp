@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * User Knowledge Upload
@@ -184,7 +184,7 @@ export default function KnowledgeUploadPage() {
               </h1>
               <p className="mt-3 text-zinc-300 max-w-2xl">
                 Upload script examples, proven itineraries, travel reports, transcripts, or documents. This becomes LEXA’s
-                idea library — so she can learn patterns, then combine them into new, original moments.
+                idea library - so she can learn patterns, then combine them into new, original moments.
               </p>
               <p className="mt-2 text-xs text-zinc-400">
                 Signed in as <span className="text-lexa-gold">{userEmail || '...'}</span>
@@ -333,5 +333,6 @@ export default function KnowledgeUploadPage() {
     </div>
   );
 }
+
 
 
