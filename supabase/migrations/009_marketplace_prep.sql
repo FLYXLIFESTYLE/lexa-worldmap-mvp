@@ -44,14 +44,18 @@ CREATE TRIGGER update_script_marketplace_listings_updated_at
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS marketplace_purchases (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  listing_id UUID NOT NULL REFERENCES script_marketplace_listings(id),
+  listing_id UUID NOT NULL,
   buyer_id UUID NOT NULL,
   seller_id UUID NOT NULL,
   price_paid DECIMAL(10,2) NOT NULL,
   commission_amount DECIMAL(10,2),
   payment_method TEXT,
   payment_metadata JSONB DEFAULT '{}'::jsonb,
-  purchased_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  purchased_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_marketplace_purchases_listing 
+    FOREIGN KEY (listing_id) 
+    REFERENCES script_marketplace_listings(id) 
+    ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_marketplace_purchases_listing ON marketplace_purchases(listing_id);
