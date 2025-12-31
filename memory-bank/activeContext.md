@@ -22,6 +22,68 @@
 
 ## Recent Major Changes
 
+### December 2025 - POI Collection System & Production Deployment
+
+**MAJOR ADDITION: Automated POI Collection System** ✅
+
+**What Was Built:**
+1. **POI Collection Dashboard** (`/admin/poi-collection`)
+   - Full-featured admin UI for Google Places POI collection
+   - Category selection (14 categories: restaurants, hotels, viewpoints, activities, etc.)
+   - Priority queue showing all destinations with luxury scores
+   - Real-time progress tracking (destinations, categories, POIs)
+   - Budget monitoring with cost estimates
+   - Start/pause/resume controls
+   - Auto-refresh live stats
+
+2. **Tick-Based Execution System**
+   - Safe, pauseable POI collection
+   - Processes in batches ("ticks") to avoid timeouts
+   - Configurable: max requests per tick, max queue items per tick
+   - Automatically pauses when Google quota exhausted
+   - Resumes from exact point after pause
+   - Quota detection: watches for `RESOURCE_EXHAUSTED` errors
+
+3. **API Endpoints** (`/api/admin/places/collector/*`)
+   - `/start` - Create new collection job with parameters
+   - `/tick` - Process one batch of destinations/POIs
+   - `/pause` - Manual pause (saves state)
+   - `/resume` - Resume from paused state
+   - `/stats` - Real-time statistics and progress
+
+4. **Dual Storage System**
+   - **Supabase**: Raw Google Places data cached in `google_places_places` table
+   - **Neo4j**: POI nodes with relationships to destinations and categories
+   - Automatic sync between both systems
+
+5. **Smart Category Queries**
+   - Custom query templates per category
+   - Example: Restaurants → ["Michelin restaurant", "fine dining", "upscale restaurant"]
+   - Example: Hotels → ["luxury hotel", "5-star hotel", "boutique hotel"]
+   - Discovers more relevant POIs than generic searches
+
+6. **Quality Filtering**
+   - Rating ≥ 4.0 stars
+   - Price level ≥ $$ (excludes budget places)
+   - Category-specific filters (e.g., restaurants need 4.2+ rating)
+
+7. **Geocoding Integration**
+   - Auto-discovers destination coordinates via Google Geocoding API
+   - Caches coordinates for reuse
+
+8. **Progress Tracking**
+   - Per-destination stats (discovered, fetched, upserted)
+   - Per-category stats across all destinations
+   - Total requests used
+   - Budget consumed (estimated)
+
+**Production Deployment:**
+- Deployed to Vercel (luxury-travel-designer.com)
+- All TypeScript type errors fixed
+- Em-dash (—) replaced with hyphen (-) for copy consistency
+- Landing page messaging updated
+- Invite-only access (signup disabled, admin-only sign-in)
+
 ### December 2025 - POI Enrichment & Yacht Destinations
 
 **What Was Built:**

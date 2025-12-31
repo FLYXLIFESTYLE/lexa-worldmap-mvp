@@ -50,6 +50,15 @@
 - [x] Editable data grid with approval workflow
 - [x] Debug profile page for troubleshooting
 - [x] Google Vision service account authentication
+- [x] **POI Collection System** (`/admin/poi-collection`)
+  - Automated Google Places API collection
+  - Priority queue management
+  - Budget tracking & cost monitoring
+  - Tick-based execution (start/pause/resume)
+  - Real-time progress dashboard
+  - Category selection (restaurants, hotels, activities, etc.)
+  - Auto-relationship creation (POI → Theme → Destination)
+  - Supabase + Neo4j dual storage
 
 ### Backend (FastAPI)
 - [x] Conversation endpoint (`/api/v1/ailessia/converse`)
@@ -89,19 +98,30 @@
 
 ### High Priority (Q1 2026)
 
-#### 1. POI Collection Automation
-**Status**: Planned
-**Effort**: 2-3 weeks
-**Components**:
-- [ ] `/api/admin/collect-pois` endpoint
-- [ ] Priority queue management (French Riviera → Yacht cities by luxury score)
-- [ ] Budget tracker & cost monitoring
-- [ ] Progress dashboard (`/admin/poi-collection`)
-- [ ] Admin UI with start/pause/resume controls
-- [ ] Real-time progress updates
-- [ ] Automatic relationship creation (POI → Theme → Destination)
+#### 1. POI Collection Automation ✅
+**Status**: ✅ COMPLETE (Dec 2025)
+**Components Built**:
+- [x] `/admin/poi-collection` admin UI page
+- [x] `/api/admin/places/collector/start` - Create new collection job
+- [x] `/api/admin/places/collector/tick` - Process POIs in safe batches
+- [x] `/api/admin/places/collector/pause` - Manual pause
+- [x] `/api/admin/places/collector/resume` - Resume after pause
+- [x] `/api/admin/places/collector/stats` - Real-time statistics
+- [x] Priority queue management (destinations ordered by luxury score)
+- [x] Budget tracker with quota detection
+- [x] Category selection (14 categories: restaurants, hotels, activities, etc.)
+- [x] Dual storage: Supabase (`google_places_places`) + Neo4j (POI nodes)
+- [x] Auto-relationship creation: `(POI)-[:LOCATED_IN]->(destination)`, `(POI)-[:HAS_CATEGORY]->(category)`
+- [x] Real-time progress dashboard with live stats
+- [x] Configurable parameters (max requests/tick, max places/destination)
 
-**Blockers**: None (Google Places API configured)
+**Key Features**:
+- **Tick-based execution**: Safe, pauseable, resumable
+- **Quota-aware**: Automatically pauses when Google budget exhausted
+- **Category queries**: Custom query templates per category (e.g., "Michelin restaurant", "luxury hotel")
+- **Quality filters**: Rating ≥ 4.0, price level ≥ $$
+- **Geocoding**: Auto-discovers destination coordinates
+- **Progress tracking**: Destinations → Categories → POIs discovered/fetched/upserted
 
 #### 1b. Testing + learning sprint (captains)
 **Status**: Active now

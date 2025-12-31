@@ -214,7 +214,38 @@ Google Places API
   → Store raw data in Supabase (audit trail)
 ```
 
-#### 3. **Theme Selection Flow**:
+#### 3. **POI Collection System Flow** (NEW - Dec 2025):
+```
+Admin starts collection job
+  → POST /api/admin/places/collector/start
+    → Create job in Supabase (places_enrichment_jobs)
+    → Build priority queue (destinations by luxury score)
+    → Return job_id
+  
+Admin triggers tick (or auto-loop)
+  → POST /api/admin/places/collector/tick
+    → Get next destination from queue
+    → Geocode destination (get coordinates)
+    → For each category:
+      → Search Google Places (text query)
+      → Discover POIs (place IDs)
+    → For each discovered POI:
+      → Fetch Place Details
+      → Apply quality filters
+      → If qualifies:
+        → Upsert to Supabase (google_places_places)
+        → Upsert to Neo4j (poi node)
+        → Create relationships: (poi)-[:LOCATED_IN]->(destination)
+        → Link categories
+    → Update progress (stats, current_index)
+    → Return progress
+  
+If quota exhausted:
+  → Auto-pause with state='paused_budget'
+  → Admin resumes later with POST /api/admin/places/collector/resume
+```
+
+#### 4. **Theme Selection Flow**:
 ```
 User clicks theme card
   → Frontend: setSelectedTheme()
@@ -398,6 +429,48 @@ async def global_exception_handler(request, exc):
 - **Monitoring**: Sentry, Datadog
 
 ## Key Architectural Decisions
+
+## Key Architectural Decisions
+
+### Why POI Collection System Uses "Ticks"?
+- **Problem**: Google Places API calls are slow (~500ms-1s each)
+- **Solution**: Process in small batches ("ticks") that complete in <30s
+- **Benefits**:
+  - No serverless timeouts (Vercel has 60s limit on Pro, 10s on Free)
+  - Pauseable/resumable (safe to stop at any time)
+  - Progress visible in real-time
+  - Can adjust speed (more/fewer requests per tick)
+  - Admin controls: start, pause, resume
+
+### Why Dual Storage (Supabase + Neo4j)?
+- **Supabase** (`google_places_places`):
+  - Raw Google Places API responses (audit trail)
+  - Fast SQL queries for admin dashboard
+  - Job tracking (`places_enrichment_jobs`)
+  - Easy to export/backup
+  
+- **Neo4j**:
+  - POI nodes with relationships
+  - Fast graph queries for recommendations
+  - Emotional tagging (theme connections)
+  - Scales for complex traversals
+
+**Pattern**: Write to both, query from appropriate store
+
+### Why Category-Specific Query Templates?
+- **Problem**: Generic "restaurant in Monaco" misses Michelin stars
+- **Solution**: Multiple targeted queries per category
+  - Restaurants: "Michelin restaurant", "fine dining", "upscale restaurant"
+  - Hotels: "luxury hotel", "5-star hotel", "boutique hotel"
+- **Result**: 3-5x more relevant POIs discovered
+
+### Why Priority Queue by Luxury Score?
+- **Problem**: Limited budget, which destinations first?
+- **Solution**: Order by proven luxury density
+  - Yacht ports: High score (proven luxury market)
+  - French Riviera: Highest score (Monaco, St. Tropez, etc.)
+  - Unknown destinations: Lower score (collect later)
+- **Benefit**: Best POIs collected first, maximize ROI
 
 ### Why Next.js?
 - React framework with built-in routing
