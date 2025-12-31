@@ -148,7 +148,7 @@ export interface SessionState {
     retry_count: number; // For MIRROR stage retries
     intake_step?: 'THEME_SELECT' | 'THEME_CUSTOM' | 'THEME_WHY' | 'MEMORY' | 'HOOK_CONFIRM' | 'LOGISTICS';
     intake_questions_asked?: number; // counts “big questions” asked before the hook (target: 3)
-    logistics_step?: 'DURATION' | 'STRUCTURE' | 'WHEN' | 'WHERE' | 'BUDGET' | 'ALTERNATIVES' | 'DONE';
+    logistics_step?: 'DURATION' | 'WEEKEND_PATTERN' | 'STRUCTURE' | 'WHEN' | 'WHERE' | 'BUDGET' | 'ALTERNATIVES' | 'DONE';
     seasonal_guidance_shown?: {
       destination: string;
       month: string;

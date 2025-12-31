@@ -368,6 +368,8 @@ function buildIntakeFallbackSystemPrompt(state: SessionState): string {
             : // LOGISTICS
               logisticsStep === 'DURATION'
               ? `Ask: how many days (give examples).`
+              : logisticsStep === 'WEEKEND_PATTERN'
+                ? `Ask: for a weekend, do they mean Friday–Sunday or Saturday–Sunday?`
               : logisticsStep === 'STRUCTURE'
                 ? `Ask: curated vs balanced vs free (and reassure they can come back).`
                 : logisticsStep === 'WHEN'

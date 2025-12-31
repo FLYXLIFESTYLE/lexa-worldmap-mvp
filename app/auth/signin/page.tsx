@@ -121,10 +121,13 @@ function SignInForm() {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-zinc-600">
-              Need access?{' '}
-              <span className="font-semibold text-zinc-700">
-                Ask your admin for an invite
-              </span>
+              Not registered yet?{' '}
+              <Link
+                href="/auth/signup"
+                className="font-semibold text-lexa-navy hover:text-lexa-gold transition-colors"
+              >
+                Click here to sign up.
+              </Link>
             </p>
           </div>
         </div>

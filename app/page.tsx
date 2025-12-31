@@ -52,10 +52,10 @@ export default function LandingPage() {
         <div className="mx-auto mb-12 max-w-3xl space-y-4 px-6">
           <div className="text-zinc-300 text-base md:text-lg leading-relaxed">
             <p className="mb-4">
-              Experience curated travel scripts that amplify or revive your emotions and feeling of wealth, anticipates your desires, and creates moments and memories that resonate with who you truly are or finally want to be(come).
+              Experience curated travel scripts that amplify or revive your emotions and feelings of wealth, anticipate your (hidden) desires, and create moments and memories that resonate with who you truly are - or who you finally want to become.
             </p>
             <p className="text-zinc-400 text-sm md:text-base">
-              No checklist like itineraries of destination and activities, no list of generic places recommendations.
+              No checklist-like itineraries of destinations and activities. No lists of generic place recommendations - instead, a clear experience script with a hook, emotional direction, and signature highlights (then we make it real with timing, places, and logistics).
             </p>
           </div>
         </div>
