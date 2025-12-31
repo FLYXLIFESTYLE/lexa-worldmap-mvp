@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS script_marketplace_listings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  script_id UUID NOT NULL REFERENCES experience_briefs(id) ON DELETE CASCADE,
+  script_id UUID NOT NULL,
   seller_id UUID NOT NULL,
   price DECIMAL(10,2) DEFAULT 0.00,
   listing_type TEXT NOT NULL DEFAULT 'free' CHECK (listing_type IN ('free', 'paid', 'premium')),
@@ -24,7 +24,11 @@ CREATE TABLE IF NOT EXISTS script_marketplace_listings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   published_at TIMESTAMPTZ,
-  UNIQUE(script_id)
+  UNIQUE(script_id),
+  CONSTRAINT fk_script_marketplace_listings_script 
+    FOREIGN KEY (script_id) 
+    REFERENCES experience_briefs(id) 
+    ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_script_marketplace_listings_seller ON script_marketplace_listings(seller_id);
@@ -104,7 +108,7 @@ CREATE TRIGGER update_experience_partners_updated_at
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS partner_placements (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  partner_id UUID NOT NULL REFERENCES experience_partners(id) ON DELETE CASCADE,
+  partner_id UUID NOT NULL,
   placement_type TEXT NOT NULL CHECK (placement_type IN ('dashboard', 'script_suggestion', 'sidebar', 'email', 'banner')),
   targeting_criteria JSONB DEFAULT '{}'::jsonb,
   priority INT DEFAULT 0,
@@ -115,7 +119,11 @@ CREATE TABLE IF NOT EXISTS partner_placements (
   active_until TIMESTAMPTZ,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_partner_placements_partner 
+    FOREIGN KEY (partner_id) 
+    REFERENCES experience_partners(id) 
+    ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_partner_placements_partner ON partner_placements(partner_id);
@@ -134,15 +142,24 @@ CREATE TRIGGER update_partner_placements_updated_at
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS partner_referrals (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  partner_id UUID NOT NULL REFERENCES experience_partners(id),
+  partner_id UUID NOT NULL,
   user_id UUID NOT NULL,
-  placement_id UUID REFERENCES partner_placements(id),
-  script_id UUID REFERENCES experience_briefs(id),
+  placement_id UUID,
+  script_id UUID,
   referral_type TEXT NOT NULL CHECK (referral_type IN ('view', 'click', 'inquiry', 'booking')),
   value DECIMAL(10,2),
   commission_earned DECIMAL(10,2),
   metadata JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_partner_referrals_partner 
+    FOREIGN KEY (partner_id) 
+    REFERENCES experience_partners(id),
+  CONSTRAINT fk_partner_referrals_placement 
+    FOREIGN KEY (placement_id) 
+    REFERENCES partner_placements(id),
+  CONSTRAINT fk_partner_referrals_script 
+    FOREIGN KEY (script_id) 
+    REFERENCES experience_briefs(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_partner_referrals_partner ON partner_referrals(partner_id);
