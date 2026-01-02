@@ -1,7 +1,5 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Heart, Sparkles, Mountain, Waves } from 'lucide-react';
 
 interface EmotionalProfileCardProps {
@@ -41,21 +39,21 @@ export function EmotionalProfileCard({
   const secondaryEmotions = profile?.secondary_emotions || [];
 
   return (
-    <Card className="border-lexa-navy/10">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
+    <div className="rounded-lg border border-lexa-navy/10 bg-white">
+      <div className="px-6 py-4 border-b border-gray-100">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
           <Heart className="h-5 w-5 text-lexa-gold" />
           Emotional Profile
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+        </h3>
+      </div>
+      <div className="p-6 space-y-6">
         {/* Personality Archetype */}
         {personalityArchetype && (
           <div>
             <p className="text-sm font-medium text-gray-600 mb-2">Personality Type</p>
-            <Badge variant="outline" className="bg-lexa-gold/10 text-lexa-gold border-lexa-gold">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-lexa-gold/10 text-lexa-gold border border-lexa-gold">
               {personalityArchetype}
-            </Badge>
+            </span>
           </div>
         )}
 
@@ -68,14 +66,13 @@ export function EmotionalProfileCard({
                 const Icon = emotionIcons[emotion.toLowerCase()] || Heart;
                 const colorClass = emotionColors[emotion.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-300';
                 return (
-                  <Badge 
+                  <span 
                     key={emotion} 
-                    variant="outline" 
-                    className={`${colorClass} inline-flex items-center gap-1`}
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium border ${colorClass}`}
                   >
                     <Icon className="h-3 w-3" />
                     {emotion}
-                  </Badge>
+                  </span>
                 );
               })}
             </div>
@@ -90,13 +87,12 @@ export function EmotionalProfileCard({
               {secondaryEmotions.map((emotion) => {
                 const colorClass = emotionColors[emotion.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-300';
                 return (
-                  <Badge 
+                  <span 
                     key={emotion} 
-                    variant="outline" 
-                    className={colorClass}
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ${colorClass}`}
                   >
                     {emotion}
-                  </Badge>
+                  </span>
                 );
               })}
             </div>
@@ -109,13 +105,12 @@ export function EmotionalProfileCard({
             <p className="text-sm font-medium text-gray-600 mb-2">Favorite Themes</p>
             <div className="flex flex-wrap gap-2">
               {primaryThemes.map((theme) => (
-                <Badge 
+                <span 
                   key={theme} 
-                  variant="outline" 
-                  className="bg-lexa-navy/5 text-lexa-navy border-lexa-navy/20"
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-lexa-navy/5 text-lexa-navy border border-lexa-navy/20"
                 >
                   {theme}
-                </Badge>
+                </span>
               ))}
             </div>
           </div>
@@ -128,7 +123,7 @@ export function EmotionalProfileCard({
             <p className="text-sm">Your emotional profile will be discovered through conversations with LEXA</p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

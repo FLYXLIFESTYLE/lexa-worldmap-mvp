@@ -1,7 +1,5 @@
 'use client';
 
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
 import { ArrowUp, CheckCircle } from 'lucide-react';
 
 interface UsageProgressBarProps {
@@ -53,11 +51,13 @@ export function UsageProgressBar({
 
       {!isUnlimited && (
         <>
-          <Progress 
-            value={percentage} 
-            className={`h-2 ${isAtLimit ? 'bg-red-100' : isNearLimit ? 'bg-orange-100' : 'bg-gray-100'}`}
-            indicatorClassName={isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-orange-600' : 'bg-lexa-gold'}
-          />
+          {/* Progress Bar */}
+          <div className={`w-full h-2 rounded-full overflow-hidden ${isAtLimit ? 'bg-red-100' : isNearLimit ? 'bg-orange-100' : 'bg-gray-100'}`}>
+            <div 
+              className={`h-full rounded-full transition-all ${isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-orange-600' : 'bg-lexa-gold'}`}
+              style={{ width: `${percentage}%` }}
+            />
+          </div>
 
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-500">
@@ -68,15 +68,13 @@ export function UsageProgressBar({
               )}
             </p>
             {(isNearLimit || isAtLimit) && onUpgrade && (
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={onUpgrade}
-                className="text-xs h-7 border-lexa-gold text-lexa-gold hover:bg-lexa-gold/10"
+                className="text-xs h-7 px-3 rounded-md border border-lexa-gold text-lexa-gold hover:bg-lexa-gold/10 transition-colors flex items-center gap-1"
               >
-                <ArrowUp className="h-3 w-3 mr-1" />
+                <ArrowUp className="h-3 w-3" />
                 Upgrade
-              </Button>
+              </button>
             )}
           </div>
         </>

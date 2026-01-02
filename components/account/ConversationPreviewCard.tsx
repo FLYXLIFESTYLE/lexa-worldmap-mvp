@@ -1,8 +1,5 @@
 'use client';
 
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Calendar, MessageCircle, ArrowRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -34,16 +31,16 @@ export function ConversationPreviewCard({
   const timeAgo = formatDistanceToNow(new Date(conversation.updated_at), { addSuffix: true });
 
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer border-lexa-navy/10">
-      <CardContent className="p-6">
+    <div className="rounded-lg border border-lexa-navy/10 bg-white hover:shadow-md transition-shadow cursor-pointer">
+      <div className="p-6">
         <div className="space-y-4">
           {/* Header */}
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant="outline" className="bg-lexa-navy/5 text-lexa-navy border-lexa-navy/20">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-lexa-navy/5 text-lexa-navy border border-lexa-navy/20">
                   {theme}
-                </Badge>
+                </span>
                 <span className="text-xs text-gray-500 flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
                   {timeAgo}
@@ -79,29 +76,25 @@ export function ConversationPreviewCard({
             </span>
             <div className="flex gap-2">
               {onView && (
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={() => onView(conversation.id)}
-                  className="text-xs"
+                  className="text-xs px-3 py-1.5 rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   View Details
-                </Button>
+                </button>
               )}
               {conversation.stage !== 'COMPLETE' && onContinue && (
-                <Button
-                  variant="default"
-                  size="sm"
+                <button
                   onClick={() => onContinue(conversation.id)}
-                  className="text-xs bg-lexa-gold hover:bg-lexa-gold/90"
+                  className="text-xs px-3 py-1.5 rounded-md bg-lexa-gold hover:bg-lexa-gold/90 text-zinc-900 font-medium transition-colors flex items-center gap-1"
                 >
-                  Continue <ArrowRight className="h-3 w-3 ml-1" />
-                </Button>
+                  Continue <ArrowRight className="h-3 w-3" />
+                </button>
               )}
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

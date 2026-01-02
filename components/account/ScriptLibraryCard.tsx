@@ -1,8 +1,5 @@
 'use client';
 
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Heart, Archive, Share2, Eye, ThumbsUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -49,8 +46,8 @@ export function ScriptLibraryCard({
   const timeAgo = formatDistanceToNow(new Date(script.created_at), { addSuffix: true });
 
   return (
-    <Card className="hover:shadow-lg transition-all cursor-pointer border-lexa-navy/10 group">
-      <CardContent className="p-6">
+    <div className="rounded-lg border border-lexa-navy/10 bg-white hover:shadow-lg transition-all cursor-pointer group">
+      <div className="p-6">
         <div className="space-y-4">
           {/* Header */}
           <div className="flex items-start justify-between">
@@ -60,38 +57,33 @@ export function ScriptLibraryCard({
               </h3>
               <p className="text-xs text-gray-500 mt-1">{timeAgo}</p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`${isFavorite ? 'text-red-500' : 'text-gray-400'} hover:text-red-500 -mt-1 -mr-2`}
+            <button
+              className={`${isFavorite ? 'text-red-500' : 'text-gray-400'} hover:text-red-500 -mt-1 -mr-2 p-2`}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleFavorite?.(script.id, !isFavorite);
               }}
             >
               <Heart className="h-4 w-4" fill={isFavorite ? 'currentColor' : 'none'} />
-            </Button>
+            </button>
           </div>
 
           {/* Tags */}
           <div className="flex flex-wrap gap-2">
             {script.theme && (
-              <Badge variant="outline" className="bg-lexa-navy/5 text-lexa-navy border-lexa-navy/20 text-xs">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-lexa-navy/5 text-lexa-navy border border-lexa-navy/20">
                 {script.theme}
-              </Badge>
+              </span>
             )}
             {script.difficulty_level && (
-              <Badge 
-                variant="outline" 
-                className={`${difficultyColors[script.difficulty_level] || 'bg-gray-100 text-gray-700'} text-xs`}
-              >
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ${difficultyColors[script.difficulty_level] || 'bg-gray-100 text-gray-700 border-gray-300'}`}>
                 {script.difficulty_level}
-              </Badge>
+              </span>
             )}
             {script.estimated_budget_range && (
-              <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300 text-xs">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300">
                 {script.estimated_budget_range}
-              </Badge>
+              </span>
             )}
           </div>
 
@@ -125,45 +117,39 @@ export function ScriptLibraryCard({
             </div>
             <div className="flex gap-1">
               {onView && (
-                <Button
-                  variant="default"
-                  size="sm"
+                <button
                   onClick={() => onView(script.id)}
-                  className="text-xs bg-lexa-gold hover:bg-lexa-gold/90"
+                  className="text-xs px-3 py-1.5 rounded-md bg-lexa-gold hover:bg-lexa-gold/90 text-zinc-900 font-medium transition-colors"
                 >
                   View
-                </Button>
+                </button>
               )}
               {onShare && !isArchived && (
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onShare(script.id);
                   }}
-                  className="text-xs"
+                  className="text-xs p-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <Share2 className="h-3 w-3" />
-                </Button>
+                </button>
               )}
               {onArchive && (
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onArchive(script.id);
                   }}
-                  className="text-xs"
+                  className="text-xs p-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <Archive className="h-3 w-3" />
-                </Button>
+                </button>
               )}
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
