@@ -1,12 +1,12 @@
-# 🚀 Quick Migration Guide - Captain Portal & Intelligence
+# 🚀 UPDATED Migration Guide - Captain Portal & Intelligence
 
-**Issue:** Migration 012 depends on tables from migration 011.
+**Issue Fixed:** The `lexa_user_profiles` table needs a `role` column before migrations 011 and 012 will work.
 
-**Solution:** Run migrations in order via Supabase Dashboard.
+**Solution:** Run migrations in order: 010b → 011 → 012
 
 ---
 
-## ✅ **Step-by-Step: Run Migrations**
+## ✅ **Step-by-Step: Run Migrations (UPDATED ORDER)**
 
 ### **1. Open Supabase Dashboard**
 - Go to: https://supabase.com/dashboard
@@ -15,7 +15,55 @@
 
 ---
 
-### **2. Run Migration 011 FIRST** (Captain Portal Tables)
+### **2. Run Migration 010b FIRST** (Add Role Column) ⚠️ **NEW**
+
+**Copy this entire file:**
+`supabase/migrations/010b_add_role_column.sql`
+
+**Paste into SQL Editor and click "Run"**
+
+**Creates:**
+- ✅ Adds `role` column to `lexa_user_profiles`
+- ✅ Default value: `'user'`
+- ✅ Allowed values: `'user'`, `'captain'`, `'admin'`
+- ✅ Index for fast role-based queries
+
+**Verify:** Check `lexa_user_profiles` table - should now have `role` column.
+
+---
+
+### **3. Set Your Role to Admin** (Optional but Recommended)
+
+Run this SQL to make yourself an admin:
+
+```sql
+-- Find your user_id first
+SELECT id, raw_user_meta_data->>'email' as email 
+FROM auth.users;
+
+-- Then set your role to admin (replace YOUR_USER_ID)
+UPDATE lexa_user_profiles 
+SET role = 'admin' 
+WHERE user_id = 'YOUR_USER_ID_FROM_ABOVE';
+```
+
+**OR** if you haven't created your profile yet:
+
+```sql
+-- Insert your profile with admin role (replace YOUR_USER_ID)
+INSERT INTO lexa_user_profiles (user_id, role, emotional_profile, preferences)
+VALUES (
+    'YOUR_USER_ID',
+    'admin',
+    '{}'::jsonb,
+    '{}'::jsonb
+)
+ON CONFLICT (user_id) DO UPDATE SET role = 'admin';
+```
+
+---
+
+### **4. Run Migration 011 SECOND** (Captain Portal Tables)
 
 **Copy this entire file:**
 `supabase/migrations/011_captain_portal_tables.sql`
@@ -36,7 +84,7 @@
 
 ---
 
-### **3. Run Migration 012 SECOND** (Intelligence Tables)
+### **5. Run Migration 012 THIRD** (Intelligence Tables)
 
 **Copy this entire file:**
 `supabase/migrations/012_intelligence_extraction_tables.sql`
@@ -84,16 +132,32 @@ ORDER BY table_name;
 
 **Expected result:** 12 tables
 
+**Check role column exists:**
+
+```sql
+SELECT column_name, data_type, column_default
+FROM information_schema.columns
+WHERE table_name = 'lexa_user_profiles'
+  AND column_name = 'role';
+```
+
+**Expected:** 1 row showing `role | text | 'user'::text`
+
 ---
 
 ## 📊 **What Each Migration Does:**
+
+### **Migration 010b** (Prerequisites) ⚠️ **MUST RUN FIRST**
+- Adds `role` column to existing `lexa_user_profiles` table
+- Enables captain/admin access control
+- **Dependencies:** None (but must run before 011)
 
 ### **Migration 011** (Foundation)
 - Captain file uploads
 - POI extraction pipeline
 - URL scraping system
 - Keyword monitoring
-- **Dependencies:** None (run first!)
+- **Dependencies:** Requires 010b (role column)
 
 ### **Migration 012** (Intelligence)
 - Experience ideas for script inspiration
@@ -102,33 +166,50 @@ ORDER BY table_name;
 - Price intelligence for budgeting
 - Competitor analysis
 - Operational knowledge
-- **Dependencies:** Requires 011 (run second!)
+- **Dependencies:** Requires 011 (captain_uploads table)
 
 ---
 
 ## ⚠️ **Important:**
 
-1. **Order matters:** Always run 011 before 012
-2. **No harm in re-running:** `IF NOT EXISTS` prevents errors
-3. **RLS policies:** Ensure your role is `captain` or `admin` in `lexa_user_profiles`
+1. **Order matters:** Must run 010b → 011 → 012
+2. **Set your role:** Make yourself `admin` to access Captain Portal
+3. **No harm in re-running:** `IF NOT EXISTS` and `ADD COLUMN IF NOT EXISTS` prevent errors
+4. **RLS policies work with roles:** The `role` column is checked by all policies
 
 ---
 
-## 🎉 **After Both Migrations:**
+## 🎉 **After All Three Migrations:**
 
 Your database will have:
+- ✅ **Role-based access control** (user, captain, admin)
 - ✅ **12 new tables** for Captain Portal & Intelligence
-- ✅ **34 indexes** for fast queries
+- ✅ **35 indexes** for fast queries (including role index)
 - ✅ **24 RLS policies** for security
 - ✅ Complete data pipeline for business intelligence
 
 ---
 
-## 🚀 **Next Step:**
+## 👤 **User Roles Explained:**
 
-Deploy the backend services:
-1. `intelligence_extractor.py` (Claude AI extraction)
-2. `intelligence_storage.py` (save/retrieve functions)
-3. `captain_upload.py` (upload API)
+| Role | Access | Who |
+|------|--------|-----|
+| **user** | LEXA chat, own scripts, account | Regular users (default) |
+| **captain** | Captain Portal, data upload, intelligence | You, Paul, Bakary, future captains |
+| **admin** | Everything + Admin Dashboard | You, Paul, Bakary |
 
-Then start uploading documents and watch LEXA get smarter! 🎯
+---
+
+## 🚀 **Next Steps:**
+
+1. ✅ Run migration 010b (add role column)
+2. ✅ Set your user to `admin` role
+3. ✅ Run migration 011 (captain portal)
+4. ✅ Run migration 012 (intelligence)
+5. Deploy backend services
+6. Access Captain Portal at `/captain`
+7. Start uploading documents!
+
+---
+
+**🎯 Remember:** You need to be `captain` or `admin` role to access the Captain Portal and upload data!
