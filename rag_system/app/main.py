@@ -43,6 +43,24 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import scraping router: {e}")
 
+try:
+    from app.api.captain_pois import router as pois_router
+    app.include_router(pois_router)
+except ImportError as e:
+    print(f"Warning: Could not import POIs router: {e}")
+
+try:
+    from app.api.captain_keywords import router as keywords_router
+    app.include_router(keywords_router)
+except ImportError as e:
+    print(f"Warning: Could not import keywords router: {e}")
+
+try:
+    from app.api.captain_stats import router as stats_router
+    app.include_router(stats_router)
+except ImportError as e:
+    print(f"Warning: Could not import stats router: {e}")
+
 
 @app.get("/")
 async def root():
@@ -55,7 +73,10 @@ async def root():
             "docs": "/docs",
             "health": "/health",
             "upload": "/api/captain/upload/*",
-            "scraping": "/api/captain/scraping/*"
+            "scraping": "/api/captain/scrape/*",
+            "pois": "/api/captain/pois/*",
+            "keywords": "/api/captain/keywords/*",
+            "stats": "/api/captain/stats/*"
         }
     }
 
@@ -70,7 +91,10 @@ async def health_check():
         "services": {
             "file_processing": "available",
             "intelligence_extraction": "available",
-            "web_scraping": "available"
+            "web_scraping": "available",
+            "poi_management": "available",
+            "keyword_monitoring": "available",
+            "statistics": "available"
         }
     }
 
