@@ -25,7 +25,6 @@ except ImportError:
 # Excel processing
 try:
     import openpyxl
-    import pandas as pd
     EXCEL_AVAILABLE = True
 except ImportError:
     EXCEL_AVAILABLE = False

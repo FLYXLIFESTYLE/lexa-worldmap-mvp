@@ -9,15 +9,12 @@ import uuid
 from datetime import datetime
 import os
 
-from app.services.file_processor import FileProcessor
+from app.services.file_processor import process_file
 from app.services.intelligence_extractor import intelligence_extractor
 from app.services.intelligence_storage import save_intelligence_to_db
 from app.services.supabase_client import get_supabase
 
 router = APIRouter(prefix="/api/captain/upload", tags=["Upload"])
-
-# Initialize file processor
-file_processor = FileProcessor()
 
 # Max file size (10MB for free tier)
 MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -87,7 +84,7 @@ async def upload_file(
             f.write(content)
         
         # Process file
-        extracted_text, metadata = file_processor.process_file(temp_path, file.filename)
+        extracted_text, metadata = await process_file(temp_path)
         
         # Clean up temp file
         if os.path.exists(temp_path):
