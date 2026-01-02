@@ -28,6 +28,37 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [stage, setStage] = useState('WELCOME');
   const [userEmail, setUserEmail] = useState<string>('');
+  const [showResetModal, setShowResetModal] = useState(false);
+  
+  // Reset chat handler
+  const handleResetChat = () => {
+    setShowResetModal(true);
+  };
+  
+  const confirmReset = async (saveConversation: boolean) => {
+    try {
+      if (saveConversation && sessionId) {
+        // Mark session as completed/archived
+        await fetch(`/api/lexa/sessions/${sessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stage: 'COMPLETE' })
+        });
+      }
+      
+      // Clear local state
+      setMessages([]);
+      setSessionId(null);
+      setStage('WELCOME');
+      setShowResetModal(false);
+      
+      // Start fresh conversation
+      await startConversation();
+    } catch (error) {
+      console.error('Error resetting chat:', error);
+      alert('Failed to reset chat. Please try again.');
+    }
+  };
   
   // Send message to LEXA
   const sendMessage = async (content: string) => {
@@ -192,6 +223,18 @@ export default function ChatPage() {
                 {stage.replace('_', ' ')}
               </span>
             </div>
+            
+            {/* Reset Chat Button */}
+            <button
+              onClick={handleResetChat}
+              className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/10 hover:border-lexa-gold/30 transition-all text-sm font-medium"
+              title="Start a new conversation"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="hidden lg:inline">Reset Chat</span>
+            </button>
           </div>
           
           <div className="flex items-center gap-4">
@@ -231,6 +274,50 @@ export default function ChatPage() {
         onSend={sendMessage}
         disabled={isLoading}
       />
+      
+      {/* Reset Chat Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+            <div className="bg-lexa-navy text-white p-6 rounded-t-2xl">
+              <h3 className="text-xl font-bold">🔄 Start New Conversation?</h3>
+              <p className="text-zinc-300 mt-2 text-sm">
+                This will start a fresh conversation with LEXA. Your current chat can be saved or deleted.
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-lexa-gold/10 border border-lexa-gold/30 rounded-lg p-4">
+                <p className="text-sm text-zinc-700">
+                  <strong>Note:</strong> Saved conversations will appear in your Account Dashboard where you can continue them later.
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={() => confirmReset(true)}
+                  className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-lexa-gold to-yellow-600 hover:from-yellow-400 hover:to-lexa-gold text-zinc-900 font-semibold transition-all hover:scale-105 hover:shadow-xl"
+                >
+                  ✅ Save & Start New
+                </button>
+                
+                <button
+                  onClick={() => confirmReset(false)}
+                  className="w-full px-6 py-3 rounded-xl border-2 border-red-500 text-red-600 hover:bg-red-50 font-semibold transition-all"
+                >
+                  🗑️ Delete & Start New
+                </button>
+                
+                <button
+                  onClick={() => setShowResetModal(false)}
+                  className="w-full px-6 py-3 rounded-xl border-2 border-zinc-300 text-zinc-700 hover:bg-zinc-50 font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

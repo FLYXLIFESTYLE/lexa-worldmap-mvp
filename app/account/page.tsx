@@ -227,10 +227,10 @@ export default function AccountDashboard() {
                 <MessageCircle className="h-12 w-12 mx-auto mb-3 text-zinc-400" />
                 <p className="text-zinc-300 mb-4">No conversations yet. Start chatting with LEXA!</p>
                 <button
-                  onClick={() => router.push('/experience')}
+                  onClick={() => router.push('/app')}
                   className="px-6 py-3 rounded-full bg-gradient-to-r from-lexa-gold to-yellow-600 hover:from-yellow-400 hover:to-lexa-gold text-zinc-900 font-semibold transition-all hover:scale-105 hover:shadow-2xl hover:shadow-lexa-gold/50 inline-flex items-center gap-2"
                 >
-                  Start Conversation
+                  Start New Conversation with LEXA
                 </button>
               </div>
             )}
@@ -270,10 +270,10 @@ export default function AccountDashboard() {
                 <FileText className="h-12 w-12 mx-auto mb-3 text-zinc-400" />
                 <p className="text-zinc-300 mb-4">No experience scripts yet. Create your first one with LEXA!</p>
                 <button
-                  onClick={() => router.push('/experience')}
+                  onClick={() => router.push('/app')}
                   className="px-6 py-3 rounded-full bg-gradient-to-r from-lexa-gold to-yellow-600 hover:from-yellow-400 hover:to-lexa-gold text-zinc-900 font-semibold transition-all hover:scale-105 hover:shadow-2xl hover:shadow-lexa-gold/50 inline-flex items-center gap-2"
                 >
-                  Create Script
+                  Start New Conversation with LEXA
                 </button>
               </div>
             )}
