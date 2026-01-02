@@ -9,17 +9,26 @@ from app.services.supabase_client import get_supabase
 
 
 async def save_intelligence_to_db(
+    supabase,
     intelligence: Dict,
-    upload_id: str = None,
-    scrape_id: str = None,
-    user_id: str = None
+    source_type: str,
+    source_id: str,
+    source_metadata: Dict = None,
+    uploaded_by: str = None
 ) -> Dict[str, int]:
     """
     Save all extracted intelligence to database
     
+    Args:
+        supabase: Supabase client instance
+        intelligence: Dict with all extracted intelligence
+        source_type: 'file_upload', 'text_paste', 'url_scrape'
+        source_id: Upload ID or scrape ID
+        source_metadata: Additional metadata about the source
+        uploaded_by: User ID who uploaded/scraped
+    
     Returns: Count of items saved per category
     """
-    supabase = get_supabase()
     counts = {
         'pois': 0,
         'experiences': 0,
@@ -29,6 +38,11 @@ async def save_intelligence_to_db(
         'competitors': 0,
         'learnings': 0
     }
+    
+    # Determine upload_id vs scrape_id based on source_type
+    upload_id = source_id if source_type in ['file_upload', 'text_paste'] else None
+    scrape_id = source_id if source_type == 'url_scrape' else None
+    user_id = uploaded_by
     
     try:
         # 1. Save POIs (as before)
