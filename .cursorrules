@@ -80,7 +80,9 @@ This project uses a Memory Bank system to maintain context across sessions. ALL 
   - Confidence score system (80% default, captain approval for >80%)
   - Google Alerts-style Keyword Monitor for daily article scanning
   - ~20 hours of development, all frontend complete
-- **Future**: Backend APIs (Phase 7), Database migrations (Phase 8), affiliate system, mobile app
+  - **INVESTOR VISION DOCUMENTED**: "Ultimate Gift" concept for UHNW individuals
+- **Future**: Backend APIs (Phase 7), Database migrations (Phase 8), then production deployment
+- **Long-term Vision**: Multi-modal transportation (yachts → jets → cars → trains), luxury assets as themes, real individuals as themes (ultimate gift service)
 
 ## Update Protocol
 When user says **"update memory bank"**, MUST review ALL memory bank files and update:
