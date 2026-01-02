@@ -5,7 +5,7 @@ Saves extracted business intelligence to Supabase
 
 from typing import Dict, List
 from datetime import datetime
-from app.services.supabase_client import get_supabase_client
+from app.services.supabase_client import get_supabase
 
 
 async def save_intelligence_to_db(
@@ -19,7 +19,7 @@ async def save_intelligence_to_db(
     
     Returns: Count of items saved per category
     """
-    supabase = get_supabase_client()
+    supabase = get_supabase()
     counts = {
         'pois': 0,
         'experiences': 0,
@@ -180,7 +180,7 @@ async def get_intelligence_for_script_creation(
     This is called by LEXA when creating experience scripts
     to enhance recommendations with real-world intelligence
     """
-    supabase = get_supabase_client()
+    supabase = get_supabase()
     intelligence = {
         'experiences': [],
         'trends': [],
@@ -236,7 +236,7 @@ async def get_intelligence_for_script_creation(
 
 async def increment_usage_count(table: str, record_id: str):
     """Track how often LEXA uses each piece of intelligence"""
-    supabase = get_supabase_client()
+    supabase = get_supabase()
     try:
         supabase.rpc(
             f'increment_usage_count',
