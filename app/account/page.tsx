@@ -163,7 +163,8 @@ export default function AccountDashboard() {
                   />
                 </div>
               </div>
-          <div className="p-6 space-y-4 bg-gradient-to-br from-lexa-gold/5 to-transparent">
+              
+              <div className="p-6 space-y-4 bg-gradient-to-br from-lexa-gold/5 to-transparent">
             {usage && (
               <div className="space-y-4 p-4 rounded-xl bg-black/10 backdrop-blur-sm">
                 <UsageProgressBar
