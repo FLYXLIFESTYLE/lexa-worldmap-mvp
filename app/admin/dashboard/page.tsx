@@ -66,13 +66,13 @@ const activeTools = [
     features: ['POI completeness', 'Missing data reports', 'Quality scores']
   },
   {
-    id: 'poi-collection',
-    name: 'POI Collection',
-    description: 'Bulk POI import and management tools',
-    icon: '📍',
-    href: '/admin/poi-collection',
-    color: 'bg-yellow-500',
-    features: ['Import POIs from CSV', 'Bulk updates', 'Category assignment']
+    id: 'captain-portal',
+    name: "Captain's Knowledge Portal",
+    description: 'Upload data, verify POIs, manage content (Captain access)',
+    icon: '⚓',
+    href: '/captain',
+    color: 'bg-blue-600',
+    features: ['Upload files & URLs', 'Manual entry', 'Verify & enhance', 'Keyword monitor']
   },
   {
     id: 'poi-search',
@@ -104,7 +104,7 @@ const activeTools = [
 ];
 
 // Section 2: In Development / Inactive Tools
-const inactiveToo = [
+const inactiveTools = [
   {
     id: 'backlog',
     name: 'Development Backlog',
@@ -122,15 +122,6 @@ const inactiveToo = [
     href: '/admin/seed-themes',
     color: 'bg-gray-500',
     features: ['Add theme categories', 'Update themes', 'One-time setup']
-  },
-  {
-    id: 'yacht-destinations',
-    name: 'Yacht Destinations Upload',
-    description: 'Legacy yacht destination upload tool',
-    icon: '⛵',
-    href: '/admin/upload-yacht-destinations-v2',
-    color: 'bg-gray-500',
-    features: ['CSV upload', 'OCR for images', 'Luxury scoring']
   },
   {
     id: 'debug-profile',
@@ -433,10 +424,10 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-3 mb-4">
             <span className="text-2xl">🚧</span>
             <h2 className="text-2xl font-bold text-gray-900">Section 3: In Development / Inactive</h2>
-            <span className="text-sm text-gray-500">({inactiveToo.length} tools)</span>
+            <span className="text-sm text-gray-500">({inactiveTools.length} tools)</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {inactiveToo.map((tool) => (
+            {inactiveTools.map((tool) => (
               <Link
                 key={tool.id}
                 href={tool.comingSoon ? '#' : tool.href}
