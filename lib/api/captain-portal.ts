@@ -1,0 +1,363 @@
+/**
+ * Captain Portal API Client
+ * Connects frontend to backend FastAPI endpoints
+ */
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://lexa-worldmap-mvp-rlss.onrender.com';
+
+// Helper for making API requests
+async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = `${API_BASE_URL}${endpoint}`;
+  
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `API error: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+// ============================================================================
+// UPLOAD API
+// ============================================================================
+
+export interface UploadResponse {
+  success: boolean;
+  upload_id: string;
+  filename: string;
+  pois_extracted: number;
+  intelligence_extracted: {
+    pois: number;
+    experiences: number;
+    trends: number;
+    insights: number;
+    prices: number;
+    competitors: number;
+    learnings: number;
+  };
+}
+
+export const uploadAPI = {
+  /**
+   * Upload a file
+   */
+  uploadFile: async (file: File): Promise<UploadResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE_URL}/api/captain/upload/`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
+      throw new Error(error.detail);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Upload text/paste
+   */
+  uploadText: async (title: string, content: string): Promise<UploadResponse> => {
+    return apiRequest('/api/captain/upload/text', {
+      method: 'POST',
+      body: JSON.stringify({ title, content }),
+    });
+  },
+
+  /**
+   * Get upload history
+   */
+  getHistory: async (skip = 0, limit = 50) => {
+    return apiRequest(`/api/captain/upload/history?skip=${skip}&limit=${limit}`, {
+      method: 'GET',
+    });
+  },
+};
+
+// ============================================================================
+// SCRAPING API
+// ============================================================================
+
+export const scrapingAPI = {
+  /**
+   * Scrape a single URL
+   */
+  scrapeURL: async (url: string, extractIntelligence = true) => {
+    return apiRequest('/api/captain/scrape/url', {
+      method: 'POST',
+      body: JSON.stringify({ url, extract_intelligence: extractIntelligence }),
+    });
+  },
+
+  /**
+   * Scrape multiple URLs
+   */
+  scrapeBatch: async (urls: string[], extractIntelligence = true) => {
+    return apiRequest('/api/captain/scrape/batch', {
+      method: 'POST',
+      body: JSON.stringify({ urls, extract_intelligence: extractIntelligence }),
+    });
+  },
+};
+
+// ============================================================================
+// POI API
+// ============================================================================
+
+export interface POI {
+  id: string;
+  name: string;
+  destination?: string;
+  category?: string;
+  description?: string;
+  confidence_score: number;
+  luxury_score?: number;
+  verified: boolean;
+  enhanced: boolean;
+  promoted_to_main: boolean;
+  created_at: string;
+}
+
+export const poisAPI = {
+  /**
+   * Get list of POIs with filters
+   */
+  getPOIs: async (params: {
+    skip?: number;
+    limit?: number;
+    destination?: string;
+    category?: string;
+    verified?: boolean;
+    enhanced?: boolean;
+    promoted?: boolean;
+    search?: string;
+  } = {}) => {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    return apiRequest<{ pois: POI[]; total: number; skip: number; limit: number }>(
+      `/api/captain/pois/?${queryParams.toString()}`,
+      { method: 'GET' }
+    );
+  },
+
+  /**
+   * Get a single POI
+   */
+  getPOI: async (poiId: string): Promise<POI> => {
+    return apiRequest(`/api/captain/pois/${poiId}`, { method: 'GET' });
+  },
+
+  /**
+   * Update a POI
+   */
+  updatePOI: async (poiId: string, updates: Partial<POI>) => {
+    return apiRequest(`/api/captain/pois/${poiId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  },
+
+  /**
+   * Verify a POI
+   */
+  verifyPOI: async (poiId: string, verified = true, confidenceScore?: number) => {
+    return apiRequest(`/api/captain/pois/${poiId}/verify`, {
+      method: 'POST',
+      body: JSON.stringify({
+        verified,
+        confidence_score: confidenceScore,
+      }),
+    });
+  },
+
+  /**
+   * Promote POI to main database
+   */
+  promotePOI: async (poiId: string) => {
+    return apiRequest(`/api/captain/pois/${poiId}/promote`, {
+      method: 'POST',
+      body: JSON.stringify({ promote: true }),
+    });
+  },
+
+  /**
+   * Delete a POI
+   */
+  deletePOI: async (poiId: string) => {
+    return apiRequest(`/api/captain/pois/${poiId}`, { method: 'DELETE' });
+  },
+};
+
+// ============================================================================
+// KEYWORDS API
+// ============================================================================
+
+export interface Keyword {
+  id: string;
+  keyword: string;
+  active: boolean;
+  total_articles_found: number;
+  last_scanned?: string;
+  created_at: string;
+}
+
+export interface Article {
+  id: string;
+  keyword_id: string;
+  title: string;
+  url: string;
+  source?: string;
+  summary?: string;
+  discovered_at: string;
+  status: 'new' | 'selected' | 'scraped' | 'deleted';
+}
+
+export const keywordsAPI = {
+  /**
+   * Get all keywords
+   */
+  getKeywords: async (activeOnly = true) => {
+    return apiRequest<{ keywords: Keyword[]; total: number }>(
+      `/api/captain/keywords/?active_only=${activeOnly}`,
+      { method: 'GET' }
+    );
+  },
+
+  /**
+   * Create a new keyword
+   */
+  createKeyword: async (keyword: string, active = true) => {
+    return apiRequest('/api/captain/keywords/', {
+      method: 'POST',
+      body: JSON.stringify({ keyword, active }),
+    });
+  },
+
+  /**
+   * Update a keyword
+   */
+  updateKeyword: async (keywordId: string, updates: { keyword?: string; active?: boolean }) => {
+    return apiRequest(`/api/captain/keywords/${keywordId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  },
+
+  /**
+   * Delete a keyword
+   */
+  deleteKeyword: async (keywordId: string) => {
+    return apiRequest(`/api/captain/keywords/${keywordId}`, { method: 'DELETE' });
+  },
+
+  /**
+   * Get articles for a keyword
+   */
+  getKeywordArticles: async (keywordId: string, status?: string) => {
+    const queryParams = status ? `?status=${status}` : '';
+    return apiRequest<{ articles: Article[]; total: number }>(
+      `/api/captain/keywords/${keywordId}/articles${queryParams}`,
+      { method: 'GET' }
+    );
+  },
+
+  /**
+   * Get all articles
+   */
+  getAllArticles: async (params: { skip?: number; limit?: number; status?: string; search?: string } = {}) => {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    return apiRequest<{ articles: Article[]; total: number }>(
+      `/api/captain/keywords/articles/all?${queryParams.toString()}`,
+      { method: 'GET' }
+    );
+  },
+
+  /**
+   * Perform action on article
+   */
+  articleAction: async (articleId: string, action: 'select' | 'delete' | 'scrape') => {
+    return apiRequest(`/api/captain/keywords/articles/${articleId}/action`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    });
+  },
+};
+
+// ============================================================================
+// STATS API
+// ============================================================================
+
+export const statsAPI = {
+  /**
+   * Get dashboard statistics
+   */
+  getDashboard: async (timeRange: '7d' | '30d' | '90d' | 'all' = '30d') => {
+    return apiRequest(`/api/captain/stats/dashboard?time_range=${timeRange}`, {
+      method: 'GET',
+    });
+  },
+
+  /**
+   * Get upload statistics
+   */
+  getUploadStats: async (timeRange: '7d' | '30d' | '90d' | 'all' = '30d') => {
+    return apiRequest(`/api/captain/stats/uploads?time_range=${timeRange}`, {
+      method: 'GET',
+    });
+  },
+
+  /**
+   * Get POI statistics
+   */
+  getPOIStats: async (timeRange: '7d' | '30d' | '90d' | 'all' = '30d') => {
+    return apiRequest(`/api/captain/stats/pois?time_range=${timeRange}`, {
+      method: 'GET',
+    });
+  },
+
+  /**
+   * Get intelligence statistics
+   */
+  getIntelligenceStats: async () => {
+    return apiRequest('/api/captain/stats/intelligence', { method: 'GET' });
+  },
+};
+
+// ============================================================================
+// HEALTH CHECK
+// ============================================================================
+
+export const healthAPI = {
+  /**
+   * Check API health
+   */
+  check: async () => {
+    return apiRequest('/health', { method: 'GET' });
+  },
+};
