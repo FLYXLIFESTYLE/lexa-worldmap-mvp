@@ -27,9 +27,9 @@ const adminPages = [
   },
   {
     name: "Captain's Portal",
-    href: '/admin/knowledge',
-    icon: '📚',
-    description: 'Knowledge management'
+    href: '/captain',
+    icon: '⚓',
+    description: 'Knowledge management hub'
   },
   {
     name: 'ChatNeo4j',

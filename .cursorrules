@@ -23,6 +23,13 @@ This project uses a Memory Bank system to maintain context across sessions. ALL 
 
 ### Code Organization
 - `app/` - Next.js frontend (user-facing)
+  - `app/admin/dashboard/` - Admin Dashboard (3 sections)
+  - `app/captain/` - Captain's Knowledge Portal (5 pages)
+    - `upload/` - File uploads, URL scraping, manual entry, yacht destinations
+    - `browse/` - POI verification, enhancement, confidence scores
+    - `history/` - Personal upload history
+    - `urls/` - Shared scraped URLs (all captains)
+    - `keywords/` - Keyword Monitor (Google Alerts for travel)
 - `components/` - Reusable React components
 - `lib/` - Shared utilities and API clients
 - `rag_system/` - Python FastAPI backend ("AIfred")
@@ -36,10 +43,14 @@ This project uses a Memory Bank system to maintain context across sessions. ALL 
 4. **Emotional Language**: Avoid transactional language, use evocative descriptions
 
 ### Data Patterns
-- **POI Structure**: Every POI must have: name, coordinates, luxury_score, theme relationships
+- **POI Structure**: Every POI must have: name, coordinates, luxury_score, theme relationships, confidence_score
 - **Theme Categories**: 12 core themes (Romance, Adventure, Wellness, etc.)
 - **Relationship Types**: `LOCATED_IN`, `HAS_THEME`, `SUPPORTS_ACTIVITY`
 - **Luxury Scoring**: 0-10 scale based on rating, price level, reviews, keywords
+- **Confidence Scoring**: 0-100%, default 80% for uploads, captain approval required for >80%
+- **Data Quality**: Excellent, Good, Fair, Poor - visual badges and filtering
+- **Upload Types**: PDF, Word, Excel, .txt, images (.png, .jpg, .jpeg), paste functionality
+- **Scraping**: URL scraping with subpage discovery, duplicate detection, error tracking
 
 ### Communication Style with User
 - **User is a beginner**: Explain WHY and WHAT for every terminal command
@@ -50,7 +61,9 @@ This project uses a Memory Bank system to maintain context across sessions. ALL 
 ### Critical Paths
 1. **Theme Selection → Conversation → Experience Script** - This is the core flow
 2. **Neo4j Enrichment Pipeline** - Google Places → Luxury Scoring → Graph Storage
-3. **Admin Upload System** - Screenshot OCR → Parse → Neo4j Storage
+3. **Captain Knowledge Pipeline** - Upload/Scrape → Extract → Verify → Enhance → Neo4j Storage
+4. **Admin Dashboard** - Chris/Paul/Bakary only - System management and monitoring
+5. **Captain Portal** - All captains - Data upload, verification, keyword monitoring
 
 ### Known Challenges
 - **Windows File Locks**: Sometimes `.next` folder needs manual deletion
@@ -60,8 +73,14 @@ This project uses a Memory Bank system to maintain context across sessions. ALL 
 ### Evolution Notes
 - **Started**: Generic travel chatbot
 - **Pivoted to**: Emotional experience design with "Experience DNA" methodology
-- **Current Focus**: POI enrichment, yacht destination data, pitch deck preparation
-- **Future**: Affiliate system, mobile app, multi-language support
+- **December 2024**: User accounts, membership tiers, multi-language support (8 languages), legal disclaimers
+- **December 31, 2024**: MAJOR MILESTONE - Complete Captain's Knowledge Portal implementation
+  - Admin Dashboard reorganized (3 sections: Statistics, Active Tools, In Development)
+  - Captain Portal created with 5 pages: Upload & Manual Entry, Browse/Verify/Enhance, Upload History, Scraped URLs, Keyword Monitor
+  - Confidence score system (80% default, captain approval for >80%)
+  - Google Alerts-style Keyword Monitor for daily article scanning
+  - ~20 hours of development, all frontend complete
+- **Future**: Backend APIs (Phase 7), Database migrations (Phase 8), affiliate system, mobile app
 
 ## Update Protocol
 When user says **"update memory bank"**, MUST review ALL memory bank files and update:
@@ -83,9 +102,54 @@ Before major changes:
 4. **Update Documentation** - Keep memory bank current
 5. **Commit Clearly** - Descriptive commit messages
 
+## Captain Portal System (Dec 31, 2024)
+
+### Access Control
+- **Admin Access**: Chris, Paul, Bakary - Full system access
+- **Captain Access**: All captains - Knowledge Portal only
+- **Personal Data**: Upload History (only own uploads)
+- **Shared Data**: Scraped URLs, Keyword articles (all captains see all)
+
+### Confidence Score Rules
+1. Default: 80% for all new uploads/manual entries
+2. Maximum: 80% for uploads (hard limit)
+3. Approval: Required to exceed 80%
+4. Visual Warning: UI shows alert when attempting >80%
+5. Color Coding: Green >80%, Yellow 60-80%, Red <60%
+
+### Upload Workflow
+1. Captain uploads file/URL → Stored
+2. Backend processes → Extracts data
+3. POIs created → Confidence 80%
+4. Captain verifies → Can adjust score
+5. Quality scored → Excellent/Good/Fair/Poor
+6. Enhanced → Better descriptions, tags
+
+### Keyword Monitor (Google Alerts)
+1. Captain adds keywords (e.g., "Monaco luxury hotels")
+2. System scans daily at 11 PM
+3. Articles discovered → Stored with summaries
+4. Next morning → Captain reviews articles
+5. Select relevant → Queue for scraping
+6. Delete irrelevant → Keep feed clean
+7. Scraping process → Extracts POI data
+
+### File Formats Supported
+- Documents: PDF, Word, Excel, Text
+- Images: PNG, JPEG (with OCR)
+- Paste: Screenshot clipboard support
+
+### Current Status
+- ✅ All 6 frontend phases complete (~20 hours)
+- ⏳ Phase 7: Backend APIs (4-5 hours)
+- ⏳ Phase 8: Database migrations (2 hours)
+- See: `CAPTAIN_PORTAL_COMPLETE_SUMMARY.md` for full details
+
 ## Remember
 - User wants **functional pitch deck content**, not technical architecture
 - Focus on **what users get** and **why it's powerful**
 - LEXA is about **emotional intelligence**, not just data
 - Every feature should answer: "How does this create unforgettable experiences?"
+- **Captain Portal**: Focus on knowledge growth, quality control, and collaboration
+- **Confidence Scores**: Default 80%, approval for higher, visual enforcement
 
