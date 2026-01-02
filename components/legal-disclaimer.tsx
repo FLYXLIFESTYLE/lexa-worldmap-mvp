@@ -36,7 +36,13 @@ export function LegalDisclaimer({
                 <strong>LEXA is a creative experience planning tool only.</strong> We are NOT a travel agency, tour operator, or booking service. 
                 LEXA provides inspirational scripts and suggestions for experiences. We do not make reservations, provide travel insurance, 
                 guarantee availability, or assume any legal responsibility for activities, accommodations, or points of interest (POIs) suggested. 
-                Users are solely responsible for booking, verifying, and ensuring the safety and suitability of all activities and destinations. 
+                Users are solely responsible for booking, verifying, and ensuring the safety and suitability of all activities and destinations.
+              </p>
+              <p className="mt-2">
+                <strong>Optional Services:</strong> You may choose to book through our premium concierge service or partner booking services, 
+                which operate under separate terms and legal entities. Standard LEXA usage remains a planning tool only.
+              </p>
+              <p className="mt-2">
                 By using LEXA, you agree that all suggestions are inspirational in nature and should be independently verified before booking or travel.
               </p>
             </div>
@@ -65,7 +71,8 @@ export function LegalDisclaimer({
             </p>
             <p className="text-xs text-amber-800 leading-relaxed">
               LEXA creates inspirational experience scripts. We don't book travel, provide insurance, 
-              or guarantee activities. Always verify and book independently. 
+              or guarantee activities. You may optionally book through our premium concierge service (separate terms apply). 
+              Always verify and book independently. 
               <Link href="/terms" className="underline ml-1 font-medium hover:text-amber-900">
                 See full terms
               </Link>
@@ -109,16 +116,20 @@ export function LegalDisclaimer({
             </ul>
           </div>
           
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p className="text-amber-900 font-medium">
-              ⚠️ Your Responsibility
-            </p>
-            <p className="text-amber-800 text-xs mt-1">
-              You are solely responsible for independently verifying all suggestions, 
-              booking your own travel, ensuring safety, checking regulations, 
-              and obtaining appropriate insurance before any travel or activities.
-            </p>
-          </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-amber-900 font-medium">
+                ⚠️ Your Responsibility
+              </p>
+              <p className="text-amber-800 text-xs mt-1">
+                You are solely responsible for independently verifying all suggestions, 
+                booking your own travel, ensuring safety, checking regulations, 
+                and obtaining appropriate insurance before any travel or activities.
+              </p>
+              <p className="text-amber-700 text-xs mt-2 font-medium">
+                💎 Optional: You may choose to book through our premium concierge service or partner 
+                booking services, which operate under separate legal agreements and provide full-service travel arrangements.
+              </p>
+            </div>
           
           <p className="text-xs text-gray-500 pt-2">
             By using LEXA, you acknowledge and agree to these terms. 

@@ -69,7 +69,7 @@ export default function TermsPage() {
             <section>
               <div className="flex items-center gap-3 mb-4">
                 <Shield className="h-5 w-5 text-lexa-gold" />
-                <h2 className="text-xl font-bold text-gray-900">2. NOT a Travel Agency</h2>
+                <h2 className="text-xl font-bold text-gray-900">2. NOT a Travel Agency (But Optional Concierge Available)</h2>
               </div>
               <div className="space-y-3 text-sm leading-relaxed bg-red-50 border border-red-200 rounded-lg p-4">
                 <p className="font-bold text-red-900">
@@ -84,6 +84,27 @@ export default function TermsPage() {
                   <li>Act as an intermediary between you and service providers</li>
                   <li>Issue tickets, vouchers, or travel documents</li>
                 </ul>
+              </div>
+              
+              <div className="space-y-3 text-sm leading-relaxed bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                <p className="font-bold text-blue-900">
+                  💎 Optional Premium Services (Separate Legal Entity)
+                </p>
+                <p>We offer optional premium services including:</p>
+                <ul className="list-disc list-inside space-y-2 ml-4">
+                  <li><strong>Concierge Booking Service:</strong> Full-service travel booking and arrangements</li>
+                  <li><strong>Partner Booking Services:</strong> Direct booking through our verified partners</li>
+                  <li><strong>White-Glove Service:</strong> Comprehensive travel management and support</li>
+                </ul>
+                <p className="font-semibold text-blue-900 mt-3">
+                  These premium services operate under separate terms and conditions, legal agreements, 
+                  and are provided by licensed travel service providers or partner agencies. 
+                  They are NOT included in standard LEXA usage.
+                </p>
+                <p className="text-blue-700 text-xs mt-2">
+                  By choosing premium services, you enter into a separate contract with our licensed 
+                  travel partners, who assume full legal responsibility for bookings and arrangements.
+                </p>
               </div>
             </section>
 
