@@ -10,6 +10,7 @@ import { useState } from 'react';
 
 export default function BugReportButton() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -25,6 +26,16 @@ export default function BugReportButton() {
     reporter_name: '',
     reporter_email: ''
   });
+
+  // Take Screenshot function - minimizes modal to let user capture
+  function takeScreenshot() {
+    setIsMinimized(true);
+    // Give user 3 seconds to capture screenshot
+    setTimeout(() => {
+      alert('Screenshot time! Press:\n\n• Windows: Win + Shift + S\n• Mac: Cmd + Shift + 4\n\nThen paste the screenshot in the upload area.');
+      setIsMinimized(false);
+    }, 500);
+  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -120,19 +131,29 @@ export default function BugReportButton() {
       </button>
 
       {/* Modal */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      {isOpen && !isMinimized && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="bg-red-600 text-white p-6 rounded-t-lg">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">🐛 Report a Bug</h2>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-white hover:text-gray-200 text-2xl"
-                >
-                  ×
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={takeScreenshot}
+                    className="text-white hover:text-gray-200 text-sm px-3 py-1 bg-white/20 rounded-md hover:bg-white/30 transition-colors"
+                    title="Minimize to take screenshot"
+                  >
+                    📸 Take Screenshot
+                  </button>
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="text-white hover:text-gray-200 text-2xl"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
               <p className="text-red-100 mt-2">
                 Help us improve LEXA by reporting any issues you encounter

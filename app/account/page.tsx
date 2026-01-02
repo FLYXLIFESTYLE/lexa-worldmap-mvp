@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import LuxuryBackground from '@/components/luxury-background';
 import { MembershipBadge } from '@/components/account/MembershipBadge';
 import { UsageProgressBar } from '@/components/account/UsageProgressBar';
 import { ConversationPreviewCard } from '@/components/account/ConversationPreviewCard';
 import { ScriptLibraryCard } from '@/components/account/ScriptLibraryCard';
-import { Crown, FileText, MessageCircle, Settings, Sparkles } from 'lucide-react';
+import { Crown, FileText, MessageCircle, Settings, Sparkles, ArrowLeft } from 'lucide-react';
 
 export default function AccountDashboard() {
   const router = useRouter();
@@ -64,8 +66,9 @@ export default function AccountDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-lexa-navy to-gray-900 flex items-center justify-center">
-        <div className="text-white">Loading your account...</div>
+      <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        <LuxuryBackground />
+        <div className="relative z-10 text-white">Loading your account...</div>
       </div>
     );
   }
@@ -73,25 +76,50 @@ export default function AccountDashboard() {
   const tier = membership?.tier || {};
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-lexa-navy to-gray-900 py-12 px-4">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">My Account</h1>
-            <p className="text-gray-300">Manage your LEXA experience and preferences</p>
+    <div className="relative min-h-screen overflow-hidden">
+      <LuxuryBackground />
+      
+      <div className="relative z-10 min-h-screen py-8 px-4">
+        {/* Header with LEXA Logo */}
+        <div className="max-w-7xl mx-auto mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <Link href="/" className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-sm">Back to Home</span>
+            </Link>
+            <button
+              onClick={() => router.push('/account/profile')}
+              className="px-4 py-2 rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/10 hover:border-lexa-gold/30 transition-all backdrop-blur-sm flex items-center gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              Edit Profile & Preferences
+            </button>
           </div>
-          <button
-            onClick={() => router.push('/account/profile')}
-            className="px-4 py-2 rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white/20 transition-colors flex items-center gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            Settings
-          </button>
+          
+          {/* LEXA Branding */}
+          <div className="text-center mb-8">
+            <div className="relative inline-block">
+              <h1 className="text-6xl sm:text-7xl font-bold tracking-tighter">
+                <span className="bg-gradient-to-r from-white via-lexa-gold to-white bg-clip-text text-transparent animate-gradient">
+                  LEXA
+                </span>
+              </h1>
+              <span className="absolute top-0 -right-10 inline-block px-2 py-0.5 rounded-full bg-lexa-gold text-zinc-900 text-xs font-bold tracking-wider shadow-lg shadow-lexa-gold/50 transform rotate-12">
+                BETA
+              </span>
+            </div>
+            <div className="mx-auto w-24 h-1 bg-gradient-to-r from-transparent via-lexa-gold to-transparent mb-4" />
+            <p className="text-sm text-lexa-gold font-semibold uppercase tracking-widest mb-2">
+              Your Account Dashboard
+            </p>
+            <p className="text-zinc-300">Manage your luxury travel experiences</p>
+          </div>
         </div>
 
+        <div className="max-w-7xl mx-auto space-y-8">
+
         {/* Membership Card */}
-        <div className="rounded-lg border border-lexa-gold/30 bg-gradient-to-br from-lexa-gold/10 to-lexa-gold/5">
+        <div className="rounded-2xl border border-lexa-gold/30 bg-black/20 backdrop-blur-xl shadow-2xl">
           <div className="px-6 py-4 border-b border-lexa-gold/20">
             <div className="flex items-center justify-between">
               <div>
@@ -99,7 +127,7 @@ export default function AccountDashboard() {
                   <Crown className="h-6 w-6 text-lexa-gold" />
                   Current Membership
                 </h3>
-                <p className="mt-2 text-sm text-gray-300">
+                <p className="mt-2 text-sm text-zinc-300">
                   {tier.description || 'Your membership tier and benefits'}
                 </p>
               </div>
@@ -110,9 +138,9 @@ export default function AccountDashboard() {
               />
             </div>
           </div>
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-4 bg-gradient-to-br from-lexa-gold/5 to-transparent">
             {usage && (
-              <div className="space-y-4">
+              <div className="space-y-4 p-4 rounded-xl bg-black/10 backdrop-blur-sm">
                 <UsageProgressBar
                   label="Experience Scripts"
                   current={usage.usage?.scripts_created || 0}
@@ -131,7 +159,7 @@ export default function AccountDashboard() {
             )}
             <button
               onClick={() => router.push('/account/membership')}
-              className="w-full px-4 py-3 rounded-lg bg-lexa-gold hover:bg-lexa-gold/90 text-zinc-900 font-semibold transition-colors flex items-center justify-center gap-2"
+              className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-lexa-gold to-yellow-600 hover:from-yellow-400 hover:to-lexa-gold text-zinc-900 font-semibold transition-all hover:scale-105 hover:shadow-2xl hover:shadow-lexa-gold/50 flex items-center justify-center gap-2"
             >
               <Sparkles className="h-4 w-4" />
               Upgrade Membership
@@ -142,32 +170,32 @@ export default function AccountDashboard() {
         {/* Stats Grid */}
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-6">
+            <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl p-6 hover:border-lexa-gold/30 transition-all">
               <div className="text-center">
                 <FileText className="h-8 w-8 text-lexa-gold mx-auto mb-2" />
                 <p className="text-3xl font-bold text-white">{stats.stats?.total_scripts || 0}</p>
-                <p className="text-sm text-gray-300 mt-1">Total Scripts</p>
+                <p className="text-sm text-zinc-300 mt-1">Total Scripts</p>
               </div>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-6">
+            <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl p-6 hover:border-blue-400/30 transition-all">
               <div className="text-center">
                 <MessageCircle className="h-8 w-8 text-blue-400 mx-auto mb-2" />
                 <p className="text-3xl font-bold text-white">{stats.stats?.total_conversations || 0}</p>
-                <p className="text-sm text-gray-300 mt-1">Conversations</p>
+                <p className="text-sm text-zinc-300 mt-1">Conversations</p>
               </div>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-6">
+            <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl p-6 hover:border-purple-400/30 transition-all">
               <div className="text-center">
                 <Crown className="h-8 w-8 text-purple-400 mx-auto mb-2" />
                 <p className="text-3xl font-bold text-white">{stats.stats?.favorite_scripts || 0}</p>
-                <p className="text-sm text-gray-300 mt-1">Favorites</p>
+                <p className="text-sm text-zinc-300 mt-1">Favorites</p>
               </div>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-6">
+            <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl p-6 hover:border-pink-400/30 transition-all">
               <div className="text-center">
                 <Sparkles className="h-8 w-8 text-pink-400 mx-auto mb-2" />
                 <p className="text-3xl font-bold text-white">{stats.stats?.shared_scripts || 0}</p>
-                <p className="text-sm text-gray-300 mt-1">Shared</p>
+                <p className="text-sm text-zinc-300 mt-1">Shared</p>
               </div>
             </div>
           </div>
@@ -179,9 +207,9 @@ export default function AccountDashboard() {
             <h2 className="text-2xl font-semibold text-white">Recent Conversations</h2>
             <button
               onClick={() => router.push('/account/conversations')}
-              className="text-lexa-gold hover:text-lexa-gold/80 transition-colors"
+              className="text-lexa-gold hover:text-lexa-gold/80 transition-colors text-sm font-medium"
             >
-              View All
+              View All →
             </button>
           </div>
           <div className="grid grid-cols-1 gap-4">
@@ -195,12 +223,12 @@ export default function AccountDashboard() {
                 />
               ))
             ) : (
-              <div className="rounded-lg border border-white/10 bg-white/5 py-12 text-center">
-                <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                <p className="text-gray-300 mb-4">No conversations yet. Start chatting with LEXA!</p>
+              <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl py-12 text-center">
+                <MessageCircle className="h-12 w-12 mx-auto mb-3 text-zinc-400" />
+                <p className="text-zinc-300 mb-4">No conversations yet. Start chatting with LEXA!</p>
                 <button
                   onClick={() => router.push('/experience')}
-                  className="px-6 py-3 rounded-lg bg-lexa-gold hover:bg-lexa-gold/90 text-zinc-900 font-semibold transition-colors inline-flex items-center gap-2"
+                  className="px-6 py-3 rounded-full bg-gradient-to-r from-lexa-gold to-yellow-600 hover:from-yellow-400 hover:to-lexa-gold text-zinc-900 font-semibold transition-all hover:scale-105 hover:shadow-2xl hover:shadow-lexa-gold/50 inline-flex items-center gap-2"
                 >
                   Start Conversation
                 </button>
@@ -215,9 +243,9 @@ export default function AccountDashboard() {
             <h2 className="text-2xl font-semibold text-white">Experience Scripts</h2>
             <button
               onClick={() => router.push('/account/scripts')}
-              className="text-lexa-gold hover:text-lexa-gold/80 transition-colors"
+              className="text-lexa-gold hover:text-lexa-gold/80 transition-colors text-sm font-medium"
             >
-              View All
+              View All →
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -238,12 +266,12 @@ export default function AccountDashboard() {
                 />
               ))
             ) : (
-              <div className="rounded-lg border border-white/10 bg-white/5 py-12 text-center md:col-span-2">
-                <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                <p className="text-gray-300 mb-4">No experience scripts yet. Create your first one with LEXA!</p>
+              <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl py-12 text-center md:col-span-2">
+                <FileText className="h-12 w-12 mx-auto mb-3 text-zinc-400" />
+                <p className="text-zinc-300 mb-4">No experience scripts yet. Create your first one with LEXA!</p>
                 <button
                   onClick={() => router.push('/experience')}
-                  className="px-6 py-3 rounded-lg bg-lexa-gold hover:bg-lexa-gold/90 text-zinc-900 font-semibold transition-colors inline-flex items-center gap-2"
+                  className="px-6 py-3 rounded-full bg-gradient-to-r from-lexa-gold to-yellow-600 hover:from-yellow-400 hover:to-lexa-gold text-zinc-900 font-semibold transition-all hover:scale-105 hover:shadow-2xl hover:shadow-lexa-gold/50 inline-flex items-center gap-2"
                 >
                   Create Script
                 </button>
@@ -252,6 +280,7 @@ export default function AccountDashboard() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }
