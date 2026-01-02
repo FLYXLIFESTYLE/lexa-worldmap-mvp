@@ -302,7 +302,9 @@ export default function AccountDashboard() {
                 </button>
               </div>
             )}
-          </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Recent Scripts */}
