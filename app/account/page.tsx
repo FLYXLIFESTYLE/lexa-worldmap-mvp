@@ -190,7 +190,9 @@ export default function AccountDashboard() {
               <Sparkles className="h-4 w-4" />
               Upgrade Membership
             </button>
-          </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Stats Grid */}
