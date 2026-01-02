@@ -8,7 +8,7 @@ import { MembershipBadge } from '@/components/account/MembershipBadge';
 import { UsageProgressBar } from '@/components/account/UsageProgressBar';
 import { ConversationPreviewCard } from '@/components/account/ConversationPreviewCard';
 import { ScriptLibraryCard } from '@/components/account/ScriptLibraryCard';
-import { Crown, FileText, MessageCircle, Settings, Sparkles, ArrowLeft } from 'lucide-react';
+import { Crown, FileText, MessageCircle, Settings, Sparkles, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function AccountDashboard() {
   const router = useRouter();
@@ -18,6 +18,18 @@ export default function AccountDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [recentConversations, setRecentConversations] = useState<any[]>([]);
   const [recentScripts, setRecentScripts] = useState<any[]>([]);
+  
+  // Collapsible sections state
+  const [sectionsOpen, setSectionsOpen] = useState({
+    membership: true,
+    stats: true,
+    conversations: true,
+    scripts: true
+  });
+  
+  const toggleSection = (section: keyof typeof sectionsOpen) => {
+    setSectionsOpen(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   useEffect(() => {
     fetchDashboardData();
@@ -120,24 +132,37 @@ export default function AccountDashboard() {
 
         {/* Membership Card */}
         <div className="rounded-2xl border border-lexa-gold/30 bg-black/20 backdrop-blur-xl shadow-2xl">
-          <div className="px-6 py-4 border-b border-lexa-gold/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-semibold flex items-center gap-3 text-white">
-                  <Crown className="h-6 w-6 text-lexa-gold" />
-                  Current Membership
-                </h3>
-                <p className="mt-2 text-sm text-zinc-300">
-                  {tier.description || 'Your membership tier and benefits'}
-                </p>
-              </div>
-              <MembershipBadge 
-                tierSlug={tier.slug || 'free'} 
-                tierName={tier.name || 'Free'} 
-                size="lg"
-              />
+          <button
+            onClick={() => toggleSection('membership')}
+            className="w-full px-6 py-4 border-b border-lexa-gold/20 flex items-center justify-between hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Crown className="h-6 w-6 text-lexa-gold" />
+              <h3 className="text-xl font-semibold text-white">Current Membership</h3>
             </div>
-          </div>
+            {sectionsOpen.membership ? (
+              <ChevronUp className="h-5 w-5 text-lexa-gold" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-lexa-gold" />
+            )}
+          </button>
+          
+          {sectionsOpen.membership && (
+            <>
+              <div className="px-6 py-4 border-b border-lexa-gold/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-zinc-300">
+                      {tier.description || 'Your membership tier and benefits'}
+                    </p>
+                  </div>
+                  <MembershipBadge 
+                    tierSlug={tier.slug || 'free'} 
+                    tierName={tier.name || 'Free'} 
+                    size="lg"
+                  />
+                </div>
+              </div>
           <div className="p-6 space-y-4 bg-gradient-to-br from-lexa-gold/5 to-transparent">
             {usage && (
               <div className="space-y-4 p-4 rounded-xl bg-black/10 backdrop-blur-sm">
@@ -168,8 +193,25 @@ export default function AccountDashboard() {
         </div>
 
         {/* Stats Grid */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl">
+          <button
+            onClick={() => toggleSection('stats')}
+            className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+          >
+            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-lexa-gold" />
+              Your Statistics
+            </h3>
+            {sectionsOpen.stats ? (
+              <ChevronUp className="h-5 w-5 text-lexa-gold" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-lexa-gold" />
+            )}
+          </button>
+          
+          {sectionsOpen.stats && stats && (
+            <div className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl p-6 hover:border-lexa-gold/30 transition-all">
               <div className="text-center">
                 <FileText className="h-8 w-8 text-lexa-gold mx-auto mb-2" />
@@ -199,20 +241,42 @@ export default function AccountDashboard() {
               </div>
             </div>
           </div>
-        )}
+          )}
+        </div>
 
         {/* Recent Conversations */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold text-white">Recent Conversations</h2>
-            <button
-              onClick={() => router.push('/account/conversations')}
-              className="text-lexa-gold hover:text-lexa-gold/80 transition-colors text-sm font-medium"
-            >
-              View All →
-            </button>
-          </div>
-          <div className="grid grid-cols-1 gap-4">
+        <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl">
+          <button
+            onClick={() => toggleSection('conversations')}
+            className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+          >
+            <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+              <MessageCircle className="h-6 w-6 text-blue-400" />
+              Recent Conversations
+            </h2>
+            <div className="flex items-center gap-3">
+              {sectionsOpen.conversations && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push('/account/conversations');
+                  }}
+                  className="text-lexa-gold hover:text-lexa-gold/80 transition-colors text-sm font-medium"
+                >
+                  View All →
+                </button>
+              )}
+              {sectionsOpen.conversations ? (
+                <ChevronUp className="h-5 w-5 text-lexa-gold" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-lexa-gold" />
+              )}
+            </div>
+          </button>
+          
+          {sectionsOpen.conversations && (
+            <div className="p-6">
+              <div className="grid grid-cols-1 gap-4">
             {recentConversations.length > 0 ? (
               recentConversations.map((conversation) => (
                 <ConversationPreviewCard
@@ -238,17 +302,38 @@ export default function AccountDashboard() {
         </div>
 
         {/* Recent Scripts */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold text-white">Experience Scripts</h2>
-            <button
-              onClick={() => router.push('/account/scripts')}
-              className="text-lexa-gold hover:text-lexa-gold/80 transition-colors text-sm font-medium"
-            >
-              View All →
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl">
+          <button
+            onClick={() => toggleSection('scripts')}
+            className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+          >
+            <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+              <FileText className="h-6 w-6 text-lexa-gold" />
+              Experience Scripts
+            </h2>
+            <div className="flex items-center gap-3">
+              {sectionsOpen.scripts && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push('/account/scripts');
+                  }}
+                  className="text-lexa-gold hover:text-lexa-gold/80 transition-colors text-sm font-medium"
+                >
+                  View All →
+                </button>
+              )}
+              {sectionsOpen.scripts ? (
+                <ChevronUp className="h-5 w-5 text-lexa-gold" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-lexa-gold" />
+              )}
+            </div>
+          </button>
+          
+          {sectionsOpen.scripts && (
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {recentScripts.length > 0 ? (
               recentScripts.map((script) => (
                 <ScriptLibraryCard

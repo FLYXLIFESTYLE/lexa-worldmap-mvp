@@ -40,26 +40,50 @@ export default function BugReportButton() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) {
-      // Check file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Screenshot must be smaller than 5MB');
-        return;
+      processImageFile(file);
+    }
+  }
+  
+  function processImageFile(file: File) {
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Screenshot must be smaller than 5MB');
+      return;
+    }
+    
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+    
+    setScreenshotFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setScreenshot(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+  
+  // Handle paste event for screenshots
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          processImageFile(file);
+          alert('✅ Screenshot pasted! You can now submit the bug report.');
+        }
+        break;
       }
-      
-      // Check file type
-      if (!file.type.startsWith('image/')) {
-        alert('Please upload an image file');
-        return;
-      }
-      
-      setScreenshotFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setScreenshot(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   }
 
@@ -205,9 +229,12 @@ export default function BugReportButton() {
                 </div>
 
                 {/* Screenshot Upload */}
-                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-4">
+                <div 
+                  className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-4"
+                  onPaste={handlePaste}
+                >
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    📸 Screenshot (Optional)
+                    📸 Screenshot (Optional) - Click to upload OR paste from clipboard!
                   </label>
                   
                   {screenshot ? (
@@ -236,7 +263,7 @@ export default function BugReportButton() {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <span className="text-sm text-gray-600">Click to upload screenshot</span>
+                        <span className="text-sm text-gray-600 font-medium">Click to upload screenshot</span>
                         <span className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</span>
                         <input
                           type="file"
@@ -245,9 +272,16 @@ export default function BugReportButton() {
                           className="hidden"
                         />
                       </label>
-                      <p className="text-xs text-gray-500 text-center">
-                        💡 Tip: Press <kbd className="px-2 py-1 bg-gray-200 rounded text-xs">Print Screen</kbd> or <kbd className="px-2 py-1 bg-gray-200 rounded text-xs">Win + Shift + S</kbd> to capture your screen
-                      </p>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-xs text-blue-800 font-medium mb-1">
+                          💡 Pro Tip: Paste directly from clipboard!
+                        </p>
+                        <p className="text-xs text-blue-700">
+                          1. Take a screenshot (Win + Shift + S or Cmd + Shift + 4)<br/>
+                          2. Click in this upload area<br/>
+                          3. Press Ctrl+V (or Cmd+V) to paste
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
