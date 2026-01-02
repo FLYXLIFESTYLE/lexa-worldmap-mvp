@@ -155,7 +155,9 @@ function getLanguageName(code: string): string {
     de: 'German / Deutsch',
     it: 'Italian / Italiano',
     es: 'Spanish / Español',
-    ru: 'Russian / Русский'
+    ru: 'Russian / Русский',
+    ar: 'Arabic / العربية',
+    zh: 'Chinese / 中文'
   };
   return names[code] || 'English';
 }

@@ -260,15 +260,15 @@ export default function AccountDashboard() {
             </h2>
             <div className="flex items-center gap-3">
               {sectionsOpen.conversations && (
-                <button
+                <span
                   onClick={(e) => {
                     e.stopPropagation();
                     router.push('/account/conversations');
                   }}
-                  className="text-lexa-gold hover:text-lexa-gold/80 transition-colors text-sm font-medium"
+                  className="text-lexa-gold hover:text-lexa-gold/80 transition-colors text-sm font-medium cursor-pointer"
                 >
                   View All →
-                </button>
+                </span>
               )}
               {sectionsOpen.conversations ? (
                 <ChevronUp className="h-5 w-5 text-lexa-gold" />
@@ -319,15 +319,15 @@ export default function AccountDashboard() {
             </h2>
             <div className="flex items-center gap-3">
               {sectionsOpen.scripts && (
-                <button
+                <span
                   onClick={(e) => {
                     e.stopPropagation();
                     router.push('/account/scripts');
                   }}
-                  className="text-lexa-gold hover:text-lexa-gold/80 transition-colors text-sm font-medium"
+                  className="text-lexa-gold hover:text-lexa-gold/80 transition-colors text-sm font-medium cursor-pointer"
                 >
                   View All →
-                </button>
+                </span>
               )}
               {sectionsOpen.scripts ? (
                 <ChevronUp className="h-5 w-5 text-lexa-gold" />
