@@ -1,6 +1,5 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
 import { Crown, Sparkles, Star, Gem } from 'lucide-react';
 
 interface MembershipBadgeProps {
@@ -55,12 +54,11 @@ export function MembershipBadge({
   };
 
   return (
-    <Badge 
-      variant="outline" 
-      className={`${config.color} ${sizeClasses[size]} font-medium border inline-flex items-center gap-1.5`}
+    <span 
+      className={`${config.color} ${sizeClasses[size]} font-medium border rounded-md inline-flex items-center gap-1.5`}
     >
       {showIcon && <Icon size={iconSizes[size]} />}
       {config.label}
-    </Badge>
+    </span>
   );
 }
