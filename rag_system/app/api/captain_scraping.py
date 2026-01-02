@@ -88,7 +88,7 @@ async def scrape_url(
             )
             
             # Save to database
-            save_intelligence_to_db(
+            await save_intelligence_to_db(
                 supabase=supabase,
                 intelligence=intelligence,
                 source_type="url_scrape",

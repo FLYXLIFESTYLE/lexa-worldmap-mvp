@@ -100,7 +100,7 @@ async def upload_file(
         intelligence = await extract_all_intelligence(extracted_text)
         
         # Save to database
-        save_intelligence_to_db(
+        await save_intelligence_to_db(
             supabase=supabase,
             intelligence=intelligence,
             source_type="file_upload",
@@ -162,7 +162,7 @@ async def upload_text(
         intelligence = await extract_all_intelligence(request.text)
         
         # Save to database
-        save_intelligence_to_db(
+        await save_intelligence_to_db(
             supabase=supabase,
             intelligence=intelligence,
             source_type="text_paste",
