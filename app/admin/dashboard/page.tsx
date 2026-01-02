@@ -18,25 +18,34 @@ interface DashboardStats {
   totalClients: Stat;
 }
 
-const adminTools = [
+// Section 1: Active Tools - Production ready
+const activeTools = [
   {
-    id: 'demo-chat',
-    name: 'LEXA Demo Chat',
-    description: 'Test the LEXA conversation experience with admin access',
-    icon: '✨',
-    href: '/demo/chat',
-    color: 'bg-gradient-to-r from-lexa-gold to-yellow-600',
-    features: ['Full conversation flow', 'Dark/Light mode', 'Reset session', 'Admin testing'],
-    featured: true
+    id: 'users',
+    name: 'User Management',
+    description: 'Manage user accounts, roles, and permissions',
+    icon: '👥',
+    href: '/admin/users',
+    color: 'bg-blue-500',
+    features: ['View all users', 'Assign roles', 'User statistics']
   },
   {
-    id: 'captains-portal',
-    name: "Captain's Knowledge Portal",
-    description: 'Contribute knowledge, upload files, scrape URLs, and manage content',
-    icon: '📚',
-    href: '/admin/knowledge',
-    color: 'bg-blue-500',
-    features: ['Upload files', 'Scrape URLs', 'Manual input', 'Knowledge browser']
+    id: 'bug-reports',
+    name: 'Bug Reports',
+    description: 'User-reported bugs and issues requiring attention',
+    icon: '🐛',
+    href: '/admin/bugs',
+    color: 'bg-red-500',
+    features: ['Open/Resolved tickets', 'Severity levels', 'Screenshots']
+  },
+  {
+    id: 'error-logs',
+    name: 'System Errors',
+    description: 'System errors and exceptions with auto-tracking',
+    icon: '⚠️',
+    href: '/admin/errors',
+    color: 'bg-orange-500',
+    features: ['Auto-deduplication', 'Occurrence tracking', 'Stack traces']
   },
   {
     id: 'chat-neo4j',
@@ -48,96 +57,98 @@ const adminTools = [
     features: ['Natural language queries', 'Cypher generation', 'Data exploration']
   },
   {
-    id: 'destinations',
-    name: 'Destinations Browser',
-    description: 'Enhanced destination analytics with AI-powered insights (integrating into ChatNeo4j)',
-    icon: '🗺️',
-    href: '#',
+    id: 'data-quality',
+    name: 'Data Quality Dashboard',
+    description: 'Monitor data quality and completeness across the system',
+    icon: '📈',
+    href: '/admin/data-quality',
     color: 'bg-purple-500',
-    features: ['POI statistics', 'Data quality', 'Destination coverage'],
-    comingSoon: true
+    features: ['POI completeness', 'Missing data reports', 'Quality scores']
+  },
+  {
+    id: 'poi-collection',
+    name: 'POI Collection',
+    description: 'Bulk POI import and management tools',
+    icon: '📍',
+    href: '/admin/poi-collection',
+    color: 'bg-yellow-500',
+    features: ['Import POIs from CSV', 'Bulk updates', 'Category assignment']
   },
   {
     id: 'poi-search',
     name: 'POI Search & Edit',
-    description: 'Search for POIs and edit their properties, scores, and relationships',
+    description: 'Search for POIs and edit their properties and scores',
     icon: '🔍',
     href: '/admin/knowledge/editor',
-    color: 'bg-yellow-500',
-    features: ['Search POIs', 'Edit properties', 'Update scores', 'Add comments']
-  },
-  {
-    id: 'scraped-urls',
-    name: 'Scraped URLs Manager',
-    description: 'View and manage scraped URLs, re-trigger scrapes, and check status',
-    icon: '🌐',
-    href: '/admin/knowledge/scraped-urls',
     color: 'bg-indigo-500',
-    features: ['URL history', 'Re-scrape', 'Status tracking', 'Subpage detection']
-  },
-  {
-    id: 'documentation',
-    name: 'Platform Architecture',
-    description: 'Complete system architecture, features, and technical documentation',
-    icon: '📖',
-    href: '/admin/documentation',
-    color: 'bg-red-500',
-    features: ['System architecture', 'Features list', 'Technical docs']
+    features: ['Search POIs', 'Edit properties', 'Update scores']
   },
   {
     id: 'release-notes',
     name: 'Release Notes',
-    description: 'Daily changelog of features, improvements, and bug fixes',
+    description: 'Daily changelog of features and improvements',
     icon: '📝',
     href: '/admin/release-notes',
     color: 'bg-teal-500',
     features: ['Daily updates', 'Feature tracking', 'Version history']
   },
   {
+    id: 'documentation',
+    name: 'Platform Architecture',
+    description: 'Complete system architecture and technical docs',
+    icon: '📖',
+    href: '/admin/documentation',
+    color: 'bg-pink-500',
+    features: ['System architecture', 'Features list', 'Technical docs']
+  }
+];
+
+// Section 2: In Development / Inactive Tools
+const inactiveToo = [
+  {
     id: 'backlog',
     name: 'Development Backlog',
     description: 'Track and manage all development tasks and priorities',
     icon: '📋',
     href: '/admin/backlog',
-    color: 'bg-indigo-500',
+    color: 'bg-gray-500',
     features: ['Open/Resolved tracking', 'Priority management', 'Status tracking']
   },
   {
-    id: 'bug-reports',
-    name: 'Bug Reports',
-    description: 'User-reported bugs and issues requiring attention',
-    icon: '🐛',
-    href: '/admin/bugs',
-    color: 'bg-red-500',
-    features: ['Open/Resolved tickets', 'Severity levels', 'Auto-backlog integration']
+    id: 'seed-themes',
+    name: 'Seed Themes',
+    description: 'One-time theme category setup (rarely needed)',
+    icon: '🎨',
+    href: '/admin/seed-themes',
+    color: 'bg-gray-500',
+    features: ['Add theme categories', 'Update themes', 'One-time setup']
   },
   {
-    id: 'error-logs',
-    name: 'Error Logs',
-    description: 'System errors and exceptions with auto-tracking',
-    icon: '⚠️',
-    href: '/admin/errors',
-    color: 'bg-orange-500',
-    features: ['Auto-deduplication', 'Occurrence tracking', 'Stack traces']
+    id: 'yacht-destinations',
+    name: 'Yacht Destinations Upload',
+    description: 'Legacy yacht destination upload tool',
+    icon: '⛵',
+    href: '/admin/upload-yacht-destinations-v2',
+    color: 'bg-gray-500',
+    features: ['CSV upload', 'OCR for images', 'Luxury scoring']
   },
   {
-    id: 'data-quality',
-    name: 'Data Quality Agent',
-    description: 'Run data quality checks, merge duplicates, and fix relationships',
+    id: 'debug-profile',
+    name: 'Debug Profile',
+    description: 'Debug user profiles and sessions',
     icon: '🔧',
+    href: '/admin/debug-profile',
+    color: 'bg-gray-500',
+    features: ['View user data', 'Session debugging', 'Profile editor']
+  },
+  {
+    id: 'destinations',
+    name: 'Destinations Browser',
+    description: 'Being integrated into ChatNeo4j',
+    icon: '🗺️',
     href: '#',
     color: 'bg-gray-500',
-    features: ['Duplicate detection', 'Merge POIs', 'Relationship fixes'],
-    comingSoon: true
-  },
-  {
-    id: 'enrichment',
-    name: 'Enrichment Dashboard',
-    description: 'Monitor enrichment progress, costs, and data quality metrics',
-    icon: '💎',
-    href: '#',
-    color: 'bg-pink-500',
-    features: ['Progress tracking', 'Cost estimation', 'Quality metrics'],
+    features: ['POI statistics', 'Data quality', 'Destination coverage'],
     comingSoon: true
   }
 ];
@@ -229,27 +240,32 @@ export default function AdminDashboard() {
               Admin Dashboard
             </h1>
             <p className="text-lg text-gray-600 mb-4">
-              Manage LEXA's knowledge base, data quality, and system operations
+              System management for Chris, Paul, and Bakary
             </p>
             
             {/* Why - What - How */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2 max-w-3xl">
               <div className="text-sm">
-                <strong className="text-blue-900">WHY:</strong> <span className="text-gray-700">Centralized command center for all LEXA admin operations and monitoring</span>
+                <strong className="text-blue-900">3 SECTIONS:</strong> <span className="text-gray-700">Statistics • Active Tools • In Development</span>
               </div>
               <div className="text-sm">
-                <strong className="text-blue-900">WHAT:</strong> <span className="text-gray-700">Access tools, track stats, manage knowledge, and monitor system health</span>
+                <strong className="text-blue-900">ACCESS:</strong> <span className="text-gray-700">Admin-only dashboard for system management and monitoring</span>
               </div>
               <div className="text-sm">
-                <strong className="text-blue-900">HOW:</strong> <span className="text-gray-700">Click any tool card or use Quick Actions for common tasks</span>
+                <strong className="text-blue-900">TIP:</strong> <span className="text-gray-700">Use Quick Actions for common tasks, browse tools by section below</span>
               </div>
             </div>
           </div>
           <AdminNav />
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        {/* Quick Stats - SECTION 1 */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-2xl">📊</span>
+            <h2 className="text-2xl font-bold text-gray-900">Section 1: Statistics</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {loading ? (
             // Loading skeletons
             [1, 2, 3, 4].map((i) => (
@@ -317,6 +333,7 @@ export default function AdminDashboard() {
               </a>
             ))
           )}
+          </div>
         </div>
 
         {/* Refresh Button */}
@@ -370,18 +387,61 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Admin Tools Grid */}
+        {/* SECTION 2: Active Tools */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Admin Tools</h2>
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-2xl">✅</span>
+            <h2 className="text-2xl font-bold text-gray-900">Section 2: Active Tools</h2>
+            <span className="text-sm text-gray-500">({activeTools.length} tools)</span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {adminTools.map((tool) => (
+            {activeTools.map((tool) => (
+              <Link
+                key={tool.id}
+                href={tool.href}
+                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all overflow-hidden"
+              >
+                <div className={`${tool.color} h-2`}></div>
+                <div className="p-6">
+                  <div className="flex items-center mb-3">
+                    <span className="text-4xl mr-3">{tool.icon}</span>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {tool.name}
+                      </h3>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 text-sm mb-4">
+                    {tool.description}
+                  </p>
+                  <div className="space-y-1">
+                    {tool.features.map((feature, idx) => (
+                      <div key={idx} className="flex items-center text-xs text-gray-500">
+                        <span className="mr-2">✓</span>
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* SECTION 3: In Development / Inactive */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-2xl">🚧</span>
+            <h2 className="text-2xl font-bold text-gray-900">Section 3: In Development / Inactive</h2>
+            <span className="text-sm text-gray-500">({inactiveToo.length} tools)</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {inactiveToo.map((tool) => (
               <Link
                 key={tool.id}
                 href={tool.comingSoon ? '#' : tool.href}
                 className={`bg-white rounded-lg shadow-sm hover:shadow-md transition-all overflow-hidden ${
-                  tool.comingSoon ? 'opacity-60 cursor-not-allowed' : ''
-                } ${
-                  tool.featured ? 'ring-2 ring-lexa-gold shadow-lg shadow-lexa-gold/20 hover:shadow-xl hover:shadow-lexa-gold/30' : ''
+                  tool.comingSoon ? 'opacity-60 cursor-not-allowed' : 'opacity-70 hover:opacity-100'
                 }`}
                 onClick={(e) => tool.comingSoon && e.preventDefault()}
               >
@@ -392,11 +452,6 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">
                         {tool.name}
-                        {tool.featured && (
-                          <span className="ml-2 text-xs bg-lexa-gold text-zinc-900 px-2 py-1 rounded font-bold">
-                            NEW
-                          </span>
-                        )}
                         {tool.comingSoon && (
                           <span className="ml-2 text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
                             Coming Soon
