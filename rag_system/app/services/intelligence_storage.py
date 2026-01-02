@@ -183,6 +183,7 @@ async def save_intelligence_to_db(
 
 
 async def get_intelligence_for_script_creation(
+    supabase,
     destination: str = None,
     themes: List[str] = None,
     target_audience: str = None,
@@ -193,8 +194,14 @@ async def get_intelligence_for_script_creation(
     
     This is called by LEXA when creating experience scripts
     to enhance recommendations with real-world intelligence
+    
+    Args:
+        supabase: Supabase client instance
+        destination: Target destination
+        themes: List of theme names
+        target_audience: Target audience description
+        budget_range: (min, max) budget tuple
     """
-    supabase = get_supabase()
     intelligence = {
         'experiences': [],
         'trends': [],
@@ -248,9 +255,15 @@ async def get_intelligence_for_script_creation(
         return intelligence
 
 
-async def increment_usage_count(table: str, record_id: str):
-    """Track how often LEXA uses each piece of intelligence"""
-    supabase = get_supabase()
+async def increment_usage_count(supabase, table: str, record_id: str):
+    """
+    Track how often LEXA uses each piece of intelligence
+    
+    Args:
+        supabase: Supabase client instance
+        table: Table name
+        record_id: Record ID to increment
+    """
     try:
         supabase.rpc(
             f'increment_usage_count',
