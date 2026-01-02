@@ -9,8 +9,8 @@ import uuid
 from datetime import datetime
 import os
 
-from app.services.file_processor import process_file
-from app.services.intelligence_extractor import intelligence_extractor
+from app.services.file_processor import process_file_auto
+from app.services.intelligence_extractor import extract_all_intelligence
 from app.services.intelligence_storage import save_intelligence_to_db
 from app.services.supabase_client import get_supabase
 
@@ -84,7 +84,7 @@ async def upload_file(
             f.write(content)
         
         # Process file
-        extracted_text, metadata = await process_file(temp_path)
+        extracted_text, metadata = await process_file_auto(temp_path)
         
         # Clean up temp file
         if os.path.exists(temp_path):
@@ -97,9 +97,7 @@ async def upload_file(
             )
         
         # Extract intelligence with Claude AI
-        intelligence = intelligence_extractor.extract_comprehensive_intelligence(
-            extracted_text
-        )
+        intelligence = await extract_all_intelligence(extracted_text)
         
         # Save to database
         save_intelligence_to_db(
@@ -161,9 +159,7 @@ async def upload_text(
         upload_id = str(uuid.uuid4())
         
         # Extract intelligence
-        intelligence = intelligence_extractor.extract_comprehensive_intelligence(
-            request.text
-        )
+        intelligence = await extract_all_intelligence(request.text)
         
         # Save to database
         save_intelligence_to_db(

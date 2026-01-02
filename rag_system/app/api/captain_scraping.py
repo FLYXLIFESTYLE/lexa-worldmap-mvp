@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 
 from app.services.web_scraper import web_scraper
-from app.services.intelligence_extractor import intelligence_extractor
+from app.services.intelligence_extractor import extract_all_intelligence
 from app.services.intelligence_storage import save_intelligence_to_db
 from app.services.supabase_client import get_supabase
 
@@ -83,7 +83,7 @@ async def scrape_url(
         extracted_experiences = 0
         
         if request.extract_intelligence and scrape_result["content"]:
-            intelligence = intelligence_extractor.extract_comprehensive_intelligence(
+            intelligence = await extract_all_intelligence(
                 scrape_result["content"]
             )
             
