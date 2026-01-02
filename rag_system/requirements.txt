@@ -20,7 +20,7 @@ anthropic==0.7.7
 # Web scraping
 httpx==0.24.1
 beautifulsoup4==4.12.2
-lxml==4.9.3
+lxml>=5.0.0
 
 # Database
 supabase==2.3.0
