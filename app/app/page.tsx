@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import ChatTranscript from '@/components/chat/chat-transcript';
 import ChatInput from '@/components/chat/chat-input';
 import LuxuryBackground from '@/components/luxury-background';
+import { LegalDisclaimer } from '@/components/legal-disclaimer';
 import type { LexaUiPayload } from '@/lib/lexa/types';
 
 interface Message {
@@ -318,6 +319,9 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+      
+      {/* Legal Disclaimer Footer */}
+      <LegalDisclaimer variant="footer" className="relative z-10" />
       </div>
     </div>
   );

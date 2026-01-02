@@ -1,7 +1,8 @@
 'use client';
 
-import { Heart, Archive, Share2, Eye, ThumbsUp } from 'lucide-react';
+import { Heart, Archive, Share2, Eye, ThumbsUp, Info } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useState } from 'react';
 
 interface ScriptLibraryCardProps {
   script: {
@@ -9,6 +10,9 @@ interface ScriptLibraryCardProps {
     created_at: string;
     when_at?: any;
     theme?: string;
+    theme_category?: string;
+    hook?: string;
+    description?: string;
     tags?: string[];
     difficulty_level?: string;
     estimated_budget_range?: string;
@@ -40,33 +44,97 @@ export function ScriptLibraryCard({
   onArchive,
   onShare 
 }: ScriptLibraryCardProps) {
+  const [showDescription, setShowDescription] = useState(false);
   const isFavorite = script.library_metadata?.is_favorite || false;
   const isArchived = script.library_metadata?.is_archived || false;
   const title = script.when_at?.title || 'Experience Script';
   const timeAgo = formatDistanceToNow(new Date(script.created_at), { addSuffix: true });
+  
+  // Click outside to close description
+  const handleBackdropClick = () => {
+    setShowDescription(false);
+  };
 
   return (
-    <div className="rounded-lg border border-lexa-navy/10 bg-white hover:shadow-lg transition-all cursor-pointer group">
-      <div className="p-6">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-gray-900 truncate group-hover:text-lexa-gold transition-colors">
-                {title}
-              </h3>
-              <p className="text-xs text-gray-500 mt-1">{timeAgo}</p>
+    <>
+      {/* Backdrop overlay when description is open */}
+      {showDescription && (
+        <div 
+          className="fixed inset-0 bg-black/20 z-40"
+          onClick={handleBackdropClick}
+        />
+      )}
+      
+      <div className={`rounded-lg border border-lexa-navy/10 bg-white hover:shadow-lg transition-all cursor-pointer group ${showDescription ? 'relative z-50' : ''}`}>
+        <div className="p-6">
+          <div className="space-y-4">
+            {/* Header with Info Button */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-gray-900 truncate group-hover:text-lexa-gold transition-colors">
+                  {title}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">{timeAgo}</p>
+              </div>
+              <div className="flex items-center gap-1">
+                {/* Info Button - Mobile friendly */}
+                {(script.theme_category || script.hook || script.description) && (
+                  <button
+                    className={`rounded-full p-1.5 transition-all ${
+                      showDescription 
+                        ? 'bg-lexa-gold text-white' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-lexa-gold/20 hover:text-lexa-gold'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDescription(!showDescription);
+                    }}
+                    title="View details"
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  className={`${isFavorite ? 'text-red-500' : 'text-gray-400'} hover:text-red-500 p-2`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite?.(script.id, !isFavorite);
+                  }}
+                >
+                  <Heart className="h-4 w-4" fill={isFavorite ? 'currentColor' : 'none'} />
+                </button>
+              </div>
             </div>
-            <button
-              className={`${isFavorite ? 'text-red-500' : 'text-gray-400'} hover:text-red-500 -mt-1 -mr-2 p-2`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleFavorite?.(script.id, !isFavorite);
-              }}
-            >
-              <Heart className="h-4 w-4" fill={isFavorite ? 'currentColor' : 'none'} />
-            </button>
-          </div>
+            
+            {/* Theme Category and Hook - Always Visible */}
+            {(script.theme_category || script.hook) && (
+              <div className="space-y-2 py-3 border-t border-gray-100">
+                {script.theme_category && (
+                  <div>
+                    <span className="text-xs font-semibold text-lexa-gold uppercase tracking-wider">
+                      {script.theme_category}
+                    </span>
+                  </div>
+                )}
+                {script.hook && (
+                  <p className="text-sm text-gray-700 font-medium italic">
+                    "{script.hook}"
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {/* Expandable Description */}
+            {showDescription && script.description && (
+              <div className="bg-gradient-to-br from-lexa-gold/5 to-lexa-navy/5 border border-lexa-gold/30 rounded-lg p-4 space-y-2 animate-in slide-in-from-top duration-200">
+                <p className="text-xs font-semibold text-lexa-navy uppercase tracking-wider">
+                  About This Experience
+                </p>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {script.description}
+                </p>
+              </div>
+            )}
 
           {/* Tags */}
           <div className="flex flex-wrap gap-2">
@@ -148,8 +216,9 @@ export function ScriptLibraryCard({
               )}
             </div>
           </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

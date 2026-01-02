@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Experience Script Preview
  * Shows the final composed script with theme, hook, and highlights
  */
@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client-browser';
 import { useRouter } from 'next/navigation';
 import { Sparkles, Download, Share2, Calendar, MapPin, Heart } from 'lucide-react';
 import { lexaAPI, loadFromLocalStorage } from '@/lib/api/lexa-client';
+import { LegalDisclaimer } from '@/components/legal-disclaimer';
 
 interface ScriptData {
   themeName: string;
@@ -292,6 +293,11 @@ export default function ScriptPreviewPage() {
         {/* Footer Note */}
         <div className="text-center text-sm text-zinc-500 pt-8">
           <p>Crafted by LEXA • Powered by emotional intelligence • {new Date().toLocaleDateString()}</p>
+        </div>
+        
+        {/* Legal Disclaimer */}
+        <div className="mt-8">
+          <LegalDisclaimer variant="inline" />
         </div>
       </main>
     </div>
