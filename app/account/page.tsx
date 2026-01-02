@@ -243,7 +243,8 @@ export default function AccountDashboard() {
                 <p className="text-sm text-zinc-300 mt-1">Shared</p>
               </div>
             </div>
-          </div>
+              </div>
+            </div>
           )}
         </div>
 
