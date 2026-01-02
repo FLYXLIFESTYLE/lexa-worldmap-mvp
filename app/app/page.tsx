@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Main Chat Interface - Protected Route
  */
 
@@ -197,10 +197,14 @@ export default function ChatPage() {
           <div className="flex items-center gap-4">
             {/* User Menu */}
             <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-              <div className="text-right">
+              <button
+                onClick={() => router.push('/account')}
+                className="text-right hover:opacity-80 transition-opacity cursor-pointer"
+                title="Go to Account Dashboard"
+              >
                 <p className="text-sm font-medium text-zinc-100">{userEmail?.split('@')[0]}</p>
                 <p className="text-xs text-zinc-400">{userEmail?.split('@')[1]}</p>
-              </div>
+              </button>
               <button
                 onClick={handleSignOut}
                 className="rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-white transition-all hover:bg-white/10 hover:border-lexa-gold/30"

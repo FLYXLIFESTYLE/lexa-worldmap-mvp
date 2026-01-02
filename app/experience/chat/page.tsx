@@ -217,10 +217,14 @@ export default function LexaChatPage() {
           </div>
           
           <div className="flex items-center gap-3">
-            <div className="text-right">
+            <button
+              onClick={() => router.push('/account')}
+              className="text-right hover:opacity-70 transition-opacity cursor-pointer"
+              title="Go to Account Dashboard"
+            >
               <p className="text-sm font-medium text-zinc-900">{userEmail.split('@')[0]}</p>
-              <p className="text-xs text-zinc-500">In conversation</p>
-            </div>
+              <p className="text-xs text-zinc-500">View account</p>
+            </button>
           </div>
         </div>
         

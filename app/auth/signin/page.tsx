@@ -20,8 +20,8 @@ function SignInForm() {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  // Get redirectTo from URL params
-  const redirectTo = searchParams.get('redirectTo') || '/app';
+  // Get redirectTo from URL params - default to account dashboard
+  const redirectTo = searchParams.get('redirectTo') || '/account';
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();

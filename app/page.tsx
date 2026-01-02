@@ -81,7 +81,7 @@ export default function LandingPage() {
           </Link>
           
           <Link
-            href="/auth/signin"
+            href="/account"
             className="rounded-full border-2 border-zinc-600 px-10 py-5 text-lg font-semibold text-white backdrop-blur-sm transition-all hover:border-lexa-gold hover:bg-white/5 hover:text-lexa-gold"
           >
             Welcome Back
