@@ -2,8 +2,11 @@
 FastAPI Main Application Entry Point
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import os
 from dotenv import load_dotenv
 
@@ -17,19 +20,90 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# CORS configuration
+CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://lexa-worldmap-mvp.vercel.app",
+    "https://lexa-worldmap-mvp-git-main-flyxlifestyles-projects.vercel.app",  # Git branch preview
+]
+
 # CORS middleware (allow Next.js frontend)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://lexa-worldmap-mvp.vercel.app",
-        "https://lexa-worldmap-mvp-git-main-flyxlifestyles-projects.vercel.app",  # Git branch preview
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+# Exception handler to ensure CORS headers are always sent
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Ensure CORS headers are sent even on errors"""
+    origin = request.headers.get("origin")
+    if origin in CORS_ORIGINS:
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    else:
+        headers = {}
+    
+    import traceback
+    error_detail = str(exc)
+    traceback_str = traceback.format_exc()
+    print(f"Unhandled exception: {error_detail}")
+    print(traceback_str)
+    
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {error_detail}"},
+        headers=headers
+    )
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handle HTTP exceptions with CORS headers"""
+    origin = request.headers.get("origin")
+    if origin in CORS_ORIGINS:
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    else:
+        headers = {}
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle validation errors with CORS headers"""
+    origin = request.headers.get("origin")
+    if origin in CORS_ORIGINS:
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    else:
+        headers = {}
+    
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors(), "body": exc.body},
+        headers=headers
+    )
 
 # Import routers
 try:
