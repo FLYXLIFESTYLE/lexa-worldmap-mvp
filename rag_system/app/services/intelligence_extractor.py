@@ -23,8 +23,14 @@ class IntelligenceExtractor:
     """
     
     def __init__(self):
-        self.client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+        if not api_key:
+            print("ERROR: ANTHROPIC_API_KEY not set in environment variables!")
+            raise ValueError("ANTHROPIC_API_KEY environment variable is required")
+        print(f"Initializing Anthropic client with API key (length: {len(api_key)})")
+        self.client = anthropic.Anthropic(api_key=api_key)
         self.model = "claude-3-5-sonnet-20241022"
+        print(f"Using model: {self.model}")
     
     async def extract_all_intelligence(
         self,
