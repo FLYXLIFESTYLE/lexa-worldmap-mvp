@@ -72,7 +72,18 @@ class IntelligenceExtractor:
                 print(f"Empty or invalid response content: {response}")
                 return self._empty_result()
             
-            return self._parse_intelligence_response(response_text, source_file)
+            # Log first 500 chars of response for debugging
+            print(f"Claude response preview (first 500 chars): {response_text[:500]}")
+            
+            parsed_result = self._parse_intelligence_response(response_text, source_file)
+            
+            # Log extraction results
+            pois_count = len(parsed_result.get('pois', []))
+            experiences_count = len(parsed_result.get('experiences', []))
+            trends_count = len(parsed_result.get('trends', []))
+            print(f"Extracted: {pois_count} POIs, {experiences_count} Experiences, {trends_count} Trends")
+            
+            return parsed_result
             
         except AttributeError as e:
             print(f"Anthropic API error (attribute): {str(e)}")
@@ -93,18 +104,38 @@ SOURCE: {source_file or "Unknown"}
 
 Extract and categorize ALL valuable information into these sections:
 
-## 1. POIS (Places/Venues)
-Extract specific places with details for our POI database.
+## 1. POIS (Places/Venues) - REQUIRED
+Extract EVERY specific place, venue, restaurant, hotel, spa, beach, port, village, or location mentioned:
+- name: Full name of the place
+- type: (restaurant, hotel, spa, beach, port, village, landmark, etc.)
+- location: City/region (e.g., "Monaco", "Saint-Tropez", "Èze")
+- description: What makes it special or what happens there
+- coordinates: If you can infer approximate location, include lat/lng
+- category: (wellness, dining, accommodation, activity, etc.)
 
-## 2. EXPERIENCE IDEAS
-Creative experience concepts that could inspire LEXA scripts:
-- experience_title, experience_type, target_audience
-- emotional_goal, narrative_arc, key_moments
-- duration, estimated_budget, unique_elements
-- inspiration_source
+EXAMPLES from itineraries:
+- "Èze" → POI: name="Èze", type="village", location="French Riviera"
+- "Hotel du Cap-Eden-Roc Spa" → POI: name="Hotel du Cap-Eden-Roc", type="hotel_spa", location="Cap d'Antibes"
+- "Cheval Blanc St-Tropez Spa" → POI: name="Cheval Blanc St-Tropez", type="hotel_spa", location="Saint-Tropez"
+- "Elsa (Monaco)" → POI: name="Elsa", type="restaurant", location="Monaco", description="1 Michelin star"
+
+## 2. EXPERIENCE IDEAS - REQUIRED
+Extract EVERY experience, activity, or moment described:
+- experience_title: Name of the experience
+- experience_type: (wellness, dining, activity, spa_treatment, excursion, etc.)
+- description: What happens during this experience
+- location: Where it takes place
+- duration: If mentioned (e.g., "morning", "afternoon", "full day")
+- unique_elements: What makes it special
+- emotional_goal: What feeling it creates (relaxation, adventure, luxury, etc.)
+
+EXAMPLES:
+- "Sunrise yoga on deck" → Experience: title="Sunrise Yoga", type="wellness", location="onboard"
+- "Private thermal circuit at Thermes Marins Monte-Carlo" → Experience: title="Thermal Circuit", type="wellness", location="Monaco"
+- "Mindful walk through Èze village" → Experience: title="Mindful Village Walk", type="activity", location="Èze"
 
 ## 3. MARKET TRENDS
-Current patterns in luxury travel:
+Current patterns in luxury travel (only if explicitly mentioned or clearly implied):
 - trend_name, trend_category, description
 - target_demographic, growth_indicator
 - business_opportunity for LEXA
@@ -117,27 +148,39 @@ Understanding what luxury travelers want:
 - pain_points, unmet_needs
 
 ## 5. PRICE INTELLIGENCE
-Pricing patterns:
+Pricing patterns (if mentioned):
 - experience_type, price_range
 - value_drivers, price_sensitivity_factors
 
 ## 6. COMPETITOR ANALYSIS
-Other players:
+Other players mentioned (companies, services, brands):
 - competitor_name, strengths, weaknesses
 - lessons_for_lexa
 
 ## 7. OPERATIONAL LEARNINGS
-Practical knowledge about logistics, seasons, regulations, bookings
+Practical knowledge about logistics, seasons, regulations, bookings, requirements
 
 Text to analyze:
 ---
 {text[:12000]}
 ---
 
-Return ONLY valid JSON with this structure:
+CRITICAL: Even if the text is an itinerary or travel plan, extract:
+- ALL locations as POIs
+- ALL activities/experiences as Experiences
+- Any companies/services as Competitors
+- Any operational details as Learnings
+
+Return ONLY valid JSON (no markdown, no explanations, just JSON):
 {{
-  "pois": [...],
-  "experiences": [...],
+  "pois": [
+    {{"name": "...", "type": "...", "location": "...", "description": "...", "category": "..."}},
+    ...
+  ],
+  "experiences": [
+    {{"experience_title": "...", "experience_type": "...", "description": "...", "location": "...", "emotional_goal": "..."}},
+    ...
+  ],
   "trends": [...],
   "client_insights": [...],
   "price_intelligence": {{}},
