@@ -175,11 +175,16 @@ async def health_check():
 
 
 @app.post("/test/extraction")
-async def test_extraction(text: str = None):
+async def test_extraction(request: dict = None):
     """Test endpoint to verify Claude extraction is working"""
     from app.services.intelligence_extractor import extract_all_intelligence
+    from fastapi import Body
     
-    test_text = text or """Wellness Cruise 
+    # Get text from request body or use default
+    if request and isinstance(request, dict) and "text" in request:
+        test_text = request["text"]
+    else:
+        test_text = """Wellness Cruise 
 
 DAY 1 – ST-LAURENT-DU-VAR → BEAULIEU-SUR-MER & ÈZE
 Arrival · Decompression · Nervous System Reset
@@ -195,25 +200,45 @@ Exclusive Shore Experience – Èze
 • Optional Fragonard Wellness Atelier (olfactive grounding & breath)
 Evening
 • Sound healing or guided breathwork on deck
-• Early, clean Mediterranean dinner or dinner at La Chevre d'Or"""
+• Early, clean Mediterranean dinner or dinner at La Chevre d'Or
+
+Hotel du Cap-Eden-Roc Spa
+Cheval Blanc St-Tropez Spa by Guerlain
+Elsa (Monaco) 1 * Michelin
+Drip Hydration (UK based but operates internationally)
+Epulsive (Tailored workouts using EMS suits)"""
+    
+    print(f"=== TEST EXTRACTION CALLED ===")
+    print(f"Text length: {len(test_text)}")
+    print(f"First 200 chars: {test_text[:200]}")
     
     try:
         result = await extract_all_intelligence(test_text, "test_document.txt")
+        print(f"=== TEST EXTRACTION RESULT ===")
+        print(f"POIs: {len(result.get('pois', []))}")
+        print(f"Experiences: {len(result.get('experiences', []))}")
+        print(f"Competitors: {len(result.get('competitor_analysis', []))}")
+        
         return {
             "success": True,
+            "text_length": len(test_text),
             "extracted": {
                 "pois": len(result.get("pois", [])),
                 "experiences": len(result.get("experiences", [])),
-                "competitors": len(result.get("competitor_analysis", []))
+                "competitors": len(result.get("competitor_analysis", [])),
+                "trends": len(result.get("trends", []))
             },
             "data": result
         }
     except Exception as e:
         import traceback
+        error_trace = traceback.format_exc()
+        print(f"=== TEST EXTRACTION ERROR ===")
+        print(error_trace)
         return {
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            "traceback": error_trace
         }
 
 
