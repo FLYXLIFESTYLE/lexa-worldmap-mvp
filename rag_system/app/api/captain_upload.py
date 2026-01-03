@@ -38,7 +38,7 @@ class UploadResponse(BaseModel):
     message: str
 
 
-@router.post("/", response_model=UploadResponse)
+@router.post("/")
 async def upload_file(
     file: UploadFile = File(...),
     supabase = Depends(get_supabase)
@@ -166,7 +166,7 @@ async def upload_file(
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
 
-@router.post("/text", response_model=UploadResponse)
+@router.post("/text")
 async def upload_text(
     request: UploadTextRequest,
     supabase = Depends(get_supabase)
