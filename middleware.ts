@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   
   // Skip middleware for public routes
-  if (!path.startsWith('/app') && !path.startsWith('/api') && !path.startsWith('/admin') && !path.startsWith('/knowledge')) {
+  if (!path.startsWith('/app') && !path.startsWith('/api') && !path.startsWith('/admin') && !path.startsWith('/knowledge') && !path.startsWith('/captain')) {
     return NextResponse.next();
   }
 
@@ -101,6 +101,41 @@ export async function middleware(request: NextRequest) {
 
     if (profileError || !profile) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+  }
+
+  // Protect /captain routes - require captain or admin role
+  if (path.startsWith('/captain')) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth/signin';
+      url.searchParams.set('redirectTo', path);
+      return NextResponse.redirect(url);
+    }
+
+    // Check for captain profile or admin role in lexa_user_profiles
+    const { data: profile, error: profileError } = await supabase
+      .from('lexa_user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
+      const url = request.nextUrl.clone();
+      url.pathname = '/unauthorized';
+      url.searchParams.set('from', path);
+      url.searchParams.set('error', 'profile_fetch_error');
+      return NextResponse.redirect(url);
+    }
+
+    if (!profile || (profile.role !== 'captain' && profile.role !== 'admin')) {
+      console.log('User does not have captain or admin role:', user.id);
+      const url = request.nextUrl.clone();
+      url.pathname = '/unauthorized';
+      url.searchParams.set('from', path);
+      url.searchParams.set('error', 'insufficient_permissions');
+      return NextResponse.redirect(url);
     }
   }
 
