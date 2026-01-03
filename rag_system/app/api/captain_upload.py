@@ -64,6 +64,11 @@ async def upload_file(
     - Number of POIs and experiences extracted
     - Processing status
     """
+    print(f"=== UPLOAD REQUEST RECEIVED ===")
+    print(f"Filename: {file.filename}")
+    print(f"Content-Type: {file.content_type}")
+    print(f"Size: {file.size if hasattr(file, 'size') else 'unknown'}")
+    
     try:
         # Read file content
         content = await file.read()
@@ -84,6 +89,8 @@ async def upload_file(
             f.write(content)
         
         # Process file
+        print(f"=== PROCESSING FILE ===")
+        print(f"Temp path: {temp_path}")
         extracted_text, metadata = await process_file_auto(temp_path)
         
         # Clean up temp file
@@ -91,8 +98,13 @@ async def upload_file(
             os.remove(temp_path)
         
         # Log extracted text for debugging
+        print(f"=== TEXT EXTRACTION COMPLETE ===")
         print(f"Extracted text length: {len(extracted_text) if extracted_text else 0}")
-        print(f"Extracted text preview (first 500 chars): {extracted_text[:500] if extracted_text else 'NONE'}")
+        print(f"Metadata: {metadata}")
+        if extracted_text:
+            print(f"Extracted text preview (first 1000 chars):\n{extracted_text[:1000]}")
+        else:
+            print("ERROR: No text extracted from file!")
         
         if not extracted_text or len(extracted_text) < 50:
             raise HTTPException(
