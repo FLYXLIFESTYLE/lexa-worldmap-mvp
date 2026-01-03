@@ -96,6 +96,30 @@ async def upload_file(
                 detail="Could not extract meaningful text from file"
             )
         
+        # Create upload record FIRST with default confidence_score=80
+        try:
+            upload_record = {
+                "id": upload_id,
+                "filename": file.filename,
+                "file_type": metadata.get("file_type", "unknown"),
+                "file_size": file_size,
+                "processing_status": "processing",
+                "confidence_score": 80,  # Default 80% for uploads
+                "uploaded_by": None,  # TODO: Get from auth when implemented
+                "metadata": {
+                    "filename": file.filename,
+                    "file_size": file_size,
+                    "file_type": metadata.get("file_type"),
+                    **metadata
+                }
+            }
+            supabase.table("captain_uploads").insert(upload_record).execute()
+        except Exception as e:
+            print(f"Failed to create upload record: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Continue anyway - we'll update the record later
+        
         # Extract intelligence with Claude AI
         try:
             intelligence = await extract_all_intelligence(extracted_text, source_file=file.filename)
@@ -103,12 +127,20 @@ async def upload_file(
             print(f"Intelligence extraction failed: {str(e)}")
             import traceback
             traceback.print_exc()
+            # Update upload record to failed status
+            try:
+                supabase.table("captain_uploads").update({
+                    "processing_status": "failed",
+                    "error_message": str(e)
+                }).eq("id", upload_id).execute()
+            except:
+                pass
             raise HTTPException(
                 status_code=500,
                 detail=f"Intelligence extraction failed: {str(e)}"
             )
         
-        # Save to database
+        # Save extracted intelligence to database
         try:
             await save_intelligence_to_db(
                 supabase=supabase,
@@ -127,12 +159,20 @@ async def upload_file(
             print(f"Database save failed: {str(e)}")
             import traceback
             traceback.print_exc()
+            # Update upload record to failed status
+            try:
+                supabase.table("captain_uploads").update({
+                    "processing_status": "failed",
+                    "error_message": f"Database save failed: {str(e)}"
+                }).eq("id", upload_id).execute()
+            except:
+                pass
             raise HTTPException(
                 status_code=500,
                 detail=f"Database save failed: {str(e)}"
             )
         
-        # Map to frontend-expected format
+        # Update upload record with extraction results
         pois_count = len(intelligence.get("pois", []))
         experiences_count = len(intelligence.get("experiences", []))
         trends_count = len(intelligence.get("trends", []))
@@ -141,11 +181,23 @@ async def upload_file(
         competitors_count = len(intelligence.get("competitor_analysis", []))
         learnings_count = len(intelligence.get("operational_learnings", []))
         
+        try:
+            supabase.table("captain_uploads").update({
+                "processing_status": "completed",
+                "pois_extracted": pois_count,
+                "experiences_extracted": experiences_count,
+                "trends_extracted": trends_count
+            }).eq("id", upload_id).execute()
+        except Exception as e:
+            print(f"Failed to update upload record: {str(e)}")
+        
+        # Return response WITH extracted data for frontend editing
         return {
             "success": True,
             "upload_id": upload_id,
             "filename": file.filename,
             "status": "completed",
+            "confidence_score": 80,
             "pois_extracted": pois_count,
             "intelligence_extracted": {
                 "pois": pois_count,
@@ -156,6 +208,7 @@ async def upload_file(
                 "competitors": competitors_count,
                 "learnings": learnings_count
             },
+            "extracted_data": intelligence,  # Return full intelligence for editing
             "file_size_kb": file_size / 1024,
             "message": "File processed successfully"
         }
