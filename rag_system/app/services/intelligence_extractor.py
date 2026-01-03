@@ -229,18 +229,48 @@ Return ONLY valid JSON (no markdown code blocks, no explanations before/after, j
         """Parse Claude's comprehensive intelligence response"""
         
         try:
-            # Extract JSON
+            # Try multiple JSON extraction strategies
+            json_str = None
+            
+            # Strategy 1: Look for JSON code blocks
             json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
-            else:
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                print("Found JSON in code block")
+            
+            # Strategy 2: Look for JSON object directly
+            if not json_str:
+                json_match = re.search(r'\{[\s\S]*\}', response_text)
                 if json_match:
                     json_str = json_match.group(0)
-                else:
-                    return self._empty_result()
+                    print("Found JSON object directly")
             
+            # Strategy 3: Try to find JSON starting from first {
+            if not json_str:
+                first_brace = response_text.find('{')
+                if first_brace >= 0:
+                    # Try to extract balanced JSON
+                    brace_count = 0
+                    end_pos = first_brace
+                    for i in range(first_brace, len(response_text)):
+                        if response_text[i] == '{':
+                            brace_count += 1
+                        elif response_text[i] == '}':
+                            brace_count -= 1
+                            if brace_count == 0:
+                                end_pos = i + 1
+                                break
+                    if brace_count == 0:
+                        json_str = response_text[first_brace:end_pos]
+                        print("Extracted JSON by balancing braces")
+            
+            if not json_str:
+                print(f"ERROR: Could not find JSON in response. Response text: {response_text[:1000]}")
+                return self._empty_result()
+            
+            print(f"Attempting to parse JSON (length: {len(json_str)})")
             intelligence = json.loads(json_str)
+            print(f"Successfully parsed JSON. Keys: {list(intelligence.keys())}")
             
             # Add metadata
             intelligence['metadata'] = {
