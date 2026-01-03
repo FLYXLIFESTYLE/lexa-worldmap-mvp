@@ -29,11 +29,13 @@ class IntelligenceExtractor:
             print("Intelligence extraction will fail. Please set ANTHROPIC_API_KEY in Render environment variables.")
             # Don't raise error on init - let it fail when actually called
             self.client = None
-            self.model = "claude-3-5-sonnet-20240620"  # Correct model name
+            # Use a currently supported Anthropic model
+            self.model = "claude-sonnet-4-20250514"
         else:
             print(f"Initializing Anthropic client with API key (length: {len(api_key)})")
             self.client = anthropic.Anthropic(api_key=api_key)
-            self.model = "claude-3-5-sonnet-20240620"  # Correct model name
+            # Use a currently supported Anthropic model
+            self.model = "claude-sonnet-4-20250514"
             print(f"Using model: {self.model}")
     
     async def extract_all_intelligence(
@@ -110,14 +112,28 @@ class IntelligenceExtractor:
             return parsed_result
             
         except AttributeError as e:
-            print(f"Anthropic API error (attribute): {str(e)}")
+            error_msg = f"Anthropic API error (attribute): {str(e)}"
+            print(error_msg)
             print(f"Response object: {response if 'response' in locals() else 'N/A'}")
-            return self._empty_result()
+            raise Exception(error_msg)
         except Exception as e:
-            print(f"Intelligence extraction error: {str(e)}")
+            error_msg = str(e)
+            print(f"Intelligence extraction error: {error_msg}")
             import traceback
             traceback.print_exc()
-            return self._empty_result()
+            
+            # Check if it's a model not found error
+            if '404' in error_msg or 'not_found' in error_msg.lower() or 'model' in error_msg.lower():
+                enhanced_error = (
+                    f"Claude model '{self.model}' not found (404). "
+                    f"Try updating to a supported model (e.g. claude-sonnet-4-20250514). "
+                    f"Original error: {error_msg}"
+                )
+                print(f"⚠️ CRITICAL: {enhanced_error}")
+                raise Exception(enhanced_error)
+            
+            # Re-raise the exception so upload endpoint can handle it
+            raise Exception(f"Intelligence extraction failed: {error_msg}")
     
     def _build_comprehensive_prompt(self, text: str, source_file: Optional[str]) -> str:
         """Build prompt for comprehensive intelligence extraction"""
@@ -127,12 +143,15 @@ class IntelligenceExtractor:
 Document: {source_file or "Unknown"}
 
 Extract:
-1. All locations/places (POIs) - restaurants, hotels, spas, beaches, villages, landmarks
-2. All experiences/activities - what people do, treatments, excursions, moments
-3. All companies/services mentioned - competitors, partners, vendors
-4. Any trends, insights, or learnings
+1. All locations/places (POIs) - restaurants, hotels, spas, beaches, villages, landmarks, ports, marinas
+2. All experiences/activities - what people do, treatments, excursions, moments, rituals, protocols
+3. All companies/services mentioned - competitors, partners, vendors, service providers
+4. Emotional mapping - what emotions are evoked, with intensities if mentioned
+5. Client archetypes and profiles - who this experience is for, their emotional drivers
+6. Any trends, insights, or learnings
 
-Be thorough - extract EVERYTHING mentioned, even if it seems minor.
+Be EXTREMELY thorough - extract EVERYTHING mentioned, even if it seems minor. 
+Extract sub-experiences, variations, optional activities, and all details.
 
 Return ONLY valid JSON with this structure:
 {{
@@ -209,12 +228,15 @@ EXAMPLES:
 }}
 
 ### 5. CLIENT INSIGHTS - Understanding luxury traveler behavior
+Extract emotional profiles, client archetypes, and psychological insights:
 {{
-  "insight_category": "desires|pain_points|buying_behavior|decision_factors",
-  "client_segment": "Who this applies to",
+  "insight_category": "desires|pain_points|buying_behavior|decision_factors|emotional_profile|client_archetype",
+  "client_segment": "Who this applies to (e.g., 'Burnt-Out Executive', 'Longevity Optimizer', 'Wellness Enthusiast')",
   "insight_description": "The insight",
-  "emotional_drivers": "What motivates them",
-  "pain_points": "What frustrates them"
+  "emotional_drivers": ["List of primary emotions sought, e.g., ['Rejuvenation', 'Serenity', 'Transformation']"],
+  "emotional_intensities": {{"emotion_name": intensity_1_to_10}},  // If mentioned
+  "pain_points": ["What frustrates them or what they're escaping from"],
+  "transformation_journey": "If described, the before/after transformation (e.g., 'Depleted → Restored → Vitalized')"
 }}
 
 ### 6. OPERATIONAL LEARNINGS - Practical logistics, requirements, tips

@@ -160,12 +160,26 @@ async def upload_file(
             )
             
             if total_items == 0:
-                print("⚠️ WARNING: Extraction returned ZERO items!")
+                error_msg = "Extraction returned ZERO items. This could mean: Claude API failed, JSON parsing failed, or text doesn't contain extractable content."
+                print(f"⚠️ WARNING: {error_msg}")
                 print("This could mean:")
                 print("  1. Claude API returned empty JSON")
                 print("  2. JSON parsing failed")
                 print("  3. Text doesn't contain extractable content")
                 print("  4. Prompt format issue")
+                print("  5. Model name incorrect (check logs for 404 errors)")
+                
+                # Update upload record to failed status
+                try:
+                    supabase.table("captain_uploads").update({
+                        "processing_status": "failed",
+                        "error_message": error_msg
+                    }).eq("id", upload_id).execute()
+                except:
+                    pass
+                
+                # Still return response but with warning - don't fail completely
+                # Frontend can show the error message
         except Exception as e:
             print(f"❌ ERROR: Intelligence extraction failed: {str(e)}")
             import traceback

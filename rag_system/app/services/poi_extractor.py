@@ -17,7 +17,8 @@ class POIExtractor:
         self.client = anthropic.Anthropic(
             api_key=os.getenv('ANTHROPIC_API_KEY')
         )
-        self.model = "claude-3-5-sonnet-20240620"  # Correct model name
+        # Use a currently supported Anthropic model
+        self.model = "claude-sonnet-4-20250514"
     
     async def extract_pois_from_text(
         self,

@@ -275,10 +275,10 @@ async def process_file_auto(file_path: str) -> Tuple[str, Dict]:
     Returns: (extracted_text, metadata)
     """
     mime_type, _ = mimetypes.guess_type(file_path)
+    ext = os.path.splitext(file_path)[1].lower()
     
     if not mime_type:
         # Try to guess from extension
-        ext = os.path.splitext(file_path)[1].lower()
         mime_type_map = {
             '.pdf': 'application/pdf',
             '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -295,19 +295,37 @@ async def process_file_auto(file_path: str) -> Tuple[str, Dict]:
     if not mime_type:
         raise Exception(f"Could not determine file type for: {file_path}")
     
+    # Determine file_type for database constraint
+    file_type_map = {
+        '.pdf': 'pdf',
+        '.docx': 'word',
+        '.doc': 'word',
+        '.xlsx': 'excel',
+        '.xls': 'excel',
+        '.txt': 'text',
+        '.png': 'image',
+        '.jpg': 'image',
+        '.jpeg': 'image'
+    }
+    file_type = file_type_map.get(ext, 'unknown')
+    
     # Route to appropriate processor
     if 'pdf' in mime_type:
-        return await process_pdf(file_path)
+        text, metadata = await process_pdf(file_path)
     elif 'wordprocessingml' in mime_type or 'msword' in mime_type:
-        return await process_word(file_path)
+        text, metadata = await process_word(file_path)
     elif 'spreadsheetml' in mime_type or 'ms-excel' in mime_type:
-        return await process_excel(file_path)
+        text, metadata = await process_excel(file_path)
     elif 'image' in mime_type:
-        return await process_image(file_path)
+        text, metadata = await process_image(file_path)
     elif 'text' in mime_type:
-        return await process_text(file_path)
+        text, metadata = await process_text(file_path)
     else:
         raise Exception(f"Unsupported file type: {mime_type}")
+    
+    # Add file_type to metadata
+    metadata['file_type'] = file_type
+    return text, metadata
 
 
 # Utility function for checking dependencies
