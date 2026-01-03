@@ -113,15 +113,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Check for captain profile or admin role in lexa_user_profiles
+    // Check for captain profile or admin role in captain_profiles
     const { data: profile, error: profileError } = await supabase
-      .from('lexa_user_profiles')
+      .from('captain_profiles')
       .select('role')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .maybeSingle();
 
     if (profileError) {
-      console.error('Error fetching user profile:', profileError);
+      console.error('Error fetching captain profile:', profileError);
       const url = request.nextUrl.clone();
       url.pathname = '/unauthorized';
       url.searchParams.set('from', path);
