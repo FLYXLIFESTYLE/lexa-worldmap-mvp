@@ -72,8 +72,10 @@ class IntelligenceExtractor:
                 print(f"Empty or invalid response content: {response}")
                 return self._empty_result()
             
-            # Log first 500 chars of response for debugging
-            print(f"Claude response preview (first 500 chars): {response_text[:500]}")
+            # Log full response for debugging
+            print(f"=== CLAUDE RESPONSE (full) ===")
+            print(response_text)
+            print(f"=== END CLAUDE RESPONSE ===")
             
             parsed_result = self._parse_intelligence_response(response_text, source_file)
             
@@ -81,7 +83,14 @@ class IntelligenceExtractor:
             pois_count = len(parsed_result.get('pois', []))
             experiences_count = len(parsed_result.get('experiences', []))
             trends_count = len(parsed_result.get('trends', []))
-            print(f"Extracted: {pois_count} POIs, {experiences_count} Experiences, {trends_count} Trends")
+            competitors_count = len(parsed_result.get('competitor_analysis', []))
+            print(f"=== EXTRACTION RESULTS ===")
+            print(f"POIs: {pois_count}")
+            print(f"Experiences: {experiences_count}")
+            print(f"Trends: {trends_count}")
+            print(f"Competitors: {competitors_count}")
+            print(f"Full parsed result keys: {list(parsed_result.keys())}")
+            print(f"=== END EXTRACTION RESULTS ===")
             
             return parsed_result
             

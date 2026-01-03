@@ -90,10 +90,14 @@ async def upload_file(
         if os.path.exists(temp_path):
             os.remove(temp_path)
         
+        # Log extracted text for debugging
+        print(f"Extracted text length: {len(extracted_text) if extracted_text else 0}")
+        print(f"Extracted text preview (first 500 chars): {extracted_text[:500] if extracted_text else 'NONE'}")
+        
         if not extracted_text or len(extracted_text) < 50:
             raise HTTPException(
                 status_code=400,
-                detail="Could not extract meaningful text from file"
+                detail=f"Could not extract meaningful text from file. Extracted length: {len(extracted_text) if extracted_text else 0}"
             )
         
         # Create upload record FIRST with default confidence_score=80
