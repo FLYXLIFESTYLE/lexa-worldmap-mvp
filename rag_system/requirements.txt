@@ -16,7 +16,7 @@ openpyxl==3.1.2
 Pillow>=10.2.0
 
 # AI and enrichment
-anthropic==0.7.7
+anthropic>=0.18.0,<1.0.0  # Updated for messages API support
 
 # Web scraping
 httpx==0.24.1  # Pin exact version compatible with supabase 2.3.0
