@@ -52,18 +52,36 @@ class IntelligenceExtractor:
         prompt = self._build_comprehensive_prompt(text, source_file)
         
         try:
-            message = self.client.messages.create(
+            response = self.client.messages.create(
                 model=self.model,
                 max_tokens=8000,  # More tokens for comprehensive extraction
                 temperature=0.3,
                 messages=[{"role": "user", "content": prompt}]
             )
             
-            response_text = message.content[0].text
+            # Extract text from response (handle different response formats)
+            if hasattr(response, 'content') and len(response.content) > 0:
+                if hasattr(response.content[0], 'text'):
+                    response_text = response.content[0].text
+                elif isinstance(response.content[0], dict) and 'text' in response.content[0]:
+                    response_text = response.content[0]['text']
+                else:
+                    print(f"Unexpected response format: {type(response.content[0])}")
+                    return self._empty_result()
+            else:
+                print(f"Empty or invalid response content: {response}")
+                return self._empty_result()
+            
             return self._parse_intelligence_response(response_text, source_file)
             
+        except AttributeError as e:
+            print(f"Anthropic API error (attribute): {str(e)}")
+            print(f"Response object: {response if 'response' in locals() else 'N/A'}")
+            return self._empty_result()
         except Exception as e:
             print(f"Intelligence extraction error: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return self._empty_result()
     
     def _build_comprehensive_prompt(self, text: str, source_file: Optional[str]) -> str:
