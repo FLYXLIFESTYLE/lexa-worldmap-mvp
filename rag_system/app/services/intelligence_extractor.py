@@ -25,12 +25,16 @@ class IntelligenceExtractor:
     def __init__(self):
         api_key = os.getenv('ANTHROPIC_API_KEY')
         if not api_key:
-            print("ERROR: ANTHROPIC_API_KEY not set in environment variables!")
-            raise ValueError("ANTHROPIC_API_KEY environment variable is required")
-        print(f"Initializing Anthropic client with API key (length: {len(api_key)})")
-        self.client = anthropic.Anthropic(api_key=api_key)
-        self.model = "claude-3-5-sonnet-20241022"
-        print(f"Using model: {self.model}")
+            print("WARNING: ANTHROPIC_API_KEY not set in environment variables!")
+            print("Intelligence extraction will fail. Please set ANTHROPIC_API_KEY in Render environment variables.")
+            # Don't raise error on init - let it fail when actually called
+            self.client = None
+            self.model = "claude-3-5-sonnet-20241022"
+        else:
+            print(f"Initializing Anthropic client with API key (length: {len(api_key)})")
+            self.client = anthropic.Anthropic(api_key=api_key)
+            self.model = "claude-3-5-sonnet-20241022"
+            print(f"Using model: {self.model}")
     
     async def extract_all_intelligence(
         self,
@@ -52,6 +56,11 @@ class IntelligenceExtractor:
         """
         
         if len(text) < 50:
+            return self._empty_result()
+        
+        # Check if client is initialized
+        if not self.client:
+            print("ERROR: Anthropic client not initialized. ANTHROPIC_API_KEY is missing!")
             return self._empty_result()
         
         # Build comprehensive extraction prompt
