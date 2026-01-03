@@ -18,8 +18,9 @@ Pillow>=10.2.0
 # AI and enrichment
 anthropic>=0.18.0,<1.0.0  # Updated for messages API support
 
-# Web scraping
+# Web scraping - Pin entire httpx/httpcore chain
 httpx==0.24.1  # Pin exact version compatible with supabase 2.3.0
+httpcore==0.17.3  # Compatible with httpx 0.24.1 (prevents socket_options error)
 beautifulsoup4==4.12.2
 lxml>=5.0.0
 
