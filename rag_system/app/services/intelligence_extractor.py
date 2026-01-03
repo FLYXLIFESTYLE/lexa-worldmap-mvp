@@ -29,11 +29,11 @@ class IntelligenceExtractor:
             print("Intelligence extraction will fail. Please set ANTHROPIC_API_KEY in Render environment variables.")
             # Don't raise error on init - let it fail when actually called
             self.client = None
-            self.model = "claude-3-5-sonnet-20241022"
+            self.model = "claude-3-5-sonnet-20240620"  # Correct model name
         else:
             print(f"Initializing Anthropic client with API key (length: {len(api_key)})")
             self.client = anthropic.Anthropic(api_key=api_key)
-            self.model = "claude-3-5-sonnet-20241022"
+            self.model = "claude-3-5-sonnet-20240620"  # Correct model name
             print(f"Using model: {self.model}")
     
     async def extract_all_intelligence(
