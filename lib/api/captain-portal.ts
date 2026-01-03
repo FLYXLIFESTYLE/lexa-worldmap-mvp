@@ -5,6 +5,11 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://lexa-worldmap-mvp-rlss.onrender.com';
 
+// Debug log (remove after testing)
+if (typeof window !== 'undefined') {
+  console.log('🔧 Captain Portal API Base URL:', API_BASE_URL);
+}
+
 // Helper for making API requests
 async function apiRequest<T>(
   endpoint: string,
