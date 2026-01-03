@@ -21,6 +21,8 @@ anthropic==0.18.1  # Pin to version compatible with httpcore 0.17.3
 # Web scraping - Pin entire httpx/httpcore chain
 httpx==0.24.1  # Pin exact version compatible with supabase 2.3.0
 httpcore==0.17.3  # Compatible with httpx 0.24.1 (prevents socket_options error)
+anyio==3.7.1  # Pin to prevent conflicts
+h11==0.14.0  # Pin HTTP/1.1 implementation
 beautifulsoup4==4.12.2
 lxml>=5.0.0
 
