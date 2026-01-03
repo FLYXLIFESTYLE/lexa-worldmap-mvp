@@ -174,6 +174,49 @@ async def health_check():
     }
 
 
+@app.post("/test/extraction")
+async def test_extraction(text: str = None):
+    """Test endpoint to verify Claude extraction is working"""
+    from app.services.intelligence_extractor import extract_all_intelligence
+    
+    test_text = text or """Wellness Cruise 
+
+DAY 1 – ST-LAURENT-DU-VAR → BEAULIEU-SUR-MER & ÈZE
+Arrival · Decompression · Nervous System Reset
+• Private embarkation in St-Laurent-du-Var
+• Welcome onboard with mineralised water, adaptogenic tonics & anti-jet-lag supplements
+• Light detox lunch onboard
+Afternoon – Beaulieu-sur-Mer
+• Gentle coastal cruise and anchorage
+• Sea immersion therapy & floating meditation
+Exclusive Shore Experience – Èze
+• Private transfer to Èze
+• Mindful walk through the village & nature paths
+• Optional Fragonard Wellness Atelier (olfactive grounding & breath)
+Evening
+• Sound healing or guided breathwork on deck
+• Early, clean Mediterranean dinner or dinner at La Chevre d'Or"""
+    
+    try:
+        result = await extract_all_intelligence(test_text, "test_document.txt")
+        return {
+            "success": True,
+            "extracted": {
+                "pois": len(result.get("pois", [])),
+                "experiences": len(result.get("experiences", [])),
+                "competitors": len(result.get("competitor_analysis", []))
+            },
+            "data": result
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

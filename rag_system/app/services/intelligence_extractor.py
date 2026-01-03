@@ -122,11 +122,30 @@ class IntelligenceExtractor:
     def _build_comprehensive_prompt(self, text: str, source_file: Optional[str]) -> str:
         """Build prompt for comprehensive intelligence extraction"""
         
-        prompt = f"""You are an expert at extracting structured information from travel and luxury experience content. Think like Claude - be thorough, accurate, and extract everything valuable.
+        prompt = f"""Extract all valuable information from this travel/luxury experience document and return it as JSON.
 
-SOURCE DOCUMENT: {source_file or "Unknown"}
+Document: {source_file or "Unknown"}
 
-Your task: Extract ALL valuable information and organize it into structured JSON.
+Extract:
+1. All locations/places (POIs) - restaurants, hotels, spas, beaches, villages, landmarks
+2. All experiences/activities - what people do, treatments, excursions, moments
+3. All companies/services mentioned - competitors, partners, vendors
+4. Any trends, insights, or learnings
+
+Be thorough - extract EVERYTHING mentioned, even if it seems minor.
+
+Return ONLY valid JSON with this structure:
+{{
+  "pois": [{{"name": "...", "type": "...", "location": "...", "description": "..."}}],
+  "experiences": [{{"experience_title": "...", "experience_type": "...", "description": "...", "location": "..."}}],
+  "competitor_analysis": [{{"competitor_name": "...", "service_type": "..."}}],
+  "trends": [],
+  "client_insights": [],
+  "price_intelligence": {{}},
+  "operational_learnings": []
+}}
+
+Document content:
 
 ## EXTRACTION RULES:
 
@@ -214,29 +233,9 @@ EXAMPLES:
 
 ---
 
-TEXT TO ANALYZE:
 {text[:15000]}
 
----
-
-CRITICAL INSTRUCTIONS:
-1. Extract EVERY location mentioned - even small villages, beaches, ports
-2. Extract EVERY activity/experience - even simple ones like "swim" or "sunset cruise"
-3. Extract ALL companies/services mentioned
-4. Be thorough - if it's mentioned, extract it
-5. Use clear, descriptive names
-6. If something is unclear, make your best inference
-
-Return ONLY valid JSON (no markdown code blocks, no explanations before/after, just pure JSON):
-{{
-  "pois": [...],
-  "experiences": [...],
-  "trends": [...],
-  "client_insights": [...],
-  "price_intelligence": {{}},
-  "competitor_analysis": [...],
-  "operational_learnings": [...]
-}}"""
+IMPORTANT: Return ONLY the JSON object, no markdown, no explanations, no code blocks. Start with {{ and end with }}."""
         
         return prompt
     
