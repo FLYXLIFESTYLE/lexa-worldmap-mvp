@@ -97,22 +97,40 @@ async def upload_file(
             )
         
         # Extract intelligence with Claude AI
-        intelligence = await extract_all_intelligence(extracted_text)
+        try:
+            intelligence = await extract_all_intelligence(extracted_text, source_file=file.filename)
+        except Exception as e:
+            print(f"Intelligence extraction failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Intelligence extraction failed: {str(e)}"
+            )
         
         # Save to database
-        await save_intelligence_to_db(
-            supabase=supabase,
-            intelligence=intelligence,
-            source_type="file_upload",
-            source_id=upload_id,
-            source_metadata={
-                "filename": file.filename,
-                "file_size": file_size,
-                "file_type": metadata.get("file_type"),
-                **metadata
-            },
-            uploaded_by=None  # TODO: Get from auth when implemented
-        )
+        try:
+            await save_intelligence_to_db(
+                supabase=supabase,
+                intelligence=intelligence,
+                source_type="file_upload",
+                source_id=upload_id,
+                source_metadata={
+                    "filename": file.filename,
+                    "file_size": file_size,
+                    "file_type": metadata.get("file_type"),
+                    **metadata
+                },
+                uploaded_by=None  # TODO: Get from auth when implemented
+            )
+        except Exception as e:
+            print(f"Database save failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database save failed: {str(e)}"
+            )
         
         # Map to frontend-expected format
         pois_count = len(intelligence.get("pois", []))
