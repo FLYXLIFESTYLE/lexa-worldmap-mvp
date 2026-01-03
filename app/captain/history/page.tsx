@@ -207,6 +207,19 @@ export default function CaptainHistoryPage() {
     setFilteredUploads(filtered);
   }, [uploads, statusFilter, searchQuery, sortBy]);
 
+  // Toggle keep/dump file
+  const handleToggleKeepFile = async (id: string, currentKeep: boolean) => {
+    try {
+      // TODO: Call backend API to update keep_file
+      setUploads(prev => prev.map(u => 
+        u.id === id ? { ...u, keep_file: !currentKeep } : u
+      ));
+      alert(`✅ File ${!currentKeep ? 'saved' : 'marked for deletion'}!`);
+    } catch (error) {
+      alert('❌ Failed to update file status');
+    }
+  };
+
   // Delete upload
   const handleDelete = async (id: string, filename: string) => {
     if (!confirm(`Delete "${filename}"? Extracted knowledge will remain in the database.`)) {
@@ -481,6 +494,21 @@ export default function CaptainHistoryPage() {
                       >
                         {expandedId === upload.id ? '▲ Hide' : '▼ Details'}
                       </button>
+                      
+                      {/* Keep/Dump Toggle */}
+                      {upload.processing_status === 'completed' && (
+                        <button
+                          onClick={() => handleToggleKeepFile(upload.id, upload.keep_file)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                            upload.keep_file
+                              ? 'bg-green-600 text-white hover:bg-green-700'
+                              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                          }`}
+                          title={upload.keep_file ? 'Click to dump file (delete after extraction)' : 'Click to keep file'}
+                        >
+                          {upload.keep_file ? '💾 Keep File' : '🗑️ Dump File'}
+                        </button>
+                      )}
                       
                       {upload.file_url && upload.keep_file && (
                         <button

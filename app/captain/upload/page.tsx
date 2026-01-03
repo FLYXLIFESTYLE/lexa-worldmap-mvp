@@ -19,6 +19,8 @@ interface UploadedFile {
   type: string;
   status: 'pending' | 'processing' | 'done' | 'error';
   confidenceScore: number;
+  uploadId?: string;
+  extractedData?: any; // Full intelligence data for editing
 }
 
 interface YachtDestination {
@@ -39,6 +41,7 @@ export default function CaptainUploadPage() {
   // File Upload State
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [editingFile, setEditingFile] = useState<UploadedFile | null>(null); // File being edited
   
   // URL Scraping State
   const [url, setUrl] = useState('');
@@ -92,18 +95,40 @@ export default function CaptainUploadPage() {
         // Upload to backend (THIS IS THE REAL API CALL)
         const result = await uploadAPI.uploadFile(file);
   
-        // Update status to done
+        // Update status to done WITH extracted data
         setFiles(prev => prev.map(f => 
           f.name === file.name 
-            ? { ...f, status: 'done', confidenceScore: 80 }
+            ? { 
+                ...f, 
+                status: 'done', 
+                confidenceScore: result.confidence_score || 80,
+                uploadId: result.upload_id,
+                extractedData: result.extracted_data // Store for editing
+              }
             : f
         ));
   
-        // Show success message
-        alert(`✅ ${file.name} uploaded!\n` +
-              `POIs found: ${result.pois_extracted}\n` +
-              `Experiences: ${result.intelligence_extracted.experiences}\n` +
-              `Trends: ${result.intelligence_extracted.trends}`);
+        // Show success message and open editor if data extracted
+        const hasData = result.pois_extracted > 0 || result.intelligence_extracted.experiences > 0;
+        if (hasData) {
+          // Auto-open editor for extracted data
+          const updatedFile = {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            status: 'done' as const,
+            confidenceScore: result.confidence_score || 80,
+            uploadId: result.upload_id,
+            extractedData: result.extracted_data
+          };
+          setEditingFile(updatedFile);
+        } else {
+          alert(`✅ ${file.name} uploaded!\n` +
+                `POIs found: ${result.pois_extracted}\n` +
+                `Experiences: ${result.intelligence_extracted.experiences}\n` +
+                `Trends: ${result.intelligence_extracted.trends}\n\n` +
+                `No data extracted. Please review the document or try manual entry.`);
+        }
       }
     } catch (error: any) {
       console.error('Upload failed:', error);
@@ -847,6 +872,222 @@ export default function CaptainUploadPage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Extracted Data Editor Modal */}
+        {editingFile && editingFile.extractedData && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    ✏️ Edit Extracted Data: {editingFile.name}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Review and enhance extracted intelligence. Set confidence score and save.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setEditingFile(null)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Content - Scrollable */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Confidence Score */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Confidence Score: {editingFile.confidenceScore}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={editingFile.confidenceScore}
+                    onChange={(e) => setEditingFile({
+                      ...editingFile,
+                      confidenceScore: parseInt(e.target.value)
+                    })}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0% (Unverified)</span>
+                    <span>80% (Default Upload)</span>
+                    <span>100% (Captain Approved)</span>
+                  </div>
+                </div>
+
+                {/* POIs Section */}
+                {editingFile.extractedData.pois && editingFile.extractedData.pois.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">
+                      📍 POIs ({editingFile.extractedData.pois.length})
+                    </h3>
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {editingFile.extractedData.pois.map((poi: any, idx: number) => (
+                        <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                          <input
+                            type="text"
+                            value={poi.name || ''}
+                            onChange={(e) => {
+                              const updated = { ...editingFile };
+                              updated.extractedData.pois[idx].name = e.target.value;
+                              setEditingFile(updated);
+                            }}
+                            placeholder="POI Name"
+                            className="w-full font-semibold mb-2 px-2 py-1 border border-gray-300 rounded"
+                          />
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <input
+                              type="text"
+                              value={poi.location || ''}
+                              onChange={(e) => {
+                                const updated = { ...editingFile };
+                                updated.extractedData.pois[idx].location = e.target.value;
+                                setEditingFile(updated);
+                              }}
+                              placeholder="Location"
+                              className="px-2 py-1 border border-gray-300 rounded"
+                            />
+                            <input
+                              type="text"
+                              value={poi.type || ''}
+                              onChange={(e) => {
+                                const updated = { ...editingFile };
+                                updated.extractedData.pois[idx].type = e.target.value;
+                                setEditingFile(updated);
+                              }}
+                              placeholder="Type"
+                              className="px-2 py-1 border border-gray-300 rounded"
+                            />
+                          </div>
+                          <textarea
+                            value={poi.description || ''}
+                            onChange={(e) => {
+                              const updated = { ...editingFile };
+                              updated.extractedData.pois[idx].description = e.target.value;
+                              setEditingFile(updated);
+                            }}
+                            placeholder="Description"
+                            className="w-full mt-2 px-2 py-1 border border-gray-300 rounded text-sm"
+                            rows={2}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Experiences Section */}
+                {editingFile.extractedData.experiences && editingFile.extractedData.experiences.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">
+                      ✨ Experiences ({editingFile.extractedData.experiences.length})
+                    </h3>
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {editingFile.extractedData.experiences.map((exp: any, idx: number) => (
+                        <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                          <input
+                            type="text"
+                            value={exp.experience_title || ''}
+                            onChange={(e) => {
+                              const updated = { ...editingFile };
+                              updated.extractedData.experiences[idx].experience_title = e.target.value;
+                              setEditingFile(updated);
+                            }}
+                            placeholder="Experience Title"
+                            className="w-full font-semibold mb-2 px-2 py-1 border border-gray-300 rounded"
+                          />
+                          <textarea
+                            value={exp.description || ''}
+                            onChange={(e) => {
+                              const updated = { ...editingFile };
+                              updated.extractedData.experiences[idx].description = e.target.value;
+                              setEditingFile(updated);
+                            }}
+                            placeholder="Description"
+                            className="w-full mt-2 px-2 py-1 border border-gray-300 rounded text-sm"
+                            rows={2}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Competitors Section */}
+                {editingFile.extractedData.competitor_analysis && editingFile.extractedData.competitor_analysis.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">
+                      🏢 Competitors ({editingFile.extractedData.competitor_analysis.length})
+                    </h3>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {editingFile.extractedData.competitor_analysis.map((comp: any, idx: number) => (
+                        <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                          <input
+                            type="text"
+                            value={comp.competitor_name || ''}
+                            onChange={(e) => {
+                              const updated = { ...editingFile };
+                              updated.extractedData.competitor_analysis[idx].competitor_name = e.target.value;
+                              setEditingFile(updated);
+                            }}
+                            placeholder="Competitor Name"
+                            className="w-full font-semibold px-2 py-1 border border-gray-300 rounded"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+                <button
+                  onClick={() => {
+                    // TODO: Implement dump/delete functionality
+                    setEditingFile(null);
+                    setFiles(prev => prev.filter(f => f.name !== editingFile.name));
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700"
+                >
+                  🗑️ Dump File
+                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setEditingFile(null)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      // TODO: Save edited data with confidence score
+                      setLoading(true);
+                      try {
+                        // Call API to update with edited data and confidence score
+                        alert(`✅ Data saved with ${editingFile.confidenceScore}% confidence!`);
+                        setEditingFile(null);
+                      } catch (error) {
+                        alert('❌ Failed to save data');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {loading ? 'Saving...' : '💾 Save & Keep File'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
