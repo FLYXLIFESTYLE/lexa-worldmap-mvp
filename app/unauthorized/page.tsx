@@ -115,13 +115,6 @@ function UnauthorizedContent() {
           )}
           
           <Link
-            href="/demo/chat"
-            className="block w-full px-6 py-3 bg-gradient-to-r from-lexa-navy to-lexa-gold text-white rounded-xl font-semibold text-center hover:shadow-lg transition-all"
-          >
-            Go to LEXA Demo Chat
-          </Link>
-          
-          <Link
             href="/"
             className="block w-full px-6 py-3 bg-white/5 border border-white/10 text-white rounded-xl font-semibold text-center hover:bg-white/10 transition-all"
           >
