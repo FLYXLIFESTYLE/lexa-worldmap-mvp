@@ -122,8 +122,7 @@ async def upload_file(
                 "file_size": file_size,
                 "processing_status": "processing",
                 "confidence_score": 80,  # Default 80% for uploads
-                "uploaded_by": "00000000-0000-0000-0000-000000000000",  # Placeholder UUID until auth implemented
-                "uploaded_by_email": "system@lexa.ai",  # Placeholder email until auth implemented
+                # uploaded_by and uploaded_by_email are nullable until auth is implemented
                 "metadata": {
                     "filename": file.filename,
                     "file_size": file_size,
@@ -228,8 +227,9 @@ async def upload_file(
         try:
             supabase.table("captain_uploads").update({
                 "processing_status": "completed",
-                "pois_discovered": pois_count,  # Use correct column name
-                "relationships_discovered": experiences_count + trends_count  # Combine experiences and trends
+                "pois_extracted": pois_count,
+                "experiences_extracted": experiences_count,
+                "trends_extracted": trends_count
             }).eq("id", upload_id).execute()
         except Exception as e:
             print(f"Failed to update upload record: {str(e)}")
