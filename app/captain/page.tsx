@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
+import { statsAPI } from '@/lib/api/captain-portal';
 
 interface Captain {
   name: string;

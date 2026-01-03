@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
 import { Bell, Plus, Edit2, Trash2, Check, X, ExternalLink, Clock } from 'lucide-react';
+import { keywordsAPI } from '@/lib/api/captain-portal';
 
 interface Keyword {
   id: string;

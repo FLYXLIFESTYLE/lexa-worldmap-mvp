@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
+import { uploadAPI, scrapingAPI } from '@/lib/api/captain-portal';
 
 type UploadMode = 'file' | 'url' | 'manual' | 'yacht';
 
@@ -73,20 +74,45 @@ export default function CaptainUploadPage() {
   // FILE UPLOAD HANDLERS
   const handleFileUpload = async (uploadedFiles: FileList | null) => {
     if (!uploadedFiles || uploadedFiles.length === 0) return;
-
-    const newFiles: UploadedFile[] = Array.from(uploadedFiles).map(file => ({
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      status: 'pending',
-      confidenceScore: 80
-    }));
-
-    setFiles(prev => [...prev, ...newFiles]);
-    setIsDragging(false);
-
-    // TODO: Process files with backend
-    alert(`📤 ${newFiles.length} file(s) added! Processing will be implemented soon.`);
+  
+    setLoading(true);
+  
+    try {
+      for (const file of Array.from(uploadedFiles)) {
+        // Show file as processing
+        const newFile: UploadedFile = {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          status: 'processing',
+          confidenceScore: 0
+        };
+        setFiles(prev => [...prev, newFile]);
+  
+        // Upload to backend (THIS IS THE REAL API CALL)
+        const result = await uploadAPI.uploadFile(file);
+  
+        // Update status to done
+        setFiles(prev => prev.map(f => 
+          f.name === file.name 
+            ? { ...f, status: 'done', confidenceScore: 80 }
+            : f
+        ));
+  
+        // Show success message
+        alert(`✅ ${file.name} uploaded!\n` +
+              `POIs found: ${result.pois_extracted}\n` +
+              `Experiences: ${result.intelligence_extracted.experiences}\n` +
+              `Trends: ${result.intelligence_extracted.trends}`);
+      }
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+      alert(`❌ Upload failed: ${error.message}`);
+      setFiles(prev => prev.map(f => ({ ...f, status: 'error' })));
+    } finally {
+      setLoading(false);
+      setIsDragging(false);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {

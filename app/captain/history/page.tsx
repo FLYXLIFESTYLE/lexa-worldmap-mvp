@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
+import { uploadAPI } from '@/lib/api/captain-portal';
 
 interface UploadRecord {
   id: string;
