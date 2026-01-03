@@ -114,15 +114,33 @@ async def upload_file(
             uploaded_by=None  # TODO: Get from auth when implemented
         )
         
-        return UploadResponse(
-            upload_id=upload_id,
-            filename=file.filename,
-            status="completed",
-            extracted_pois=len(intelligence.get("pois", [])),
-            extracted_experiences=len(intelligence.get("experiences", [])),
-            file_size_kb=file_size / 1024,
-            message="File processed successfully"
-        )
+        # Map to frontend-expected format
+        pois_count = len(intelligence.get("pois", []))
+        experiences_count = len(intelligence.get("experiences", []))
+        trends_count = len(intelligence.get("trends", []))
+        insights_count = len(intelligence.get("client_insights", []))
+        prices_count = len(intelligence.get("price_intelligence", {}).keys()) if isinstance(intelligence.get("price_intelligence"), dict) else 0
+        competitors_count = len(intelligence.get("competitor_analysis", []))
+        learnings_count = len(intelligence.get("operational_learnings", []))
+        
+        return {
+            "success": True,
+            "upload_id": upload_id,
+            "filename": file.filename,
+            "status": "completed",
+            "pois_extracted": pois_count,
+            "intelligence_extracted": {
+                "pois": pois_count,
+                "experiences": experiences_count,
+                "trends": trends_count,
+                "insights": insights_count,
+                "prices": prices_count,
+                "competitors": competitors_count,
+                "learnings": learnings_count
+            },
+            "file_size_kb": file_size / 1024,
+            "message": "File processed successfully"
+        }
         
     except HTTPException as e:
         raise e
@@ -175,15 +193,33 @@ async def upload_text(
             uploaded_by=None  # TODO: Get from auth when implemented
         )
         
-        return UploadResponse(
-            upload_id=upload_id,
-            filename=f"{request.title}.txt",
-            status="completed",
-            extracted_pois=len(intelligence.get("pois", [])),
-            extracted_experiences=len(intelligence.get("experiences", [])),
-            file_size_kb=len(request.text.encode('utf-8')) / 1024,
-            message="Text processed successfully"
-        )
+        # Map to frontend-expected format
+        pois_count = len(intelligence.get("pois", []))
+        experiences_count = len(intelligence.get("experiences", []))
+        trends_count = len(intelligence.get("trends", []))
+        insights_count = len(intelligence.get("client_insights", []))
+        prices_count = len(intelligence.get("price_intelligence", {}).keys()) if isinstance(intelligence.get("price_intelligence"), dict) else 0
+        competitors_count = len(intelligence.get("competitor_analysis", []))
+        learnings_count = len(intelligence.get("operational_learnings", []))
+        
+        return {
+            "success": True,
+            "upload_id": upload_id,
+            "filename": f"{request.title}.txt",
+            "status": "completed",
+            "pois_extracted": pois_count,
+            "intelligence_extracted": {
+                "pois": pois_count,
+                "experiences": experiences_count,
+                "trends": trends_count,
+                "insights": insights_count,
+                "prices": prices_count,
+                "competitors": competitors_count,
+                "learnings": learnings_count
+            },
+            "file_size_kb": len(request.text.encode('utf-8')) / 1024,
+            "message": "Text processed successfully"
+        }
         
     except HTTPException as e:
         raise e
