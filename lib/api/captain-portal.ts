@@ -41,6 +41,8 @@ export interface UploadResponse {
   success: boolean;
   upload_id: string;
   filename: string;
+  status: string;
+  confidence_score?: number;
   pois_extracted: number;
   intelligence_extracted: {
     pois: number;
@@ -51,6 +53,17 @@ export interface UploadResponse {
     competitors: number;
     learnings: number;
   };
+  extracted_data?: {
+    pois?: any[];
+    experiences?: any[];
+    trends?: any[];
+    client_insights?: any[];
+    price_intelligence?: any;
+    competitor_analysis?: any[];
+    operational_learnings?: any[];
+  };
+  file_size_kb?: number;
+  message?: string;
 }
 
 export const uploadAPI = {
