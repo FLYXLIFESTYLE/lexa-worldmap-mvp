@@ -20,7 +20,12 @@ app = FastAPI(
 # CORS middleware (allow Next.js frontend)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:\d+",
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://lexa-worldmap-mvp.vercel.app",
+        "https://lexa-worldmap-mvp-git-main-flyxlifestyles-projects.vercel.app",  # Git branch preview
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
