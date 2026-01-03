@@ -137,10 +137,36 @@ async def upload_file(
             # Continue anyway - we'll update the record later
         
         # Extract intelligence with Claude AI
+        print(f"=== STARTING INTELLIGENCE EXTRACTION ===")
+        print(f"Text length to analyze: {len(extracted_text)}")
+        print(f"First 500 chars of text:\n{extracted_text[:500]}")
+        
         try:
             intelligence = await extract_all_intelligence(extracted_text, source_file=file.filename)
+            print(f"=== INTELLIGENCE EXTRACTION RETURNED ===")
+            print(f"Intelligence type: {type(intelligence)}")
+            print(f"Intelligence keys: {list(intelligence.keys()) if isinstance(intelligence, dict) else 'NOT A DICT'}")
+            print(f"POIs count: {len(intelligence.get('pois', []))}")
+            print(f"Experiences count: {len(intelligence.get('experiences', []))}")
+            print(f"Competitors count: {len(intelligence.get('competitor_analysis', []))}")
+            
+            # Check if extraction actually returned data
+            total_items = (
+                len(intelligence.get('pois', [])) +
+                len(intelligence.get('experiences', [])) +
+                len(intelligence.get('trends', [])) +
+                len(intelligence.get('competitor_analysis', []))
+            )
+            
+            if total_items == 0:
+                print("⚠️ WARNING: Extraction returned ZERO items!")
+                print("This could mean:")
+                print("  1. Claude API returned empty JSON")
+                print("  2. JSON parsing failed")
+                print("  3. Text doesn't contain extractable content")
+                print("  4. Prompt format issue")
         except Exception as e:
-            print(f"Intelligence extraction failed: {str(e)}")
+            print(f"❌ ERROR: Intelligence extraction failed: {str(e)}")
             import traceback
             traceback.print_exc()
             # Update upload record to failed status
