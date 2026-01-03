@@ -19,12 +19,16 @@ Pillow>=10.2.0
 anthropic==0.7.7
 
 # Web scraping
-httpx>=0.23.0,<0.25.0
+httpx==0.24.1  # Pin exact version compatible with supabase 2.3.0
 beautifulsoup4==4.12.2
 lxml>=5.0.0
 
-# Database
-supabase==2.3.0  # Pin to 2.3.0 for stability
+# Database - Pin entire supabase dependency chain
+supabase==2.3.0
+gotrue==2.4.2  # Compatible with supabase 2.3.0 and httpx 0.24.1
+postgrest==0.13.0  # Compatible with supabase 2.3.0
+realtime==1.0.3  # Compatible with supabase 2.3.0
+storage3==0.7.0  # Compatible with supabase 2.3.0
 psycopg2-binary==2.9.9
 
 # Utilities
