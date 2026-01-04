@@ -579,25 +579,31 @@ async def get_upload_history(
     try:
         user = await get_current_user(request)
         user_id = user.get("id")
+        user_email = (user.get("email") or "").lower()
 
-        # Get uploads from captain_uploads table (only this user's uploads)
-        response = supabase.table("captain_uploads")\
+        # Get uploads from captain_uploads table (only this user's uploads).
+        # Also include legacy rows where uploaded_by is NULL but uploaded_by_email matches.
+        primary = supabase.table("captain_uploads")\
             .select("*")\
             .eq("uploaded_by", user_id)\
-            .order("uploaded_at", desc=True)\
-            .range(offset, offset + limit - 1)\
             .execute()
-        
-        # Get total count
-        count_response = supabase.table("captain_uploads")\
-            .select("id", count="exact")\
-            .eq("uploaded_by", user_id)\
+        legacy = supabase.table("captain_uploads")\
+            .select("*")\
+            .is_("uploaded_by", "null")\
+            .eq("uploaded_by_email", user_email)\
             .execute()
-        
-        total_count = count_response.count if hasattr(count_response, 'count') else len(count_response.data)
+
+        rows = (primary.data or []) + (legacy.data or [])
+        # De-dup by id
+        unique = {r.get("id"): r for r in rows if isinstance(r, dict) and r.get("id")}
+        uploads = list(unique.values())
+        uploads.sort(key=lambda r: r.get("uploaded_at") or r.get("created_at") or "", reverse=True)
+
+        total_count = len(uploads)
+        uploads = uploads[offset: offset + limit]
         
         return {
-            "uploads": response.data,
+            "uploads": uploads,
             "total": total_count,
             "limit": limit,
             "offset": offset
@@ -618,18 +624,23 @@ async def get_upload_detail(
     """
     user = await get_current_user(request)
     user_id = user.get("id")
+    user_email = (user.get("email") or "").lower()
 
     resp = supabase.table("captain_uploads")\
         .select("*")\
         .eq("id", str(upload_id))\
-        .eq("uploaded_by", user_id)\
         .limit(1)\
         .execute()
 
     if not resp.data:
         raise HTTPException(status_code=404, detail="Upload not found")
 
-    return {"upload": resp.data[0]}
+    row = resp.data[0]
+    # Ownership check: current user OR legacy row matched by email
+    if row.get("uploaded_by") != user_id and (row.get("uploaded_by_email") or "").lower() != user_email:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    return {"upload": row}
 
 
 @router.delete("/id/{upload_id}")
@@ -644,16 +655,19 @@ async def delete_upload(
     """
     user = await get_current_user(request)
     user_id = user.get("id")
+    user_email = (user.get("email") or "").lower()
 
     # Ensure ownership
     existing = supabase.table("captain_uploads")\
-        .select("id")\
+        .select("id, uploaded_by, uploaded_by_email")\
         .eq("id", str(upload_id))\
-        .eq("uploaded_by", user_id)\
         .limit(1)\
         .execute()
 
     if not existing.data:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    row = existing.data[0]
+    if row.get("uploaded_by") != user_id and (row.get("uploaded_by_email") or "").lower() != user_email:
         raise HTTPException(status_code=404, detail="Upload not found")
 
     supabase.table("captain_uploads").delete().eq("id", str(upload_id)).execute()
@@ -673,15 +687,18 @@ async def update_upload(
     """
     user = await get_current_user(request)
     user_id = user.get("id")
+    user_email = (user.get("email") or "").lower()
 
     existing = supabase.table("captain_uploads")\
-        .select("id, metadata")\
+        .select("id, metadata, uploaded_by, uploaded_by_email")\
         .eq("id", str(upload_id))\
-        .eq("uploaded_by", user_id)\
         .limit(1)\
         .execute()
 
     if not existing.data:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    row = existing.data[0]
+    if row.get("uploaded_by") != user_id and (row.get("uploaded_by_email") or "").lower() != user_email:
         raise HTTPException(status_code=404, detail="Upload not found")
 
     updates = {}
