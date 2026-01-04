@@ -197,6 +197,7 @@ async def scrape_url(
             extracted = {
                 "pois": pois,
                 "experiences": experiences,
+                "experience_overview": final_package.get("experience_overview"),
                 "trends": [],
                 "client_insights": [],
                 "price_intelligence": {},
@@ -204,6 +205,8 @@ async def scrape_url(
                 "operational_learnings": [],
                 "service_providers": providers,
                 "emotional_map": final_package.get("emotional_map", []),
+                "client_archetypes": final_package.get("client_archetypes", []),
+                "offerings": ((final_package.get("metadata", {}) or {}).get("core_offerings") if isinstance(final_package, dict) else []) or [],
                 "metadata": final_package.get("metadata", {}),
             }
 

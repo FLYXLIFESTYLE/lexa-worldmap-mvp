@@ -128,9 +128,11 @@ class MultipassExtractor:
                 "Add per-item confidence 0–1 and include citations (snippets) for concrete claims.",
                 "Fill counts.real_extracted for citation-backed items; counts.estimated_potential for likely but not explicit items.",
                 # Claude-style outputs for the Captain UI (stored inside package.metadata)
-                "In package.metadata, include `captain_summary` (a Claude-style 'Perfect! I've extracted...' summary with counts + top emotions) and `report_markdown` (a full markdown document that mirrors the Captain-facing extraction report: Overview, Emotional Mapping, Experience Breakdown (50+), Destinations & Venues, Service Providers, Client Archetypes, Neo4j relationship examples, Next steps).",
+                "In package.metadata, include `captain_summary` (a Claude-style 'Perfect! I've extracted...' summary with counts + top emotions) and `report_markdown` (a full markdown document that mirrors the Captain-facing extraction report: Overview, Offerings / Core Experience Categories, Customer Pain Points, Emotional Mapping, Experience Breakdown (50+), Destinations & Venues, Service Providers, Client Archetypes, Neo4j relationship examples, Next steps).",
                 # Additional structured meta to help rendering & downstream DB
                 "In package.metadata, include: experience_type, duration_days, duration_nights, route (array of locations in order), primary_theme, secondary_emotions (array), anti_emotions (array), and price_indicators (array) when present in source.",
+                # Provider/brand pages (like AliveXperiences): extract the same business-level insights Claude would surface
+                "In package.metadata, include provider-level insights when present: `core_offerings` (array of 5–12 core offering categories, each with name, description, emotional_drivers, pain_points, example_experiences), `customer_pain_points` (deduped list), `value_propositions` (deduped list), and `emotional_drivers` (deduped list).",
                 "Return strict JSON with package + findings + warnings + status.",
             ],
         )

@@ -17,6 +17,27 @@ class WebScraper:
         self.timeout = 30.0
         self.max_subpages = 50
         self.max_pages_default = 25
+
+        # Heuristic keywords to prioritize relevant pages when crawling sitemaps
+        self._preferred_path_keywords = [
+            "experience",
+            "experiences",
+            "itinerary",
+            "itineraries",
+            "tailored",
+            "private",
+            "guide",
+            "guides",
+            "tour",
+            "tours",
+            "service",
+            "services",
+            "destination",
+            "destinations",
+            "offer",
+            "offering",
+            "about",
+        ]
     
     async def scrape_url(self, url: str, extract_subpages: bool = True) -> Dict:
         """
@@ -133,6 +154,65 @@ class WebScraper:
         
         return sorted(list(subpages))
 
+    async def _fetch_sitemap_urls(self, base_url: str) -> List[str]:
+        """
+        Best-effort: fetch WordPress sitemap (wp-sitemap.xml) or generic sitemap.xml and return URLs.
+        This helps when the entry page doesn't link out to important subpages (common on marketing sites).
+        """
+        parsed = urlparse(base_url)
+        root = f"{parsed.scheme}://{parsed.netloc}"
+        candidates = [f"{root}/wp-sitemap.xml", f"{root}/sitemap.xml"]
+
+        urls: List[str] = []
+        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
+            for sm in candidates:
+                try:
+                    r = await client.get(sm, headers={"User-Agent": "LEXA-Scraper/1.0"})
+                    if r.status_code != 200 or not r.text:
+                        continue
+                    soup = BeautifulSoup(r.text, "xml")
+                    locs = [loc.get_text(strip=True) for loc in soup.find_all("loc")]
+                    for u in locs:
+                        try:
+                            u_parsed = urlparse(u)
+                            if u_parsed.netloc != parsed.netloc:
+                                continue
+                            clean = u.split("#")[0].split("?")[0]
+                            if clean:
+                                urls.append(clean)
+                        except Exception:
+                            continue
+                    if urls:
+                        break
+                except Exception:
+                    continue
+
+        # De-dupe while preserving order
+        seen = set()
+        unique: List[str] = []
+        for u in urls:
+            if u in seen:
+                continue
+            seen.add(u)
+            unique.append(u)
+        return unique
+
+    def _rank_urls(self, urls: List[str]) -> List[str]:
+        """
+        Prefer URLs that look like content pages (experience offerings etc.).
+        """
+        def score(u: str) -> int:
+            path = (urlparse(u).path or "").lower()
+            s = 0
+            for kw in self._preferred_path_keywords:
+                if kw in path:
+                    s += 2
+            # Prefer deeper paths over home/root
+            s += min(len([p for p in path.split("/") if p]), 6)
+            return s
+
+        return sorted(urls, key=score, reverse=True)
+
     async def scrape_url_with_subpages_content(
         self,
         url: str,
@@ -145,8 +225,23 @@ class WebScraper:
         max_pages = max_pages or self.max_pages_default
         base = await self.scrape_url(url, extract_subpages=True)
 
+        # Discover subpages from on-page links
         subpages: List[str] = base.get("subpages", []) or []
-        subpages = subpages[: max_pages - 1]  # keep room for root page
+
+        # If the entry page doesn't expose many links, also use sitemap URLs as a fallback.
+        sitemap_urls: List[str] = []
+        try:
+            sitemap_urls = await self._fetch_sitemap_urls(url)
+        except Exception:
+            sitemap_urls = []
+
+        # Merge and rank
+        merged = list(dict.fromkeys([*subpages, *sitemap_urls]))  # preserve order, unique
+        merged = [u for u in merged if isinstance(u, str) and u]  # safety
+        merged_ranked = self._rank_urls(merged)
+
+        # Keep room for root page
+        subpages = merged_ranked[: max_pages - 1]
 
         pages: List[Dict[str, str]] = [{"url": url, "content": base.get("content", "")}]
 
@@ -180,7 +275,11 @@ class WebScraper:
             "subpage_count": len(subpages),
             "pages_fetched": len(pages),
             "content": combined_text,
-            "metadata": base.get("metadata", {}),
+            "metadata": {
+                **(base.get("metadata", {}) or {}),
+                "sitemap_used": bool(sitemap_urls),
+                "sitemap_url_count": len(sitemap_urls),
+            },
             "word_count": len(combined_text.split()),
         }
 
