@@ -609,7 +609,7 @@ async def get_upload_history(
 
 @router.get("/{upload_id}")
 async def get_upload_detail(
-    upload_id: str,
+    upload_id: uuid.UUID,
     request: Request,
     supabase = Depends(get_supabase),
 ):
@@ -621,7 +621,7 @@ async def get_upload_detail(
 
     resp = supabase.table("captain_uploads")\
         .select("*")\
-        .eq("id", upload_id)\
+        .eq("id", str(upload_id))\
         .eq("uploaded_by", user_id)\
         .limit(1)\
         .execute()
@@ -634,7 +634,7 @@ async def get_upload_detail(
 
 @router.delete("/{upload_id}")
 async def delete_upload(
-    upload_id: str,
+    upload_id: uuid.UUID,
     request: Request,
     supabase = Depends(get_supabase),
 ):
@@ -648,7 +648,7 @@ async def delete_upload(
     # Ensure ownership
     existing = supabase.table("captain_uploads")\
         .select("id")\
-        .eq("id", upload_id)\
+        .eq("id", str(upload_id))\
         .eq("uploaded_by", user_id)\
         .limit(1)\
         .execute()
@@ -656,13 +656,13 @@ async def delete_upload(
     if not existing.data:
         raise HTTPException(status_code=404, detail="Upload not found")
 
-    supabase.table("captain_uploads").delete().eq("id", upload_id).execute()
-    return {"success": True, "deleted": upload_id}
+    supabase.table("captain_uploads").delete().eq("id", str(upload_id)).execute()
+    return {"success": True, "deleted": str(upload_id)}
 
 
 @router.put("/{upload_id}")
 async def update_upload(
-    upload_id: str,
+    upload_id: uuid.UUID,
     body: UpdateUploadRequest,
     request: Request,
     supabase = Depends(get_supabase),
@@ -676,7 +676,7 @@ async def update_upload(
 
     existing = supabase.table("captain_uploads")\
         .select("id, metadata")\
-        .eq("id", upload_id)\
+        .eq("id", str(upload_id))\
         .eq("uploaded_by", user_id)\
         .limit(1)\
         .execute()
@@ -695,10 +695,10 @@ async def update_upload(
         updates["metadata"] = {**current_meta, **body.metadata}
 
     if not updates:
-        return {"success": True, "upload_id": upload_id}
+        return {"success": True, "upload_id": str(upload_id)}
 
-    supabase.table("captain_uploads").update(updates).eq("id", upload_id).execute()
-    return {"success": True, "upload_id": upload_id}
+    supabase.table("captain_uploads").update(updates).eq("id", str(upload_id)).execute()
+    return {"success": True, "upload_id": str(upload_id)}
 
 
 @router.get("/health")
