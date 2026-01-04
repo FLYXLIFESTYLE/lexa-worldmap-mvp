@@ -35,6 +35,7 @@ export default function CaptainURLsPage() {
   const supabase = createClient();
   
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [urls, setUrls] = useState<ScrapedURL[]>([]);
   const [filteredUrls, setFilteredUrls] = useState<ScrapedURL[]>([]);
   
@@ -68,6 +69,23 @@ export default function CaptainURLsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/auth/signin');
+        return;
+      }
+      // Admin-only (shared history)
+      try {
+        const { data: profile } = await supabase
+          .from('captain_profiles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        const admin = profile?.role === 'admin';
+        setIsAdmin(admin);
+        if (!admin) {
+          router.push('/unauthorized');
+          return;
+        }
+      } catch {
+        router.push('/unauthorized');
         return;
       }
       fetchURLs();

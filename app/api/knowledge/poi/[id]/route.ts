@@ -18,6 +18,14 @@ interface POIDetail {
   destination_name: string | null;
   lat: number;
   lon: number;
+  website_url?: string | null;
+  address?: string | null;
+  location_scope?: string | null;
+  coordinate_mode?: string | null;
+  photo_urls?: string[];
+  attachment_urls?: string[];
+  extra_text?: string | null;
+  description?: string | null;
   // Canonical scoring fields (preferred)
   luxury_score_base: number | null;
   luxury_score_verified: number | null;
@@ -108,6 +116,14 @@ export async function GET(
         destination_name: poi.destination_name || null,
         lat: poi.lat,
         lon: poi.lon,
+        website_url: poi.website_url || null,
+        address: poi.address || null,
+        location_scope: poi.location_scope || null,
+        coordinate_mode: poi.coordinate_mode || null,
+        photo_urls: (poi.photo_urls || []) as string[],
+        attachment_urls: (poi.attachment_urls || []) as string[],
+        extra_text: poi.extra_text || null,
+        description: poi.description || null,
         luxury_score_base: luxuryScoreBase,
         luxury_score_verified: luxuryScoreVerified,
         confidence_score: confidenceScore,
@@ -184,6 +200,17 @@ export async function PATCH(
 
       // Other editable fields
       'captain_comments',
+      'description',
+      'destination_name',
+      'lat',
+      'lon',
+      'website_url',
+      'address',
+      'location_scope',
+      'coordinate_mode',
+      'photo_urls',
+      'attachment_urls',
+      'extra_text',
       'type',
       'name',
       'verified',
@@ -258,6 +285,25 @@ export async function PATCH(
       }
 
       const updatedPoi = result.records[0].get('p').properties;
+
+      // If destination_name was updated, keep located_in relationship consistent (best effort)
+      if (updateFields.destination_name) {
+        try {
+          await session.run(
+            `
+            MATCH (p:poi {poi_uid: $id})
+            OPTIONAL MATCH (p)-[r:located_in]->(:destination)
+            DELETE r
+            WITH p
+            MERGE (d:destination {name: $destination_name})
+            MERGE (p)-[:located_in]->(d)
+            `,
+            { id, destination_name: updateFields.destination_name }
+          );
+        } catch {
+          // ignore
+        }
+      }
 
       // If verified=true, set luxury_score_verified to the current base score in a second step.
       // (Keeps the dynamic SET clause simple and works even if the request didn't include base score explicitly.)

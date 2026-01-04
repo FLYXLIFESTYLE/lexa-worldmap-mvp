@@ -18,6 +18,13 @@ interface CreatePOIRequest {
   destination_name: string;
   lat: number;
   lon: number;
+  website_url?: string;
+  address?: string;
+  location_scope?: 'city' | 'country' | 'region' | 'area';
+  coordinate_mode?: 'land' | 'sea';
+  photo_urls?: string[];
+  attachment_urls?: string[];
+  extra_text?: string;
   // Canonical
   luxury_score_base?: number;
   luxury_score_verified?: number;
@@ -105,6 +112,13 @@ export async function POST(req: NextRequest) {
           destination_name: $destination_name,
           lat: $lat,
           lon: $lon,
+          website_url: $website_url,
+          address: $address,
+          location_scope: $location_scope,
+          coordinate_mode: $coordinate_mode,
+          photo_urls: $photo_urls,
+          attachment_urls: $attachment_urls,
+          extra_text: $extra_text,
           luxury_score_base: $luxury_score_base,
           luxury_score_verified: $luxury_score_verified,
           confidence_score: $confidence_score,
@@ -128,6 +142,13 @@ export async function POST(req: NextRequest) {
           destination_name: poiData.destination_name,
           lat: poiData.lat,
           lon: poiData.lon,
+          website_url: poiData.website_url || null,
+          address: poiData.address || null,
+          location_scope: poiData.location_scope || null,
+          coordinate_mode: poiData.coordinate_mode || null,
+          photo_urls: poiData.photo_urls || [],
+          attachment_urls: poiData.attachment_urls || [],
+          extra_text: poiData.extra_text || null,
           luxury_score_base: luxuryScoreBase,
           luxury_score_verified: luxuryScoreVerified,
           confidence_score: confidenceScore,

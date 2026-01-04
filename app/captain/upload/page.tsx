@@ -87,11 +87,26 @@ function CaptainUploadPageInner() {
   const [urls, setUrls] = useState<string[]>([]);
   
   // Manual Entry State
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [manualQuery, setManualQuery] = useState('');
+  const [manualSearchResults, setManualSearchResults] = useState<any[]>([]);
+  const [manualDuplicate, setManualDuplicate] = useState<any | null>(null);
+  const [manualRecent, setManualRecent] = useState<any[]>([]);
+
+  const [manualPoiUid, setManualPoiUid] = useState<string | null>(null);
   const [poiName, setPoiName] = useState('');
+  const [poiType, setPoiType] = useState('restaurant');
+  const [poiLocationLabel, setPoiLocationLabel] = useState('');
+  const [poiLocationScope, setPoiLocationScope] = useState<'city' | 'country' | 'region' | 'area'>('city');
+  const [poiWebsiteUrl, setPoiWebsiteUrl] = useState('');
+  const [poiAddress, setPoiAddress] = useState('');
   const [poiDescription, setPoiDescription] = useState('');
-  const [poiCategory, setPoiCategory] = useState('restaurant');
-  const [poiLocation, setPoiLocation] = useState('');
-  const [confidenceScore, setConfidenceScore] = useState(80);
+  const [poiLat, setPoiLat] = useState('');
+  const [poiLon, setPoiLon] = useState('');
+  const [poiCoordinateMode, setPoiCoordinateMode] = useState<'land' | 'sea'>('land');
+  const [manualConfidencePct, setManualConfidencePct] = useState(80);
+  const [manualExtraText, setManualExtraText] = useState('');
+  const [manualAttachments, setManualAttachments] = useState<Array<{ name: string; url: string; kind: 'photo' | 'doc' }>>([]);
   
   // Yacht Destinations State
   const [yachtMode, setYachtMode] = useState<'screenshot' | 'text'>('screenshot');
@@ -108,6 +123,17 @@ function CaptainUploadPageInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/auth/signin');
+        return;
+      }
+      try {
+        const { data: profile } = await supabase
+          .from('captain_profiles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        setIsAdmin(profile?.role === 'admin');
+      } catch {
+        setIsAdmin(false);
       }
     }
     checkAuth();
@@ -400,24 +426,193 @@ function CaptainUploadPageInner() {
   };
 
   // MANUAL ENTRY HANDLERS
+  const fetchManualRecent = async () => {
+    if (!isAdmin) return;
+    try {
+      const res = await fetch('/api/knowledge/poi/manual?limit=50');
+      const data = await res.json();
+      if (data?.success) setManualRecent(data.pois || []);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (mode === 'manual') fetchManualRecent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, isAdmin]);
+
+  const searchPois = async (q: string) => {
+    const query = (q || '').trim();
+    if (query.length < 2) {
+      setManualSearchResults([]);
+      return;
+    }
+    const res = await fetch(`/api/knowledge/search-poi?q=${encodeURIComponent(query)}&limit=10`);
+    const data = await res.json();
+    setManualSearchResults(data?.results || []);
+  };
+
+  // Auto duplicate detection (simple): if the top result name matches exactly (case-insensitive), flag it.
+  useEffect(() => {
+    const name = poiName.trim();
+    if (name.length < 2) {
+      setManualDuplicate(null);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/knowledge/search-poi?q=${encodeURIComponent(name)}&limit=5`);
+        const data = await res.json();
+        const top = (data?.results || [])[0];
+        if (top && String(top.name || '').toLowerCase() === name.toLowerCase()) {
+          setManualDuplicate(top);
+        } else {
+          setManualDuplicate(null);
+        }
+      } catch {
+        setManualDuplicate(null);
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [poiName]);
+
+  const loadPoiForEdit = async (poi_uid: string) => {
+    const res = await fetch(`/api/knowledge/poi/${encodeURIComponent(poi_uid)}`);
+    const data = await res.json();
+    const poi = data?.poi;
+    if (!poi) {
+      alert('Failed to load POI details.');
+      return;
+    }
+    setManualPoiUid(poi.poi_uid);
+    setPoiName(poi.name || '');
+    setPoiType(poi.type || 'restaurant');
+    setPoiLocationLabel(poi.destination_name || '');
+    setPoiLocationScope((poi.location_scope || 'city') as any);
+    setPoiWebsiteUrl(poi.website_url || '');
+    setPoiAddress(poi.address || '');
+    setPoiDescription(poi.description || '');
+    setPoiLat(String(poi.lat ?? ''));
+    setPoiLon(String(poi.lon ?? ''));
+    setPoiCoordinateMode((poi.coordinate_mode || 'land') as any);
+    setManualConfidencePct(Math.round(((poi.confidence_score ?? 0.8) as number) * 100));
+    setManualExtraText(poi.extra_text || '');
+    const photos = (poi.photo_urls || []).map((u: string) => ({ name: 'photo', url: u, kind: 'photo' as const }));
+    const docs = (poi.attachment_urls || []).map((u: string) => ({ name: 'attachment', url: u, kind: 'doc' as const }));
+    setManualAttachments([...(photos || []), ...(docs || [])]);
+    setModePersist('manual');
+  };
+
+  const resetManualForm = () => {
+    setManualPoiUid(null);
+    setPoiName('');
+    setPoiType('restaurant');
+    setPoiLocationLabel('');
+    setPoiLocationScope('city');
+    setPoiWebsiteUrl('');
+    setPoiAddress('');
+    setPoiDescription('');
+    setPoiLat('');
+    setPoiLon('');
+    setPoiCoordinateMode('land');
+    setManualConfidencePct(80);
+    setManualExtraText('');
+    setManualAttachments([]);
+    setManualDuplicate(null);
+  };
+
+  const uploadManualFiles = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setLoading(true);
+    try {
+      for (const file of Array.from(fileList)) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/knowledge/upload-attachment', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.details || data?.error || 'Upload failed');
+        const kind = (file.type || '').startsWith('image/') ? 'photo' : 'doc';
+        setManualAttachments((prev) => [...prev, { name: file.name, url: data.url, kind }]);
+      }
+    } catch (e: any) {
+      alert(`❌ Upload failed: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleManualSubmit = async () => {
+    if (!isAdmin) {
+      alert('Admins only: Manual POI entry is restricted.');
+      return;
+    }
     if (!poiName.trim() || !poiDescription.trim()) {
       alert('Please fill in POI name and description');
       return;
     }
+    if (!poiLocationLabel.trim()) {
+      alert('Please set a location (city/country/region/area name).');
+      return;
+    }
+    const lat = Number(poiLat);
+    const lon = Number(poiLon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      alert('Please enter valid coordinates (lat/lon).');
+      return;
+    }
+
+    // If duplicate detected, offer to open it instead.
+    if (!manualPoiUid && manualDuplicate) {
+      const open = confirm(`A POI named "${manualDuplicate.name}" already exists. Open it instead of creating a duplicate?`);
+      if (open) {
+        await loadPoiForEdit(manualDuplicate.poi_uid);
+        return;
+      }
+    }
+
+    const payload: any = {
+      name: poiName.trim(),
+      type: poiType,
+      destination_name: poiLocationLabel.trim(),
+      lat,
+      lon,
+      website_url: poiWebsiteUrl.trim() || undefined,
+      address: poiAddress.trim() || undefined,
+      location_scope: poiLocationScope,
+      coordinate_mode: poiCoordinateMode,
+      description: poiDescription.trim(),
+      confidence_score: Math.max(0, Math.min(1, manualConfidencePct / 100)),
+      extra_text: manualExtraText.trim() || undefined,
+      photo_urls: manualAttachments.filter(a => a.kind === 'photo').map(a => a.url),
+      attachment_urls: manualAttachments.filter(a => a.kind === 'doc').map(a => a.url),
+    };
 
     setLoading(true);
     try {
-      // TODO: Call backend API to create POI
-      alert(`✅ POI "${poiName}" created with ${confidenceScore}% confidence!`);
-      
-      // Reset form
-      setPoiName('');
-      setPoiDescription('');
-      setPoiLocation('');
-      setConfidenceScore(80);
-    } catch (error) {
-      alert('❌ Failed to create POI');
+      if (manualPoiUid) {
+        const res = await fetch(`/api/knowledge/poi/${encodeURIComponent(manualPoiUid)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.details || data?.error || 'Failed to update POI');
+        alert('✅ POI updated.');
+      } else {
+        const res = await fetch('/api/knowledge/poi/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.details || data?.error || 'Failed to create POI');
+        alert('✅ POI created.');
+      }
+      await fetchManualRecent();
+      resetManualForm();
+    } catch (e: any) {
+      alert(`❌ Failed: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -913,83 +1108,316 @@ function CaptainUploadPageInner() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">✏️ Manual POI Entry</h2>
             <p className="text-gray-600 mb-6">
-              Manually enter a point of interest with details and confidence score.
+              Search for existing POIs, edit them, or create a new POI with full details.
             </p>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">POI Name</label>
-                <input
-                  type="text"
-                  value={poiName}
-                  onChange={(e) => setPoiName(e.target.value)}
-                  placeholder="Le Louis XV - Alain Ducasse"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+            {!isAdmin ? (
+              <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-900">
+                Manual POI entry is currently <strong>Admins only</strong>.
               </div>
+            ) : (
+              <div className="space-y-8">
+                {/* Search existing POIs */}
+                <div className="border border-gray-200 rounded-xl p-6 bg-gray-50">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">🔎 Search POIs to Edit</h3>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={manualQuery}
+                      onChange={(e) => setManualQuery(e.target.value)}
+                      placeholder="Search by name, destination, or type…"
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={() => searchPois(manualQuery)}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+                    >
+                      Search
+                    </button>
+                  </div>
+                  {manualSearchResults.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      {manualSearchResults.map((r) => (
+                        <div key={r.poi_uid} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-gray-900 truncate">{r.name}</div>
+                            <div className="text-xs text-gray-600">
+                              {r.type || 'poi'} • {r.destination_name || '—'} • Confidence {(typeof r.confidence_score === 'number' ? Math.round(r.confidence_score * 100) : 0)}%
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => loadPoiForEdit(r.poi_uid)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+                          >
+                            Open to Edit
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                <select
-                  value={poiCategory}
-                  onChange={(e) => setPoiCategory(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="restaurant">Restaurant</option>
-                  <option value="hotel">Hotel</option>
-                  <option value="attraction">Attraction</option>
-                  <option value="activity">Activity</option>
-                  <option value="experience">Experience</option>
-                </select>
+                {/* Create / Edit Form */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {manualPoiUid ? '✏️ Edit POI' : '➕ Create New POI'}
+                    </h3>
+                    {manualPoiUid && (
+                      <button
+                        onClick={resetManualForm}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300"
+                      >
+                        New POI
+                      </button>
+                    )}
+                  </div>
+
+                  {manualDuplicate && !manualPoiUid && (
+                    <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-900 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold">This POI may already exist</div>
+                        <div className="text-sm truncate">
+                          {manualDuplicate.name} • {manualDuplicate.destination_name || '—'}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => loadPoiForEdit(manualDuplicate.poi_uid)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+                      >
+                        Open Existing
+                      </button>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">POI Name</label>
+                    <input
+                      type="text"
+                      value={poiName}
+                      onChange={(e) => setPoiName(e.target.value)}
+                      placeholder="Le Louis XV - Alain Ducasse"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                      <select
+                        value={poiType}
+                        onChange={(e) => setPoiType(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="restaurant">Restaurant</option>
+                        <option value="hotel">Hotel</option>
+                        <option value="spa">Spa</option>
+                        <option value="attraction">Attraction</option>
+                        <option value="activity">Activity</option>
+                        <option value="experience">Experience</option>
+                        <option value="provider">Service Provider</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Website URL</label>
+                      <input
+                        type="url"
+                        value={poiWebsiteUrl}
+                        onChange={(e) => setPoiWebsiteUrl(e.target.value)}
+                        placeholder="https://…"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Location (name)</label>
+                      <input
+                        type="text"
+                        value={poiLocationLabel}
+                        onChange={(e) => setPoiLocationLabel(e.target.value)}
+                        placeholder="Monaco / Paris / Amalfi Coast"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Location type</label>
+                      <select
+                        value={poiLocationScope}
+                        onChange={(e) => setPoiLocationScope(e.target.value as any)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="city">City</option>
+                        <option value="country">Country</option>
+                        <option value="region">Region</option>
+                        <option value="area">Area</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Address (optional)</label>
+                    <input
+                      type="text"
+                      value={poiAddress}
+                      onChange={(e) => setPoiAddress(e.target.value)}
+                      placeholder="Street, postcode, etc."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Lat</label>
+                      <input
+                        type="number"
+                        value={poiLat}
+                        onChange={(e) => setPoiLat(e.target.value)}
+                        placeholder="43.7384"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Lon</label>
+                      <input
+                        type="number"
+                        value={poiLon}
+                        onChange={(e) => setPoiLon(e.target.value)}
+                        placeholder="7.4246"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Coordinates</label>
+                      <select
+                        value={poiCoordinateMode}
+                        onChange={(e) => setPoiCoordinateMode(e.target.value as any)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="land">On land (venue)</option>
+                        <option value="sea">At sea (anchorage)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                    <textarea
+                      value={poiDescription}
+                      onChange={(e) => setPoiDescription(e.target.value)}
+                      placeholder="Describe the POI, its unique features, and why it's special…"
+                      rows={6}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    />
+                  </div>
+
+                  {/* Attachments */}
+                  <div className="border border-gray-200 rounded-xl p-6 bg-gray-50 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">📎 POI Attachments</div>
+                        <div className="text-xs text-gray-600">Upload photos/docs or paste additional notes.</div>
+                      </div>
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => uploadManualFiles(e.target.files)}
+                        disabled={loading}
+                      />
+                    </div>
+                    {manualAttachments.length > 0 && (
+                      <div className="space-y-2">
+                        {manualAttachments.map((a, idx) => (
+                          <div key={`${a.url}-${idx}`} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">{a.name}</div>
+                              <div className="text-xs text-gray-600 truncate">{a.url}</div>
+                            </div>
+                            <button
+                              onClick={() => setManualAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                              className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm font-semibold hover:bg-red-200"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Additional text (paste)</label>
+                      <textarea
+                        value={manualExtraText}
+                        onChange={(e) => setManualExtraText(e.target.value)}
+                        placeholder="Paste extra notes, brochure text, or anything that helps future enrichment…"
+                        rows={4}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Confidence Score: {manualConfidencePct}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={manualConfidencePct}
+                      onChange={(e) => setManualConfidencePct(parseInt(e.target.value))}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Manual entry can go up to 100%. Uploads stay capped at 80%.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleManualSubmit}
+                    disabled={loading}
+                    className="w-full px-6 py-4 bg-green-600 text-white rounded-lg font-semibold text-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {loading ? '⏳ Saving...' : manualPoiUid ? '💾 Save POI' : '✅ Create POI'}
+                  </button>
+                </div>
+
+                {/* Recent manual POIs */}
+                <div className="border border-gray-200 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900">🧾 Recent Manual POIs (Admins)</h3>
+                    <button
+                      onClick={fetchManualRecent}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  {manualRecent.length === 0 ? (
+                    <p className="text-sm text-gray-600">No manual POIs yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {manualRecent.map((p) => (
+                        <div key={p.poi_uid} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-gray-900 truncate">{p.name}</div>
+                            <div className="text-xs text-gray-600">
+                              {p.type || 'poi'} • {p.destination_name || '—'} • Confidence {(typeof p.confidence_score === 'number' ? Math.round(p.confidence_score * 100) : 0)}%
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => loadPoiForEdit(p.poi_uid)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+                          >
+                            Open
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-                <input
-                  type="text"
-                  value={poiLocation}
-                  onChange={(e) => setPoiLocation(e.target.value)}
-                  placeholder="Monaco"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                <textarea
-                  value={poiDescription}
-                  onChange={(e) => setPoiDescription(e.target.value)}
-                  placeholder="Describe the POI, its unique features, and why it's special..."
-                  rows={6}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Confidence Score: {confidenceScore}% (Max 80% for uploads)
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="80"
-                  value={confidenceScore}
-                  onChange={(e) => setConfidenceScore(parseInt(e.target.value))}
-                  className="w-full"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Captain approval required to increase beyond 80%
-                </p>
-              </div>
-
-              <button
-                onClick={handleManualSubmit}
-                disabled={loading}
-                className="w-full px-6 py-4 bg-green-600 text-white rounded-lg font-semibold text-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-              >
-                {loading ? '⏳ Creating...' : '✅ Create POI'}
-              </button>
-            </div>
+            )}
           </div>
         )}
 

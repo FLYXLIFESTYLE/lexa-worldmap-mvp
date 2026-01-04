@@ -69,9 +69,10 @@ const adminPages = [
   },
   {
     name: 'Scraped URLs',
-    href: '/admin/knowledge/scraped-urls',
+    // Use the shared scraped_urls table view (admins-only)
+    href: '/captain/urls',
     icon: '🌐',
-    description: 'Manage scraped content'
+    description: 'Scrape history (shared)'
   },
   {
     name: 'Seed Themes',
