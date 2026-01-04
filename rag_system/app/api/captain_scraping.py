@@ -335,9 +335,9 @@ async def update_scrape(
     user = await get_current_user(http_request)
     user_id = user.get("id")
 
-    # Admin check via lexa_user_profiles
+    # Admin check via captain_profiles (this is what the Next.js middleware uses)
     try:
-        role_resp = supabase.table("lexa_user_profiles").select("role").eq("id", user_id).limit(1).execute()
+        role_resp = supabase.table("captain_profiles").select("role").eq("user_id", user_id).limit(1).execute()
         role = role_resp.data[0].get("role") if role_resp.data else None
         if role != "admin":
             raise HTTPException(status_code=403, detail="Admin only")
