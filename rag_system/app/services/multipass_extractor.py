@@ -229,8 +229,36 @@ Source text (truncate if huge, but extract as much as possible):
 
         try:
             data = json.loads(json_str)
+            # If model returned final_package only, normalize to package
             if "package" not in data:
                 data["package"] = data.get("final_package", {})
+
+            # Claude sometimes returns the package fields at the top-level and leaves `package` empty.
+            # Detect that and wrap the known package keys into `package`.
+            package_keys = {
+                "experience_overview",
+                "emotional_map",
+                "sub_experiences",
+                "destinations",
+                "venues",
+                "service_providers",
+                "client_archetypes",
+                "script_seed",
+                "relationships",
+                "citations",
+                "confidence",
+                "counts",
+                "metadata",
+            }
+            has_top_level_package_fields = any(k in data for k in package_keys)
+            package_val = data.get("package")
+            package_is_empty = not isinstance(package_val, dict) or len(package_val.keys()) == 0
+            if has_top_level_package_fields and package_is_empty:
+                wrapped = {}
+                for k in list(data.keys()):
+                    if k in package_keys:
+                        wrapped[k] = data.pop(k)
+                data["package"] = wrapped
             return data
         except json.JSONDecodeError as e:
             print(f"[multipass] JSON parsing error: {e}")

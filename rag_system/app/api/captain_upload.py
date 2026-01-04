@@ -244,8 +244,11 @@ async def upload_file(
                 "file_type": metadata.get("file_type"),
                 "file_size": file_size,
             }
-            # In production (Render), use fast single-pass extraction to avoid timeouts.
-            if (os.getenv("ENVIRONMENT") or "").lower() == "production":
+            # Production reliability: default to fast (single-pass) to avoid HTTP timeouts.
+            # Enable multi-pass explicitly in non-production via LEXA_MULTIPASS=1.
+            env = (os.getenv("ENVIRONMENT") or "").lower()
+            multipass_enabled = (os.getenv("LEXA_MULTIPASS") or "").strip().lower() in {"1", "true", "yes"}
+            if env == "production" or not multipass_enabled:
                 extraction_contract = await run_fast_extraction(extracted_text, source_meta)
             else:
                 extraction_contract = await run_multipass_extraction(extracted_text, source_meta)
@@ -413,7 +416,9 @@ async def upload_text(
             "file_type": "text",
             "text_length": len(request.text)
         }
-        if (os.getenv("ENVIRONMENT") or "").lower() == "production":
+        env = (os.getenv("ENVIRONMENT") or "").lower()
+        multipass_enabled = (os.getenv("LEXA_MULTIPASS") or "").strip().lower() in {"1", "true", "yes"}
+        if env == "production" or not multipass_enabled:
             extraction_contract = await run_fast_extraction(request.text, source_meta)
         else:
             extraction_contract = await run_multipass_extraction(request.text, source_meta)
