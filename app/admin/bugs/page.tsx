@@ -20,7 +20,9 @@ interface BugReport {
   steps_to_reproduce: string | null;
   expected_behavior: string | null;
   actual_behavior: string | null;
-  screenshot_data: string | null;
+  // Older deployments may store screenshots as base64 in screenshot_data; newer use screenshot_url.
+  screenshot_data?: string | null;
+  screenshot_url?: string | null;
   browser_info: string | null;
 }
 
@@ -171,17 +173,22 @@ export default function BugReportsPage() {
                             <p className="text-gray-700">{bug.actual_behavior}</p>
                           </div>
                         )}
-                        {bug.screenshot_data && (
+                        {(bug.screenshot_data || bug.screenshot_url) && (
                           <div>
                             <strong className="text-gray-800">📸 Screenshot:</strong>
                             <div className="mt-2">
+                              {(() => {
+                                const src = (bug.screenshot_data || bug.screenshot_url) as string;
+                                return (
                               <img 
-                                src={bug.screenshot_data} 
+                                src={src} 
                                 alt="Bug screenshot" 
                                 className="max-w-full max-h-96 object-contain rounded-lg border-2 border-gray-300 cursor-pointer hover:border-red-500 transition-colors"
-                                onClick={() => window.open(bug.screenshot_data!, '_blank')}
+                                onClick={() => window.open(src, '_blank')}
                                 title="Click to open in new tab"
                               />
+                                );
+                              })()}
                               <p className="text-xs text-gray-500 mt-1">Click to view full size</p>
                             </div>
                           </div>

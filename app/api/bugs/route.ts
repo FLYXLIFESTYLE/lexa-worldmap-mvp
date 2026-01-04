@@ -128,7 +128,9 @@ export async function POST(request: Request) {
         reported_by: user?.id || null,
         reporter_email: reporter_email || user?.email || null,
         reporter_name: reporter_name || null,
-        screenshot_data: screenshot || null,
+        // Store screenshots in the base table column (works even if screenshot_data migration wasn't applied)
+        // screenshot is typically a data URI (base64) from the client; it also works as a plain URL.
+        screenshot_url: screenshot || null,
         status: 'open'
       })
       .select()
