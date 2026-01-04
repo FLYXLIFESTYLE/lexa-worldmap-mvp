@@ -295,6 +295,10 @@ async def upload_file(
                     }).eq("id", upload_id).execute()
                 except:
                     pass
+                raise HTTPException(
+                    status_code=502,
+                    detail="No data extracted from this file. This usually means the document has little/no readable text (e.g., mostly images), or the AI response couldn't be parsed. Try exporting as PDF with selectable text, or paste text, or use Manual Entry."
+                )
         except Exception as e:
             print(f"❌ ERROR: Multipass extraction failed: {str(e)}")
             import traceback
@@ -480,6 +484,25 @@ async def upload_text(
         final_package = extraction_contract.get("final_package", {}) or {}
         intelligence = _package_to_legacy(final_package)
         pkg_meta = (final_package.get("metadata", {}) if isinstance(final_package, dict) else {}) or {}
+
+        total_items = (
+            len(intelligence.get('pois', [])) +
+            len(intelligence.get('experiences', [])) +
+            len(intelligence.get('trends', [])) +
+            len(intelligence.get('competitor_analysis', []))
+        )
+        if total_items == 0:
+            try:
+                supabase.table("captain_uploads").update({
+                    "processing_status": "failed",
+                    "error_message": "Extraction returned zero items."
+                }).eq("id", upload_id).execute()
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=502,
+                detail="No data extracted from this text. Please paste more detailed content (50+ characters) and try again."
+            )
         
         # Save to database
         await save_intelligence_to_db(

@@ -261,61 +261,70 @@ function CaptainUploadPageInner() {
           type: file.type,
           status: 'processing',
           confidenceScore: 0,
-          keepDecision: 'keep'
+          keepDecision: 'keep',
         };
-        setFiles(prev => [...prev, newFile]);
-  
-        // Upload to backend (THIS IS THE REAL API CALL)
-        const result = await uploadAPI.uploadFile(file);
-        const extractedDataNormalized = normalizeExtractedData(result.extracted_data);
-  
-        // Update status to done WITH extracted data
-        setFiles(prev => prev.map(f => 
-          f.name === file.name 
-            ? { 
-                ...f, 
-                status: 'done', 
-                confidenceScore: result.confidence_score || 80,
-                uploadId: result.upload_id,
-                extractedData: extractedDataNormalized, // Store for editing
-                countsReal: result.counts_real,
-                countsEstimated: result.counts_estimated,
-                extractionContract: result.extraction_contract,
-                keepDecision: 'keep'
-              }
-            : f
-        ));
-  
-        // Show success message and open editor if data extracted
-        const hasData = result.pois_extracted > 0 || result.intelligence_extracted.experiences > 0;
-        if (hasData) {
-          // Auto-open editor for extracted data
-          const updatedFile = {
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            status: 'done' as const,
-            confidenceScore: result.confidence_score || 80,
-            uploadId: result.upload_id,
-            extractedData: extractedDataNormalized,
-            countsReal: result.counts_real,
-            countsEstimated: result.counts_estimated,
-            extractionContract: result.extraction_contract,
-            keepDecision: 'keep' as const
-          };
-          setEditingFile(updatedFile);
-        } else {
-          alert(`✅ ${file.name} uploaded!\n` +
+        setFiles((prev) => [...prev, newFile]);
+
+        try {
+          // Upload to backend (THIS IS THE REAL API CALL)
+          const result = await uploadAPI.uploadFile(file);
+          const extractedDataNormalized = normalizeExtractedData(result.extracted_data);
+
+          // Update status to done WITH extracted data
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.name === file.name
+                ? {
+                    ...f,
+                    status: 'done',
+                    confidenceScore: result.confidence_score || 80,
+                    uploadId: result.upload_id,
+                    extractedData: extractedDataNormalized, // Store for editing
+                    countsReal: result.counts_real,
+                    countsEstimated: result.counts_estimated,
+                    extractionContract: result.extraction_contract,
+                    keepDecision: 'keep',
+                  }
+                : f
+            )
+          );
+
+          // Show success message and open editor if data extracted
+          const hasData =
+            result.pois_extracted > 0 || result.intelligence_extracted.experiences > 0;
+          if (hasData) {
+            // Auto-open editor for extracted data
+            const updatedFile = {
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              status: 'done' as const,
+              confidenceScore: result.confidence_score || 80,
+              uploadId: result.upload_id,
+              extractedData: extractedDataNormalized,
+              countsReal: result.counts_real,
+              countsEstimated: result.counts_estimated,
+              extractionContract: result.extraction_contract,
+              keepDecision: 'keep' as const,
+            };
+            setEditingFile(updatedFile);
+          } else {
+            alert(
+              `✅ ${file.name} uploaded!\n` +
                 `POIs found: ${result.pois_extracted}\n` +
                 `Experiences: ${result.intelligence_extracted.experiences}\n` +
                 `Trends: ${result.intelligence_extracted.trends}\n\n` +
-                `No data extracted. Please review the document or try manual entry.`);
+                `No data extracted. Please review the document or try manual entry.`
+            );
+          }
+        } catch (error: any) {
+          console.error('Upload failed:', error);
+          alert(`❌ Upload failed: ${error.message}`);
+          setFiles((prev) =>
+            prev.map((f) => (f.name === file.name ? { ...f, status: 'error' } : f))
+          );
         }
       }
-    } catch (error: any) {
-      console.error('Upload failed:', error);
-      alert(`❌ Upload failed: ${error.message}`);
-      setFiles(prev => prev.map(f => ({ ...f, status: 'error' })));
     } finally {
       setLoading(false);
       setIsDragging(false);
