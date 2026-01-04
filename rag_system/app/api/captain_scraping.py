@@ -42,6 +42,7 @@ class ScrapeURLResponse(BaseModel):
     already_scraped: bool = False
     previous_scraped_at: Optional[str] = None
     message: str
+    debug: Optional[dict] = None
 
 
 @router.post("/url", response_model=ScrapeURLResponse)
@@ -140,7 +141,8 @@ async def scrape_url(
         real_counts = {}
         est_counts = {}
 
-        if request.extract_intelligence and scrape_result.get("content"):
+        content_text = (scrape_result.get("content") or "").strip()
+        if request.extract_intelligence and len(content_text) >= 80:
             content_redacted, pii_stats = redact_pii(scrape_result["content"])
 
             contract = await run_fast_extraction(content_redacted, {
@@ -236,6 +238,36 @@ async def scrape_url(
                 }).eq("id", scrape_id).execute()
             except Exception:
                 pass
+        elif request.extract_intelligence and len(content_text) < 80:
+            # Mark failure explicitly so the UI doesn't open an empty editor.
+            try:
+                supabase.table("scraped_urls").update({
+                    "scraping_status": "failed",
+                    "error_message": "No readable content extracted from URL (content too short).",
+                    "metadata": {
+                        **(scrape_result.get("metadata", {}) or {}),
+                        "content_length": len(content_text),
+                    },
+                }).eq("id", scrape_id).execute()
+            except Exception:
+                pass
+
+            return ScrapeURLResponse(
+                success=False,
+                scrape_id=scrape_id,
+                url=str(request.url),
+                status="failed",
+                content_length=len(content_text),
+                subpage_count=scrape_result.get("subpage_count"),
+                pois_extracted=0,
+                intelligence_extracted=None,
+                extracted_data=None,
+                extraction_contract=None,
+                counts_real={},
+                counts_estimated={},
+                message="No readable content extracted from URL. Try Force refresh or a different page on the same site.",
+                debug=(scrape_result.get("metadata", {}) or {}).get("content_debug") if isinstance(scrape_result.get("metadata", {}), dict) else None,
+            )
         
         return ScrapeURLResponse(
             scrape_id=scrape_id,
@@ -253,7 +285,8 @@ async def scrape_url(
             extraction_contract=contract,
             counts_real=real_counts,
             counts_estimated=est_counts,
-            message="URL scraped successfully"
+            message="URL scraped successfully",
+            debug=(scrape_result.get("metadata", {}) or {}).get("content_debug") if isinstance(scrape_result.get("metadata", {}), dict) else None,
         )
         
     except ValueError as e:

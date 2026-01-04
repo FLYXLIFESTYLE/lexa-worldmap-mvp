@@ -66,24 +66,43 @@ class WebScraper:
                 response = await client.get(url, headers=self._default_headers)
                 response.raise_for_status()
                 
-                # Parse HTML
-                soup = BeautifulSoup(response.text, 'lxml')
-                
-                # Extract content
-                content = self._extract_text_content(soup)
-                metadata = self._extract_metadata(soup, url)
+                # Parse HTML (use separate soups because text extraction mutates DOM)
+                soup_meta = BeautifulSoup(response.text, "lxml")
+                metadata = self._extract_metadata(soup_meta, url)
+                soup_content = BeautifulSoup(response.text, "lxml")
+                content = self._extract_text_content(soup_content)
+
+                # If the main text extraction is empty/too short, fall back to meta text.
+                # Some sites keep the meaningful copy in meta description/OG tags.
+                fallback_parts: List[str] = []
+                for key in ("title", "og_title", "description", "og_description", "keywords"):
+                    v = metadata.get(key)
+                    if isinstance(v, str) and v.strip():
+                        fallback_parts.append(v.strip())
+                fallback_text = "\n".join(fallback_parts).strip()
+                fallback_used = False
+                if len(content.strip()) < 200 and len(fallback_text) > len(content.strip()):
+                    content = fallback_text
+                    fallback_used = True
                 
                 result = {
                     "url": url,
                     "status_code": response.status_code,
                     "content": content,
-                    "metadata": metadata,
+                    "metadata": {
+                        **(metadata or {}),
+                        "content_debug": {
+                            "raw_html_length": len(response.text or ""),
+                            "extracted_text_length": len(content or ""),
+                            "fallback_used": fallback_used,
+                        },
+                    },
                     "word_count": len(content.split()),
                 }
                 
                 # Extract subpages if requested
                 if extract_subpages:
-                    subpages = self._extract_subpage_urls(soup, url)
+                    subpages = self._extract_subpage_urls(soup_meta, url)
                     result["subpages"] = subpages[:self.max_subpages]
                     result["subpage_count"] = len(subpages)
                 

@@ -348,6 +348,14 @@ function CaptainUploadPageInner() {
         setScrapeJobs((prev) => prev.map((j) => (j.url === targetUrl ? { ...j, status: 'scraping' } : j)));
         const result: any = await scrapingAPI.scrapeURL(targetUrl, true, forceRescrape);
 
+        // If backend couldn't extract readable content, show an error instead of opening an empty editor.
+        if (result?.success === false || !result?.extracted_data) {
+          const msg = String(result?.message || result?.error || 'No readable content extracted from URL.');
+          setScrapeJobs((prev) => prev.map((j) => (j.url === targetUrl ? { ...j, status: 'error', message: msg } : j)));
+          setScrapeProgressPct(Math.round(((i + 1) / total) * 100));
+          continue;
+        }
+
         if (result?.already_scraped) {
           setScrapeJobs((prev) =>
             prev.map((j) =>
