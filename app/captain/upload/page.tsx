@@ -38,6 +38,30 @@ interface YachtDestination {
 export default function CaptainUploadPage() {
   const router = useRouter();
   const supabase = createClient();
+
+  // Upload confidence policy: extracted items default to 80% and are capped at 80%
+  // until a separate "Captain approval" / promotion flow exists.
+  const clampUploadConfidence = (c: unknown): number => {
+    const n = typeof c === 'number' ? c : NaN;
+    if (!Number.isFinite(n)) return 0.8;
+    return Math.min(Math.max(n, 0), 0.8);
+  };
+
+  const normalizeExtractedData = (data: any): any => {
+    if (!data || typeof data !== 'object') return data;
+    const next = structuredClone(data);
+
+    if (Array.isArray(next.pois)) {
+      next.pois = next.pois.map((p: any) => ({ ...p, confidence: clampUploadConfidence(p?.confidence) }));
+    }
+    if (Array.isArray(next.experiences)) {
+      next.experiences = next.experiences.map((e: any) => ({ ...e, confidence: clampUploadConfidence(e?.confidence) }));
+    }
+    if (Array.isArray(next.service_providers)) {
+      next.service_providers = next.service_providers.map((sp: any) => ({ ...sp, confidence: clampUploadConfidence(sp?.confidence) }));
+    }
+    return next;
+  };
   
   const [mode, setMode] = useState<UploadMode>('file');
   const [loading, setLoading] = useState(false);
@@ -103,6 +127,7 @@ export default function CaptainUploadPage() {
   
         // Upload to backend (THIS IS THE REAL API CALL)
         const result = await uploadAPI.uploadFile(file);
+        const extractedDataNormalized = normalizeExtractedData(result.extracted_data);
   
         // Update status to done WITH extracted data
         setFiles(prev => prev.map(f => 
@@ -112,7 +137,7 @@ export default function CaptainUploadPage() {
                 status: 'done', 
                 confidenceScore: result.confidence_score || 80,
                 uploadId: result.upload_id,
-                extractedData: result.extracted_data, // Store for editing
+                extractedData: extractedDataNormalized, // Store for editing
                 countsReal: result.counts_real,
                 countsEstimated: result.counts_estimated,
                 extractionContract: result.extraction_contract,
@@ -132,7 +157,7 @@ export default function CaptainUploadPage() {
             status: 'done' as const,
             confidenceScore: result.confidence_score || 80,
             uploadId: result.upload_id,
-            extractedData: result.extracted_data,
+            extractedData: extractedDataNormalized,
             countsReal: result.counts_real,
             countsEstimated: result.counts_estimated,
             extractionContract: result.extraction_contract,
@@ -1014,6 +1039,49 @@ export default function CaptainUploadPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Claude-style Summary + Report */}
+                {(() => {
+                  const meta = editingFile.extractionContract?.final_package?.metadata || {};
+                  const captainSummary = meta?.captain_summary as string | undefined;
+                  const reportMarkdown = meta?.report_markdown as string | undefined;
+
+                  if (!captainSummary && !reportMarkdown) return null;
+
+                  return (
+                    <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">✨ Claude-style Extraction</h3>
+                      {captainSummary && (
+                        <div className="bg-lexa-gold/10 border border-lexa-gold/30 rounded-lg p-4 mb-4">
+                          <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans">
+                            {captainSummary}
+                          </pre>
+                        </div>
+                      )}
+                      {reportMarkdown && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-semibold text-gray-800">Extracted Data Document</p>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard?.writeText(reportMarkdown).then(
+                                  () => alert('✅ Copied extraction document to clipboard'),
+                                  () => alert('❌ Copy failed')
+                                );
+                              }}
+                              className="text-xs px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                          <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans">
+                            {reportMarkdown}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* POIs Section */}
                 {editingFile.extractedData.pois && editingFile.extractedData.pois.length > 0 && (

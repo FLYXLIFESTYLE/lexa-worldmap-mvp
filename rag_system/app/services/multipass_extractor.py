@@ -120,9 +120,16 @@ class MultipassExtractor:
             text=text,
             previous_package=None,
             extra_rules=[
-                "Expand to detailed fields; extract venues, providers, archetypes, sub_experiences where possible.",
+                # Goal: match Claude-quality extraction richness in a single call (production-safe).
+                "Extract with Claude-level richness when the source supports it (target 50+ sub_experiences for multi-day itineraries).",
+                "Prefer source-backed specificity over generic filler. If something is inferred, mark it `generic`: true and lower confidence.",
                 "Populate script_seed (no venue names in signature_highlights).",
-                "Add per-item confidence 0–1 where possible.",
+                "Add per-item confidence 0–1 and include citations (snippets) for concrete claims.",
+                "Fill counts.real_extracted for citation-backed items; counts.estimated_potential for likely but not explicit items.",
+                # Claude-style outputs for the Captain UI (stored inside package.metadata)
+                "In package.metadata, include `captain_summary` (a Claude-style 'Perfect! I've extracted...' summary with counts + top emotions) and `report_markdown` (a full markdown document that mirrors the Captain-facing extraction report: Overview, Emotional Mapping, Experience Breakdown (50+), Destinations & Venues, Service Providers, Client Archetypes, Neo4j relationship examples, Next steps).",
+                # Additional structured meta to help rendering & downstream DB
+                "In package.metadata, include: experience_type, duration_days, duration_nights, route (array of locations in order), primary_theme, secondary_emotions (array), anti_emotions (array), and price_indicators (array) when present in source.",
                 "Return strict JSON with package + findings + warnings + status.",
             ],
         )
@@ -172,6 +179,10 @@ class MultipassExtractor:
         prior = json.dumps(previous_package, indent=2) if previous_package else "{}"
         rules = "\n".join([f"- {r}" for r in extra_rules])
 
+        # Use a larger text window for the single-pass (fast) expand mode.
+        # This is critical for itinerary-style documents where details are spread across many pages.
+        text_limit = 60000 if (pass_name == "expand" and not previous_package) else 18000
+
         return f"""You are LEXA's extraction engine. Return STRICT JSON only.
 Pass: {pass_name}
 
@@ -190,7 +201,7 @@ Rules:
 - {rules}
 
 Source text (truncate if huge, but extract as much as possible):
-{text[:18000]}
+{text[:text_limit]}
 """
 
     def _extract_response_text(self, response) -> str:
