@@ -155,10 +155,10 @@ export const scrapingAPI = {
   /**
    * Scrape a single URL
    */
-  scrapeURL: async (url: string, extractIntelligence = true) => {
+  scrapeURL: async (url: string, extractIntelligence = true, force = false) => {
     return apiRequest('/api/captain/scrape/url', {
       method: 'POST',
-      body: JSON.stringify({ url, extract_subpages: true, extract_intelligence: extractIntelligence }),
+      body: JSON.stringify({ url, extract_subpages: true, extract_intelligence: extractIntelligence, force }),
     });
   },
 
@@ -169,6 +169,21 @@ export const scrapingAPI = {
     return apiRequest('/api/captain/scrape/batch', {
       method: 'POST',
       body: JSON.stringify({ urls, extract_intelligence: extractIntelligence }),
+    });
+  },
+
+  listURLs: async (skip = 0, limit = 50) => {
+    return apiRequest(`/api/captain/scrape/urls?offset=${skip}&limit=${limit}`, { method: 'GET' });
+  },
+
+  getScrape: async (scrapeId: string) => {
+    return apiRequest<{ scrape: any }>(`/api/captain/scrape/id/${scrapeId}`, { method: 'GET' });
+  },
+
+  updateScrape: async (scrapeId: string, updates: { metadata?: any }) => {
+    return apiRequest<{ success: boolean; scrape_id: string }>(`/api/captain/scrape/id/${scrapeId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
     });
   },
 };

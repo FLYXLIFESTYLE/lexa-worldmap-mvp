@@ -9,22 +9,22 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
+import { scrapingAPI } from '@/lib/api/captain-portal';
 
 interface ScrapedURL {
   id: string;
   url: string;
   domain: string;
   scraped_at: string;
-  scraped_by: string;
-  status: 'success' | 'failed' | 'processing' | 'pending';
-  pois_extracted: number;
-  relationships_created: number;
-  knowledge_pieces: number;
-  subpages_found: number;
-  subpages_list?: string[];
+  entered_by_email?: string;
+  status: 'success' | 'failed' | 'processing';
+  pois_discovered: number;
+  relationships_discovered: number;
+  subpages_discovered: number;
+  subpages?: string[];
   error_message?: string;
   last_scraped: string;
-  scrape_count: number;
+  metadata?: any;
 }
 
 type StatusFilter = 'all' | 'success' | 'failed' | 'processing';
@@ -79,115 +79,21 @@ export default function CaptainURLsPage() {
   const fetchURLs = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // Mock data for now
-      const mockURLs: ScrapedURL[] = [
-        {
-          id: '1',
-          url: 'https://www.monaco-tribune.com/en/luxury-hotels-monaco',
-          domain: 'monaco-tribune.com',
-          scraped_at: new Date('2024-12-30T14:20:00').toISOString(),
-          scraped_by: 'captain@lexa.com',
-          status: 'success',
-          pois_extracted: 12,
-          relationships_created: 36,
-          knowledge_pieces: 8,
-          subpages_found: 5,
-          subpages_list: [
-            '/en/hotel-de-paris',
-            '/en/hotel-hermitage',
-            '/en/fairmont-monte-carlo',
-            '/en/port-palace',
-            '/en/meridien-beach-plaza'
-          ],
-          last_scraped: new Date('2024-12-30T14:20:00').toISOString(),
-          scrape_count: 1
-        },
-        {
-          id: '2',
-          url: 'https://www.luxurytravel.com/french-riviera-restaurants',
-          domain: 'luxurytravel.com',
-          scraped_at: new Date('2024-12-29T10:15:00').toISOString(),
-          scraped_by: 'paul@lexa.com',
-          status: 'success',
-          pois_extracted: 18,
-          relationships_created: 45,
-          knowledge_pieces: 12,
-          subpages_found: 8,
-          subpages_list: [
-            '/le-louis-xv',
-            '/blue-bay',
-            '/elsa-monte-carlo',
-            '/buddha-bar',
-            '/vistamar',
-            '/ducasse-sur-mer',
-            '/louis-xv-alain-ducasse',
-            '/song-qi'
-          ],
-          last_scraped: new Date('2024-12-29T10:15:00').toISOString(),
-          scrape_count: 1
-        },
-        {
-          id: '3',
-          url: 'https://www.example-travel-blog.com/monaco-2024',
-          domain: 'example-travel-blog.com',
-          scraped_at: new Date('2024-12-28T16:45:00').toISOString(),
-          scraped_by: 'bakary@lexa.com',
-          status: 'failed',
-          pois_extracted: 0,
-          relationships_created: 0,
-          knowledge_pieces: 0,
-          subpages_found: 0,
-          error_message: 'Failed to extract content. Website returned 403 Forbidden.',
-          last_scraped: new Date('2024-12-28T16:45:00').toISOString(),
-          scrape_count: 2
-        },
-        {
-          id: '4',
-          url: 'https://www.riviera-experiences.com/yacht-charter',
-          domain: 'riviera-experiences.com',
-          scraped_at: new Date('2024-12-27T09:30:00').toISOString(),
-          scraped_by: 'captain@lexa.com',
-          status: 'processing',
-          pois_extracted: 0,
-          relationships_created: 0,
-          knowledge_pieces: 0,
-          subpages_found: 0,
-          last_scraped: new Date('2024-12-27T09:30:00').toISOString(),
-          scrape_count: 1
-        },
-        {
-          id: '5',
-          url: 'https://www.visitmonaco.com/experiences',
-          domain: 'visitmonaco.com',
-          scraped_at: new Date('2024-12-26T11:00:00').toISOString(),
-          scraped_by: 'paul@lexa.com',
-          status: 'success',
-          pois_extracted: 25,
-          relationships_created: 75,
-          knowledge_pieces: 15,
-          subpages_found: 12,
-          last_scraped: new Date('2024-12-26T11:00:00').toISOString(),
-          scrape_count: 1
-        }
-      ];
-      
-      setUrls(mockURLs);
-      
-      // Calculate stats
-      const total = mockURLs.length;
-      const success = mockURLs.filter(u => u.status === 'success').length;
-      const failed = mockURLs.filter(u => u.status === 'failed').length;
-      const processing = mockURLs.filter(u => u.status === 'processing' || u.status === 'pending').length;
-      const totalPOIs = mockURLs.reduce((sum, u) => sum + u.pois_extracted, 0);
-      const totalRelations = mockURLs.reduce((sum, u) => sum + u.relationships_created, 0);
-      const totalKnowledge = mockURLs.reduce((sum, u) => sum + u.knowledge_pieces, 0);
-      const uniqueDomains = new Set(mockURLs.map(u => u.domain)).size;
-      
+      const res: any = await scrapingAPI.listURLs(0, 200);
+      const rows: ScrapedURL[] = res.urls || [];
+      setUrls(rows);
+
+      const total = rows.length;
+      const success = rows.filter(u => u.status === 'success').length;
+      const failed = rows.filter(u => u.status === 'failed').length;
+      const processing = rows.filter(u => u.status === 'processing').length;
+      const totalPOIs = rows.reduce((sum, u) => sum + (u.pois_discovered || 0), 0);
+      const totalRelations = rows.reduce((sum, u) => sum + (u.relationships_discovered || 0), 0);
+      const totalKnowledge = 0;
+      const uniqueDomains = new Set(rows.map(u => u.domain)).size;
       setStats({ total, success, failed, processing, totalPOIs, totalRelations, totalKnowledge, uniqueDomains });
-      
-      // Extract unique domains for filter
-      const uniqueDomainsList = Array.from(new Set(mockURLs.map(u => u.domain))).sort();
+
+      const uniqueDomainsList = Array.from(new Set(rows.map(u => u.domain))).sort();
       setDomains(uniqueDomainsList);
     } catch (error) {
       console.error('Failed to fetch URLs:', error);
@@ -230,7 +136,7 @@ export default function CaptainURLsPage() {
         filtered.sort((a, b) => a.domain.localeCompare(b.domain));
         break;
       case 'pois_desc':
-        filtered.sort((a, b) => b.pois_extracted - a.pois_extracted);
+        filtered.sort((a, b) => (b.pois_discovered || 0) - (a.pois_discovered || 0));
         break;
     }
     
@@ -244,13 +150,9 @@ export default function CaptainURLsPage() {
     }
     
     try {
-      // TODO: Call backend API
-      alert('🔄 Re-scraping started! This may take a few minutes.');
-      
-      // Update status to processing
-      setUrls(prev => prev.map(u => 
-        u.id === urlId ? { ...u, status: 'processing' as const } : u
-      ));
+      await scrapingAPI.scrapeURL(url, true, true);
+      alert('🔄 Re-scraping started! This may take a moment.');
+      fetchURLs();
     } catch (error) {
       alert('❌ Failed to start re-scraping');
     }
@@ -263,9 +165,9 @@ export default function CaptainURLsPage() {
     }
     
     try {
-      // TODO: Call backend API
+      // Admin-only deletion not wired yet; keep audit trail.
       setUrls(prev => prev.filter(u => u.id !== urlId));
-      alert('✅ URL record deleted!');
+      alert('✅ Hidden locally. Admin deletion endpoint can be added next.');
     } catch (error) {
       alert('❌ Failed to delete URL record');
     }
@@ -276,7 +178,6 @@ export default function CaptainURLsPage() {
     switch (status) {
       case 'success': return 'bg-green-100 text-green-700';
       case 'processing': return 'bg-blue-100 text-blue-700';
-      case 'pending': return 'bg-yellow-100 text-yellow-700';
       case 'failed': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
     }
@@ -483,24 +384,21 @@ export default function CaptainURLsPage() {
                       <div className="flex items-center gap-4 text-sm text-gray-600 mb-3 flex-wrap">
                         <span>🌐 {urlData.domain}</span>
                         <span>📅 {new Date(urlData.scraped_at).toLocaleDateString()}</span>
-                        <span>👤 {urlData.scraped_by}</span>
-                        <span>🔄 Scraped {urlData.scrape_count}x</span>
+                        {urlData.entered_by_email && <span>👤 {urlData.entered_by_email}</span>}
+                        <span>🕐 {new Date(urlData.last_scraped || urlData.scraped_at).toLocaleTimeString()}</span>
                       </div>
 
                       {urlData.status === 'success' && (
                         <div className="flex items-center gap-6 text-sm">
                           <span className="text-green-600 font-semibold">
-                            📍 {urlData.pois_extracted} POIs
+                            📍 {urlData.pois_discovered} POIs
                           </span>
                           <span className="text-blue-600 font-semibold">
-                            🔗 {urlData.relationships_created} Relations
+                            🔗 {urlData.relationships_discovered} Relations
                           </span>
-                          <span className="text-purple-600 font-semibold">
-                            💡 {urlData.knowledge_pieces} Knowledge
-                          </span>
-                          {urlData.subpages_found > 0 && (
+                          {urlData.subpages_discovered > 0 && (
                             <span className="text-orange-600 font-semibold">
-                              📄 {urlData.subpages_found} Subpages
+                              📄 {urlData.subpages_discovered} Subpages
                             </span>
                           )}
                         </div>
@@ -515,6 +413,12 @@ export default function CaptainURLsPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 ml-4">
+                      <button
+                        onClick={() => router.push(`/captain/upload?tab=url&openScrape=${urlData.id}`)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                      >
+                        Open
+                      </button>
                       <button
                         onClick={() => setExpandedId(expandedId === urlData.id ? null : urlData.id)}
                         className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
@@ -542,13 +446,13 @@ export default function CaptainURLsPage() {
                 {/* Expanded Details */}
                 {expandedId === urlData.id && (
                   <div className="border-t border-gray-200 bg-gray-50 p-6">
-                    {urlData.status === 'success' && urlData.subpages_list && urlData.subpages_list.length > 0 && (
+                    {urlData.status === 'success' && urlData.subpages && urlData.subpages.length > 0 && (
                       <div>
                         <h4 className="font-semibold text-gray-900 mb-3">
-                          📄 Discovered Subpages ({urlData.subpages_list.length})
+                          📄 Discovered Subpages ({urlData.subpages.length})
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {urlData.subpages_list.map((subpage, i) => (
+                          {urlData.subpages.map((subpage, i) => (
                             <a
                               key={i}
                               href={subpage}
@@ -569,9 +473,6 @@ export default function CaptainURLsPage() {
                       <p className="text-sm">
                         <strong>Last Scraped:</strong>{' '}
                         {new Date(urlData.last_scraped).toLocaleString()}
-                      </p>
-                      <p className="text-sm mt-1">
-                        <strong>Total Scrapes:</strong> {urlData.scrape_count}
                       </p>
                     </div>
                   </div>

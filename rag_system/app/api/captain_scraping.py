@@ -22,6 +22,7 @@ class ScrapeURLRequest(BaseModel):
     url: HttpUrl
     extract_subpages: bool = True
     extract_intelligence: bool = True
+    force: bool = False
 
 
 class ScrapeURLResponse(BaseModel):
@@ -38,6 +39,8 @@ class ScrapeURLResponse(BaseModel):
     extraction_contract: Optional[dict] = None
     counts_real: Optional[dict] = None
     counts_estimated: Optional[dict] = None
+    already_scraped: bool = False
+    previous_scraped_at: Optional[str] = None
     message: str
 
 
@@ -66,17 +69,50 @@ async def scrape_url(
         user_id = user.get("id")
         user_email = (user.get("email") or "").lower()
 
+        # Dedupe: if URL already scraped successfully and we have cached extraction, reuse it (unless force=true)
+        existing = supabase.table("scraped_urls")\
+            .select("*")\
+            .eq("url", str(request.url))\
+            .limit(1)\
+            .execute()
+        if existing.data:
+            row = existing.data[0]
+            meta = row.get("metadata") if isinstance(row, dict) else {}
+            if not isinstance(meta, dict):
+                meta = {}
+            if (not request.force) and row.get("scraping_status") == "success" and meta.get("extraction_contract") and meta.get("extracted_data"):
+                return ScrapeURLResponse(
+                    scrape_id=row.get("id"),
+                    url=str(request.url),
+                    status="completed",
+                    content_length=int(row.get("content_length") or 0),
+                    subpage_count=int(row.get("subpages_discovered") or 0),
+                    pois_extracted=int(row.get("pois_discovered") or 0),
+                    intelligence_extracted={
+                        "pois": int(row.get("pois_discovered") or 0),
+                        "experiences": int((meta.get("counts_real") or {}).get("sub_experiences", 0)) if isinstance(meta.get("counts_real"), dict) else 0,
+                        "service_providers": int((meta.get("counts_real") or {}).get("service_providers", 0)) if isinstance(meta.get("counts_real"), dict) else 0,
+                    },
+                    extracted_data=meta.get("extracted_data"),
+                    extraction_contract=meta.get("extraction_contract"),
+                    counts_real=meta.get("counts_real") or {},
+                    counts_estimated=meta.get("counts_estimated") or {},
+                    already_scraped=True,
+                    previous_scraped_at=row.get("last_scraped") or row.get("scraped_at"),
+                    message="URL already scraped - showing existing extraction",
+                )
+
         # Scrape the URL + subpages content (when enabled)
         if request.extract_subpages:
             scrape_result = await web_scraper.scrape_url_with_subpages_content(str(request.url))
         else:
             scrape_result = await web_scraper.scrape_url(str(request.url), extract_subpages=False)
         
-        scrape_id = str(uuid.uuid4())
+        scrape_id = (existing.data[0].get("id") if existing.data else None) or str(uuid.uuid4())
         
         # Save scraped URL to database (shared view across captains)
         try:
-            supabase.table("scraped_urls").insert({
+            supabase.table("scraped_urls").upsert({
                 "id": scrape_id,
                 "url": str(request.url),
                 "domain": scrape_result.get("metadata", {}).get("domain"),
@@ -92,7 +128,7 @@ async def scrape_url(
                     **(scrape_result.get("metadata", {}) or {}),
                     "pages_fetched": scrape_result.get("pages_fetched"),
                 },
-            }).execute()
+            }, on_conflict="url").execute()
         except Exception:
             pass
         
@@ -259,6 +295,76 @@ async def list_scraped_urls(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch URLs: {str(e)}")
+
+
+@router.get("/id/{scrape_id}")
+async def get_scrape_detail(
+    scrape_id: str,
+    supabase = Depends(get_supabase),
+):
+    """
+    Fetch one scraped URL record (shared view).
+    """
+    response = supabase.table("scraped_urls")\
+        .select("*")\
+        .eq("id", scrape_id)\
+        .limit(1)\
+        .execute()
+
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Scrape not found")
+
+    return {"scrape": response.data[0]}
+
+
+class UpdateScrapeRequest(BaseModel):
+    metadata: Optional[dict] = None
+
+
+@router.put("/id/{scrape_id}")
+async def update_scrape(
+    scrape_id: str,
+    body: UpdateScrapeRequest,
+    http_request: Request,
+    supabase = Depends(get_supabase),
+):
+    """
+    Update a scraped URL record (admin-only).
+    Used to persist edited extracted data back into the scraped_urls.metadata cache.
+    """
+    user = await get_current_user(http_request)
+    user_id = user.get("id")
+
+    # Admin check via lexa_user_profiles
+    try:
+        role_resp = supabase.table("lexa_user_profiles").select("role").eq("id", user_id).limit(1).execute()
+        role = role_resp.data[0].get("role") if role_resp.data else None
+        if role != "admin":
+            raise HTTPException(status_code=403, detail="Admin only")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    existing = supabase.table("scraped_urls")\
+        .select("id, metadata")\
+        .eq("id", scrape_id)\
+        .limit(1)\
+        .execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Scrape not found")
+
+    updates = {}
+    if body.metadata is not None and isinstance(body.metadata, dict):
+        current_meta = existing.data[0].get("metadata") or {}
+        if not isinstance(current_meta, dict):
+            current_meta = {}
+        updates["metadata"] = {**current_meta, **body.metadata}
+    if not updates:
+        return {"success": True, "scrape_id": scrape_id}
+
+    supabase.table("scraped_urls").update(updates).eq("id", scrape_id).execute()
+    return {"success": True, "scrape_id": scrape_id}
 
 
 @router.get("/queue")

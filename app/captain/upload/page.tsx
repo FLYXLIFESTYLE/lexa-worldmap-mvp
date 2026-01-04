@@ -67,6 +67,10 @@ export default function CaptainUploadPage() {
   
   const [mode, setMode] = useState<UploadMode>('file');
   const [loading, setLoading] = useState(false);
+
+  // Scraping progress UI
+  const [scrapeJobs, setScrapeJobs] = useState<Array<{ url: string; status: 'queued' | 'scraping' | 'done' | 'already' | 'error'; message?: string }>>([]);
+  const [scrapeProgressPct, setScrapeProgressPct] = useState(0);
   
   // File Upload State
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -108,6 +112,31 @@ export default function CaptainUploadPage() {
     checkAuth();
   }, [router, supabase.auth]);
 
+  // Persist selected mode so refresh stays on the same tab
+  const setModePersist = (next: UploadMode) => {
+    setMode(next);
+    try {
+      localStorage.setItem('captain_upload_mode', next);
+    } catch {}
+    try {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', next);
+      router.replace(`/captain/upload?${params.toString()}`);
+    } catch {}
+  };
+
+  useEffect(() => {
+    const tab = searchParams.get('tab') as UploadMode | null;
+    if (tab && ['file', 'url', 'manual', 'yacht'].includes(tab)) {
+      setMode(tab);
+      return;
+    }
+    try {
+      const saved = localStorage.getItem('captain_upload_mode') as UploadMode | null;
+      if (saved && ['file', 'url', 'manual', 'yacht'].includes(saved)) setMode(saved);
+    } catch {}
+  }, [searchParams]);
+
   // Open an upload from history: /captain/upload?open=<upload_id>
   useEffect(() => {
     const openId = searchParams.get('open');
@@ -144,6 +173,47 @@ export default function CaptainUploadPage() {
       } catch (e: any) {
         console.error('Failed to open upload:', e);
         alert(`Failed to open upload: ${e.message}`);
+      }
+    })();
+  }, [searchParams]);
+
+  // Open a scrape from history: /captain/upload?openScrape=<scrape_id>
+  useEffect(() => {
+    const openScrapeId = searchParams.get('openScrape');
+    if (!openScrapeId) return;
+
+    (async () => {
+      try {
+        const res = await scrapingAPI.getScrape(openScrapeId);
+        const row = (res as any).scrape;
+        const meta = row?.metadata || {};
+        const extracted = meta?.extracted_data;
+        const contract = meta?.extraction_contract;
+
+        if (!extracted || !contract) {
+          alert('This scraped URL has no cached extraction yet.');
+          return;
+        }
+
+        const openedFile: UploadedFile = {
+          name: row.url,
+          size: row.content_length || 0,
+          type: 'url',
+          status: row.scraping_status === 'success' ? 'done' : 'error',
+          confidenceScore: 80,
+          uploadId: row.id,
+          extractedData: normalizeExtractedData(extracted),
+          countsReal: meta?.counts_real || {},
+          countsEstimated: meta?.counts_estimated || {},
+          extractionContract: contract,
+          keepDecision: 'keep',
+        };
+
+        setModePersist('url');
+        setEditingFile(openedFile);
+      } catch (e: any) {
+        console.error('Failed to open scrape:', e);
+        alert(`Failed to open scrape: ${e.message}`);
       }
     })();
   }, [searchParams]);
@@ -268,9 +338,27 @@ export default function CaptainUploadPage() {
     }
 
     setLoading(true);
+    setScrapeJobs(urls.map((u) => ({ url: u, status: 'queued' as const })));
+    setScrapeProgressPct(0);
     try {
-      for (const targetUrl of urls) {
+      const total = urls.length;
+      for (let i = 0; i < urls.length; i++) {
+        const targetUrl = urls[i];
+        setScrapeJobs((prev) => prev.map((j) => (j.url === targetUrl ? { ...j, status: 'scraping' } : j)));
         const result: any = await scrapingAPI.scrapeURL(targetUrl, true);
+
+        if (result?.already_scraped) {
+          setScrapeJobs((prev) =>
+            prev.map((j) =>
+              j.url === targetUrl
+                ? { ...j, status: 'already', message: `Already scraped (${result.previous_scraped_at || 'earlier'})` }
+                : j
+            )
+          );
+        } else {
+          setScrapeJobs((prev) => prev.map((j) => (j.url === targetUrl ? { ...j, status: 'done' } : j)));
+        }
+
         const extractedDataNormalized = normalizeExtractedData(result.extracted_data);
 
         const newFile: UploadedFile = {
@@ -289,13 +377,16 @@ export default function CaptainUploadPage() {
 
         setFiles(prev => [...prev, newFile]);
         setEditingFile(newFile);
+        setScrapeProgressPct(Math.round(((i + 1) / total) * 100));
       }
 
       setUrls([]);
     } catch (error: any) {
       alert(`❌ Scraping failed: ${error.message || 'Unknown error'}`);
+      setScrapeJobs((prev) => prev.map((j) => (j.status === 'scraping' || j.status === 'queued' ? { ...j, status: 'error', message: error.message } : j)));
     } finally {
       setLoading(false);
+      setScrapeProgressPct((p) => (p < 100 ? 100 : p));
     }
   };
 
@@ -534,10 +625,12 @@ export default function CaptainUploadPage() {
             
             {/* Info Box */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2 max-w-3xl">
-              <div className="text-sm">
-                <strong className="text-blue-900">FORMATS:</strong>{' '}
-                <span className="text-gray-700">PDF, Word, Excel, .txt, Images (.png, .jpg, .jpeg), or paste text</span>
-              </div>
+              {mode === 'file' && (
+                <div className="text-sm">
+                  <strong className="text-blue-900">UPLOAD FORMATS:</strong>{' '}
+                  <span className="text-gray-700">PDF, Word, Excel, .txt, Images (.png, .jpg, .jpeg), or paste text</span>
+                </div>
+              )}
               <div className="text-sm">
                 <strong className="text-blue-900">CONFIDENCE SCORE:</strong>{' '}
                 <span className="text-gray-700">Defaults to 80% (maximum for uploads). Captain approval required for higher scores.</span>
@@ -550,7 +643,7 @@ export default function CaptainUploadPage() {
         {/* Mode Selector */}
         <div className="flex flex-wrap gap-3 mb-8">
           <button
-            onClick={() => setMode('file')}
+            onClick={() => setModePersist('file')}
             className={`px-6 py-3 rounded-xl font-semibold transition-all ${
               mode === 'file'
                 ? 'bg-blue-600 text-white shadow-lg'
@@ -560,7 +653,7 @@ export default function CaptainUploadPage() {
             📁 Upload Files
           </button>
           <button
-            onClick={() => setMode('url')}
+            onClick={() => setModePersist('url')}
             className={`px-6 py-3 rounded-xl font-semibold transition-all ${
               mode === 'url'
                 ? 'bg-blue-600 text-white shadow-lg'
@@ -570,7 +663,7 @@ export default function CaptainUploadPage() {
             🌐 Scrape URLs
           </button>
           <button
-            onClick={() => setMode('manual')}
+            onClick={() => setModePersist('manual')}
             className={`px-6 py-3 rounded-xl font-semibold transition-all ${
               mode === 'manual'
                 ? 'bg-blue-600 text-white shadow-lg'
@@ -580,7 +673,7 @@ export default function CaptainUploadPage() {
             ✏️ Manual Entry
           </button>
           <button
-            onClick={() => setMode('yacht')}
+            onClick={() => setModePersist('yacht')}
             className={`px-6 py-3 rounded-xl font-semibold transition-all ${
               mode === 'yacht'
                 ? 'bg-blue-600 text-white shadow-lg'
@@ -719,6 +812,73 @@ export default function CaptainUploadPage() {
                 >
                   {loading ? '⏳ Scraping...' : '🚀 Start Scraping All URLs'}
                 </button>
+              </div>
+            )}
+
+            {/* Progress + per-URL status */}
+            {loading && (
+              <div className="mt-4 w-full">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-700 font-semibold">Scraping in progress…</p>
+                  <p className="text-sm text-gray-600">{scrapeProgressPct}%</p>
+                </div>
+                <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-2 bg-blue-500 transition-all"
+                    style={{ width: `${Math.max(5, scrapeProgressPct)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {scrapeJobs.length > 0 && (
+              <div className="mt-6 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Scrape Status</h3>
+                <div className="space-y-2">
+                  {scrapeJobs.map((job) => (
+                    <div key={job.url} className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                      <span className="text-sm text-gray-700 truncate flex-1">{job.url}</span>
+                      <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                        job.status === 'queued' ? 'bg-gray-200 text-gray-700' :
+                        job.status === 'scraping' ? 'bg-blue-100 text-blue-700' :
+                        job.status === 'done' ? 'bg-green-100 text-green-700' :
+                        job.status === 'already' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {job.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-600 mt-3">
+                  Tip: If nothing happens, open DevTools → Network and look for the request to <code>/api/captain/scrape/url</code>.
+                </p>
+              </div>
+            )}
+
+            {/* Show last scraped results inside this tab */}
+            {files.filter(f => f.type === 'url').length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-3">Recent Scrape Results</h3>
+                <div className="space-y-2">
+                  {files.filter(f => f.type === 'url').slice().reverse().slice(0, 5).map((f, idx) => (
+                    <button
+                      key={`${f.name}-${idx}`}
+                      onClick={() => setEditingFile(f)}
+                      className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 truncate">{f.name}</p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            POIs {f.extractedData?.pois?.length ?? 0} • Experiences {f.extractedData?.experiences?.length ?? 0} • Providers {f.extractedData?.service_providers?.length ?? 0}
+                          </p>
+                        </div>
+                        <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 font-semibold">Open</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1505,35 +1665,41 @@ export default function CaptainUploadPage() {
 
               {/* Footer Actions */}
               <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-                <button
-                  onClick={() => {
-                    const updated = { ...editingFile, keepDecision: 'dump' as const };
-                    setFiles(prev => prev.map(f => f.name === editingFile.name ? updated : f));
-                    setLoading(true);
-                    (async () => {
-                      try {
-                        if (editingFile.uploadId) {
-                          await uploadAPI.updateUpload(editingFile.uploadId, {
-                            keep_file: false,
-                            metadata: {
-                              extracted_data: updated.extractedData,
-                              extraction_contract: updated.extractionContract,
-                            },
-                          });
+                {editingFile.type !== 'url' ? (
+                  <button
+                    onClick={() => {
+                      const updated = { ...editingFile, keepDecision: 'dump' as const };
+                      setFiles(prev => prev.map(f => f.name === editingFile.name ? updated : f));
+                      setLoading(true);
+                      (async () => {
+                        try {
+                          if (editingFile.uploadId) {
+                            await uploadAPI.updateUpload(editingFile.uploadId, {
+                              keep_file: false,
+                              metadata: {
+                                extracted_data: updated.extractedData,
+                                extraction_contract: updated.extractionContract,
+                              },
+                            });
+                          }
+                          alert(`🗑️ Marked "${editingFile.name}" as DUMP (remove original file).`);
+                          setEditingFile(null);
+                        } catch (error: any) {
+                          alert(`❌ Failed to update dump status: ${error.message || 'Unknown error'}`);
+                        } finally {
+                          setLoading(false);
                         }
-                        alert(`🗑️ Marked "${editingFile.name}" as DUMP (remove original file).`);
-                        setEditingFile(null);
-                      } catch (error: any) {
-                        alert(`❌ Failed to update dump status: ${error.message || 'Unknown error'}`);
-                      } finally {
-                        setLoading(false);
-                      }
-                    })();
-                  }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700"
-                >
-                  🗑️ Dump File
-                </button>
+                      })();
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700"
+                  >
+                    🗑️ Dump File
+                  </button>
+                ) : (
+                  <div className="text-sm text-gray-600">
+                    URL scrape results are shared (admins can update).
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <button
                     onClick={() => setEditingFile(null)}
@@ -1549,17 +1715,29 @@ export default function CaptainUploadPage() {
                       setLoading(true);
                       try {
                         if (editingFile.uploadId) {
-                          await uploadAPI.updateUpload(editingFile.uploadId, {
-                            keep_file: true,
-                            metadata: {
-                              extracted_data: updated.extractedData,
-                              extraction_contract: updated.extractionContract,
-                              captain_summary: updated.extractionContract?.final_package?.metadata?.captain_summary,
-                              report_markdown: updated.extractionContract?.final_package?.metadata?.report_markdown,
-                            },
-                          });
+                          if (editingFile.type === 'url') {
+                            await scrapingAPI.updateScrape(editingFile.uploadId, {
+                              metadata: {
+                                extracted_data: updated.extractedData,
+                                extraction_contract: updated.extractionContract,
+                                captain_summary: updated.extractionContract?.final_package?.metadata?.captain_summary,
+                                report_markdown: updated.extractionContract?.final_package?.metadata?.report_markdown,
+                              },
+                            });
+                            alert('✅ Saved scraped URL edits.');
+                          } else {
+                            await uploadAPI.updateUpload(editingFile.uploadId, {
+                              keep_file: true,
+                              metadata: {
+                                extracted_data: updated.extractedData,
+                                extraction_contract: updated.extractionContract,
+                                captain_summary: updated.extractionContract?.final_package?.metadata?.captain_summary,
+                                report_markdown: updated.extractionContract?.final_package?.metadata?.report_markdown,
+                              },
+                            });
+                            alert('✅ Saved edits. Marked as KEEP.');
+                          }
                         }
-                        alert('✅ Saved edits. Marked as KEEP.');
                         setEditingFile(null);
                       } catch (error: any) {
                         alert(`❌ Failed to save data: ${error.message || 'Unknown error'}`);
@@ -1570,7 +1748,7 @@ export default function CaptainUploadPage() {
                     disabled={loading}
                     className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
                   >
-                    {loading ? 'Saving...' : '💾 Save & Keep File'}
+                    {loading ? 'Saving...' : editingFile.type === 'url' ? '💾 Save Scrape Edits' : '💾 Save & Keep File'}
                   </button>
                 </div>
               </div>
