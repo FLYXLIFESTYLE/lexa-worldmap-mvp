@@ -80,7 +80,36 @@ export default function CaptainURLsPage() {
     setLoading(true);
     try {
       const res: any = await scrapingAPI.listURLs(0, 200);
-      const rows: ScrapedURL[] = res.urls || [];
+      const rawRows: any[] = res.urls || [];
+
+      // Backend rows are stored as scraped_urls with column names like `scraping_status`.
+      // Normalize into the UI shape and guard against missing fields.
+      const rows: ScrapedURL[] = rawRows.map((r: any) => {
+        const urlStr = String(r?.url || '');
+        const domainStr = String(r?.domain || r?.metadata?.domain || extractDomain(urlStr) || '').trim();
+        const statusRaw = String(r?.status || r?.scraping_status || '').toLowerCase();
+        const status: ScrapedURL['status'] =
+          statusRaw === 'success' ? 'success' :
+          statusRaw === 'failed' ? 'failed' :
+          'processing';
+
+        return {
+          id: String(r?.id || ''),
+          url: urlStr,
+          domain: domainStr || extractDomain(urlStr),
+          scraped_at: String(r?.scraped_at || r?.created_at || new Date().toISOString()),
+          entered_by_email: r?.entered_by_email || undefined,
+          status,
+          pois_discovered: Number(r?.pois_discovered || 0),
+          relationships_discovered: Number(r?.relationships_discovered || 0),
+          subpages_discovered: Number(r?.subpages_discovered || 0),
+          subpages: Array.isArray(r?.subpages) ? r.subpages : [],
+          error_message: r?.error_message || undefined,
+          last_scraped: String(r?.last_scraped || r?.scraped_at || r?.created_at || new Date().toISOString()),
+          metadata: r?.metadata,
+        };
+      }).filter((r) => r.id && r.url);
+
       setUrls(rows);
 
       const total = rows.length;
@@ -377,7 +406,7 @@ export default function CaptainURLsPage() {
                           {urlData.url}
                         </a>
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(urlData.status)}`}>
-                          {urlData.status.toUpperCase()}
+                          {(urlData.status || 'processing').toUpperCase()}
                         </span>
                       </div>
                       

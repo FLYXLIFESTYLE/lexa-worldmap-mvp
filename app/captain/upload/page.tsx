@@ -71,6 +71,7 @@ function CaptainUploadPageInner() {
   // Scraping progress UI
   const [scrapeJobs, setScrapeJobs] = useState<Array<{ url: string; status: 'queued' | 'scraping' | 'done' | 'already' | 'error'; message?: string }>>([]);
   const [scrapeProgressPct, setScrapeProgressPct] = useState(0);
+  const [forceRescrape, setForceRescrape] = useState(false);
   
   // File Upload State
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -345,7 +346,7 @@ function CaptainUploadPageInner() {
       for (let i = 0; i < urls.length; i++) {
         const targetUrl = urls[i];
         setScrapeJobs((prev) => prev.map((j) => (j.url === targetUrl ? { ...j, status: 'scraping' } : j)));
-        const result: any = await scrapingAPI.scrapeURL(targetUrl, true);
+        const result: any = await scrapingAPI.scrapeURL(targetUrl, true, forceRescrape);
 
         if (result?.already_scraped) {
           setScrapeJobs((prev) =>
@@ -812,6 +813,16 @@ function CaptainUploadPageInner() {
                 >
                   {loading ? '⏳ Scraping...' : '🚀 Start Scraping All URLs'}
                 </button>
+
+                <label className="mt-3 flex items-center gap-2 text-sm text-gray-700 select-none">
+                  <input
+                    type="checkbox"
+                    checked={forceRescrape}
+                    onChange={(e) => setForceRescrape(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  Force refresh (re-scrape even if already scraped)
+                </label>
               </div>
             )}
 
@@ -853,6 +864,11 @@ function CaptainUploadPageInner() {
                 <p className="text-xs text-gray-600 mt-3">
                   Tip: If nothing happens, open DevTools → Network and look for the request to <code>/api/captain/scrape/url</code>.
                 </p>
+                {scrapeJobs.some(j => j.status === 'already') && !forceRescrape && (
+                  <p className="text-xs text-yellow-800 mt-2">
+                    Some URLs were already scraped, so LEXA reused cached results. Enable <strong>Force refresh</strong> to pull new pages (recommended after scraper upgrades).
+                  </p>
+                )}
               </div>
             )}
 
