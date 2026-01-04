@@ -29,7 +29,19 @@ export async function GET(req: NextRequest) {
 
     const limit = Math.max(1, Math.min(200, parseInt(req.nextUrl.searchParams.get('limit') || '50', 10)));
 
-    const driver = getNeo4jDriver();
+    let driver;
+    try {
+      driver = getNeo4jDriver();
+    } catch (e: any) {
+      // If Neo4j env vars are missing in Vercel, don't hard-fail the whole page.
+      return NextResponse.json({
+        success: true,
+        pois: [],
+        warning: 'Neo4j connection not configured for this deployment.',
+        details: e?.message || String(e),
+      });
+    }
+
     const session = driver.session();
 
     try {
@@ -54,17 +66,29 @@ export async function GET(req: NextRequest) {
         { limit }
       );
 
+      const toNum = (v: any): number | null => {
+        if (typeof v === 'number') return v;
+        // neo4j Integer
+        if (v && typeof v === 'object' && typeof v.toNumber === 'function') return v.toNumber();
+        return null;
+      };
+      const toStr = (v: any): string | null => {
+        if (typeof v === 'string') return v;
+        if (v && typeof v === 'object' && typeof v.toString === 'function') return v.toString();
+        return v == null ? null : String(v);
+      };
+
       const rows = result.records.map((r) => ({
-        poi_uid: r.get('poi_uid'),
-        name: r.get('name'),
-        type: r.get('type'),
-        destination_name: r.get('destination_name'),
-        confidence_score: r.get('confidence_score'),
-        website_url: r.get('website_url'),
-        created_at: r.get('created_at'),
-        updated_at: r.get('updated_at'),
-        last_edited_by: r.get('last_edited_by'),
-        last_edited_at: r.get('last_edited_at'),
+        poi_uid: toStr(r.get('poi_uid')),
+        name: toStr(r.get('name')),
+        type: toStr(r.get('type')),
+        destination_name: toStr(r.get('destination_name')),
+        confidence_score: toNum(r.get('confidence_score')),
+        website_url: toStr(r.get('website_url')),
+        created_at: toStr(r.get('created_at')),
+        updated_at: toStr(r.get('updated_at')),
+        last_edited_by: toStr(r.get('last_edited_by')),
+        last_edited_at: toStr(r.get('last_edited_at')),
       }));
 
       return NextResponse.json({ success: true, pois: rows });
@@ -73,10 +97,13 @@ export async function GET(req: NextRequest) {
     }
   } catch (error) {
     console.error('Manual POI list error:', error);
-    return NextResponse.json(
-      { error: 'Failed to list manual POIs', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    // Don't throw a 500 to the browser UI — return an empty list with diagnostics instead.
+    return NextResponse.json({
+      success: true,
+      pois: [],
+      warning: 'Failed to list manual POIs (Neo4j query error).',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 }
 
