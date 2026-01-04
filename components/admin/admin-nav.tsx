@@ -14,89 +14,22 @@ const adminPages = [
     description: 'Main admin overview'
   },
   {
-    name: 'Backlog',
-    href: '/admin/backlog',
-    icon: '📋',
-    description: 'Development tasks'
-  },
-  {
-    name: 'Bug Reports',
-    href: '/admin/bugs',
-    icon: '🐛',
-    description: 'User-reported bugs'
-  },
-  {
-    name: "Captain's Portal",
+    name: "Captain's Knowledge Portal",
     href: '/captain',
     icon: '⚓',
     description: 'Knowledge management hub'
   },
   {
-    name: 'ChatNeo4j',
-    href: '/admin/chat-neo4j',
-    icon: '💬',
-    description: 'Query database'
+    name: 'User Management',
+    href: '/admin/users',
+    icon: '👥',
+    description: 'Users and roles'
   },
   {
-    name: 'LEXA Demo Chat',
-    href: '/demo/chat',
-    icon: '✨',
-    description: 'Test conversation flow'
-  },
-  {
-    name: 'Platform Architecture',
-    href: '/admin/documentation',
-    icon: '📖',
-    description: 'Documentation'
-  },
-  {
-    name: 'Error Logs',
-    href: '/admin/errors',
-    icon: '⚠️',
-    description: 'System errors'
-  },
-  {
-    name: 'POI Editor',
-    href: '/admin/knowledge/editor',
-    icon: '✏️',
-    description: 'Search & edit POIs'
-  },
-  {
-    name: 'Release Notes',
-    href: '/admin/release-notes',
-    icon: '📝',
-    description: 'Daily changelog'
-  },
-  {
-    name: 'Scraped URLs',
-    // Use the shared scraped_urls table view (admins-only)
-    href: '/captain/urls',
-    icon: '🌐',
-    description: 'Scrape history (shared)'
-  },
-  {
-    name: 'Seed Themes',
-    href: '/admin/seed-themes',
-    icon: '🎨',
-    description: 'Initialize theme categories'
-  },
-  {
-    name: 'Yacht Destinations',
-    href: '/admin/upload-yacht-destinations-v2',
-    icon: '⛵',
-    description: 'Upload yacht ports & routes'
-  },
-  {
-    name: 'POI Collection',
-    href: '/admin/poi-collection',
-    icon: '📍',
-    description: 'Google Places batch collector'
-  },
-  {
-    name: 'Upload History',
-    href: '/admin/knowledge/history',
-    icon: '📊',
-    description: 'Track file uploads'
+    name: 'Upload & Manual Entry',
+    href: '/captain/upload',
+    icon: '⬆️',
+    description: 'Upload files, scrape URLs, manual POIs'
   }
 ];
 
