@@ -5,7 +5,7 @@
  * Merges: File Upload, URL Scraping, Manual POI Entry, Yacht Destinations Upload
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
@@ -36,7 +36,7 @@ interface YachtDestination {
   isEditing: boolean;
 }
 
-export default function CaptainUploadPage() {
+function CaptainUploadPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -1767,5 +1767,13 @@ export default function CaptainUploadPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CaptainUploadPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-600">Loading…</p></div>}>
+      <CaptainUploadPageInner />
+    </Suspense>
   );
 }
