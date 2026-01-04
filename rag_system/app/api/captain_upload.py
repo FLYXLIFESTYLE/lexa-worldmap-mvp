@@ -85,8 +85,8 @@ def _package_to_legacy(intel_package: dict) -> dict:
     experiences = []
     for exp in _safe_list(intel_package.get("sub_experiences")):
         experiences.append({
-            "experience_title": exp.get("title"),
-            "experience_type": exp.get("category"),
+            "experience_title": exp.get("title") or exp.get("moment") or exp.get("name"),
+            "experience_type": exp.get("category") or exp.get("type"),
             "description": exp.get("description"),
             "location": exp.get("location"),
             "duration": exp.get("duration"),
@@ -101,9 +101,9 @@ def _package_to_legacy(intel_package: dict) -> dict:
     for archetype in _safe_list(intel_package.get("client_archetypes")):
         client_insights.append({
             "insight_category": "client_archetype",
-            "client_segment": archetype.get("name"),
-            "insight_description": archetype.get("description"),
-            "emotional_drivers": archetype.get("emotional_drivers"),
+            "client_segment": archetype.get("name") or archetype.get("archetype"),
+            "insight_description": archetype.get("description") or archetype.get("source"),
+            "emotional_drivers": archetype.get("emotional_drivers") or archetype.get("drivers"),
             "pain_points": archetype.get("pain_points"),
             "confidence": archetype.get("confidence"),
         })
@@ -111,11 +111,11 @@ def _package_to_legacy(intel_package: dict) -> dict:
     service_providers = []
     for provider in _safe_list(intel_package.get("service_providers")):
         service_providers.append({
-            "name": provider.get("name"),
-            "service_type": provider.get("kind"),
-            "description": provider.get("description"),
+            "name": provider.get("name") or provider.get("provider"),
+            "service_type": provider.get("kind") or provider.get("type") or provider.get("category"),
+            "description": provider.get("description") or provider.get("role") or provider.get("context") or provider.get("service"),
             "website": provider.get("website"),
-            "notes": provider.get("notes"),
+            "notes": provider.get("notes") or (", ".join(provider.get("services", [])) if provider.get("services") else None),
             "confidence": provider.get("confidence"),
         })
 
