@@ -26,6 +26,9 @@ interface UploadRecord {
   keep_file: boolean;
   file_url?: string;
   metadata?: any;
+  // Optional cached summary fields (legacy / future use)
+  extracted_destinations?: string[];
+  extracted_categories?: string[];
 }
 
 type StatusFilter = 'all' | 'completed' | 'processing' | 'failed';
