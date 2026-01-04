@@ -85,6 +85,13 @@
 - Dedicated APIs when more reliable (weather, advisories, events/places “open now”)
 - Gated for “Right now” concierge tier (not live yet)
 
+**Captain Upload Frontend**
+- Uses env `NEXT_PUBLIC_BACKEND_URL` when provided; fallback to Render URL.
+- File rows display quick summary of extracted counts and keep/dump state.
+- Editor supports bulk select/delete for POIs/Experiences/Providers; per-item confidence via 0–100% UI (stored as 0–1).
+- Providers handled separately from competitors; competitor data mapped into providers when present.
+- Removed top-level confidence/emotion/count boxes to reduce noise.
+
 **Google Places API**
 - Nearby Search: $32 per 1,000 requests
 - Place Details: $17 per 1,000 requests

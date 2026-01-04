@@ -40,6 +40,12 @@
    - Rate limits and role-based access for ingestion/approval
    - Chat uses read-only, bounded Neo4j queries
 
+8. **Captain Upload UX Simplicity**
+   - File rows show quick summary of extracted counts and keep/dump
+   - Editor focuses on item-level edits; bulk select/delete for POIs/Experiences/Providers
+   - Providers are distinct from competitors (competitor data is mapped into providers when present)
+   - Confidence captured per item via 0–100% UI (stored as 0–1 internally); removed top-level sliders and aggregate boxes
+
 ## System Components
 
 ### Frontend (Next.js 16 + TypeScript)

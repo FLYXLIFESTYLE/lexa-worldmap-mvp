@@ -160,6 +160,12 @@ A 4-part narrative (NOT an itinerary):
 - **Counts**: Separate real extracted counts from estimated potential coverage.
 - **World context (later/paid)**: Tavily + reliable APIs (weather, advisories, events) for “right now” suggestions, gated to paid tier when implemented.
 
+## Captain Upload UX (current)
+- File cards show quick summary (POIs, experiences, providers) and keep/dump state.
+- Editor modal: per-item confidence editable as 0–100% (stored as fractions), bulk select/delete for POIs, experiences, providers, and individual delete.
+- Providers are handled separately (no longer mixed with competitors); competitor data is converted to providers when present.
+- Removed top-level confidence slider/emotion/count boxes to keep focus on item-level edits and keep/dump decision.
+
 ## The Knowledge Graph (Neo4j)
 
 ### Why Graph Database?

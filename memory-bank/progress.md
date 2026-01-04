@@ -93,6 +93,7 @@
 - [x] Yacht destinations Q&A
 - [x] Google Vision setup guide
 - [x] **Memory Bank system implemented** (this file!)
+- [x] Captain upload UX refresh: quick summary on file rows; item-level confidence (0–100% UI, stored as fractions); bulk select/delete for POIs/Experiences/Providers; providers separated from competitors; streamlined editor (removed top slider/emotion/count boxes)
 
 ## What's Left to Build 🚧
 

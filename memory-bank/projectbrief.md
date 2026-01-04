@@ -164,6 +164,12 @@ Transform luxury travel from transactional booking to emotional experience desig
 5) **Security by Default**: Anti-exfiltration and prompt-injection defenses; role-based access; rate limits; deny “list all” or schema/architecture probing.
 6) **Real-Time World Context (Later/Paid)**: Tavily + reliable APIs (weather, advisories, events) for “right now” suggestions, gated to paid tier when built.
 
+### Recent UX (Captain Upload)
+- File rows show quick summary of extracted counts; keep/dump displayed.
+- Editor has bulk select/delete for POIs/Experiences/Providers and per-item confidence (0–100% UI, stored as fraction).
+- Providers are separated from competitors; competitor lists are mapped into providers when present.
+- Removed top-level confidence slider/emotion/count boxes to reduce clutter; focus on item-level edits and keep/dump.
+
 ## Constraints
 
 ### Technical:
