@@ -217,7 +217,7 @@ export default function AdminNav() {
             
             {/* User Profile */}
             <Link
-              href="/admin/profile"
+              href="/account/profile"
               onClick={() => setIsOpen(false)}
               className="flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-gray-50 transition-colors"
             >
