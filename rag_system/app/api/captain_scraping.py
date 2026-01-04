@@ -2,15 +2,16 @@
 Captain Portal - URL Scraping API
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional
 import uuid
 from datetime import datetime
 
 from app.services.web_scraper import web_scraper
-from app.services.intelligence_extractor import extract_all_intelligence
-from app.services.intelligence_storage import save_intelligence_to_db
+from app.services.multipass_extractor import run_fast_extraction
+from app.services.pii_redactor import redact_pii
+from app.services.supabase_auth import get_current_user
 from app.services.supabase_client import get_supabase
 
 router = APIRouter(prefix="/api/captain/scrape", tags=["Scraping"])
@@ -25,19 +26,25 @@ class ScrapeURLRequest(BaseModel):
 
 class ScrapeURLResponse(BaseModel):
     """Response model for URL scraping"""
+    success: bool = True
     scrape_id: str
     url: str
     status: str
     content_length: int
     subpage_count: Optional[int] = None
-    extracted_pois: Optional[int] = None
-    extracted_experiences: Optional[int] = None
+    pois_extracted: int = 0
+    intelligence_extracted: Optional[dict] = None
+    extracted_data: Optional[dict] = None
+    extraction_contract: Optional[dict] = None
+    counts_real: Optional[dict] = None
+    counts_estimated: Optional[dict] = None
     message: str
 
 
 @router.post("/url", response_model=ScrapeURLResponse)
 async def scrape_url(
     request: ScrapeURLRequest,
+    http_request: Request,
     supabase = Depends(get_supabase)
 ):
     """
@@ -55,65 +62,158 @@ async def scrape_url(
     - Extraction results
     """
     try:
-        # Scrape the URL
-        scrape_result = await web_scraper.scrape_url(
-            str(request.url),
-            extract_subpages=request.extract_subpages
-        )
+        user = await get_current_user(http_request)
+        user_id = user.get("id")
+        user_email = (user.get("email") or "").lower()
+
+        # Scrape the URL + subpages content (when enabled)
+        if request.extract_subpages:
+            scrape_result = await web_scraper.scrape_url_with_subpages_content(str(request.url))
+        else:
+            scrape_result = await web_scraper.scrape_url(str(request.url), extract_subpages=False)
         
         scrape_id = str(uuid.uuid4())
         
-        # Save scraped URL to database
-        scrape_record = {
-            "id": scrape_id,
-            "url": str(request.url),
-            "content": scrape_result["content"],
-            "metadata": scrape_result["metadata"],
-            "word_count": scrape_result["word_count"],
-            "subpage_urls": scrape_result.get("subpages", []),
-            "subpage_count": scrape_result.get("subpage_count", 0),
-            "scraped_at": datetime.utcnow().isoformat(),
-            "status": "completed"
-        }
+        # Save scraped URL to database (shared view across captains)
+        try:
+            supabase.table("scraped_urls").insert({
+                "id": scrape_id,
+                "url": str(request.url),
+                "domain": scrape_result.get("metadata", {}).get("domain"),
+                "entered_by": user_id,
+                "entered_by_email": user_email,
+                "scraped_at": datetime.utcnow().isoformat(),
+                "last_scraped": datetime.utcnow().isoformat(),
+                "scraping_status": "processing",
+                "content_length": len(scrape_result.get("content", "")),
+                "subpages_discovered": int(scrape_result.get("subpage_count") or 0),
+                "subpages": scrape_result.get("subpages", []),
+                "metadata": {
+                    **(scrape_result.get("metadata", {}) or {}),
+                    "pages_fetched": scrape_result.get("pages_fetched"),
+                },
+            }).execute()
+        except Exception:
+            pass
         
-        supabase.table("scraped_urls").insert(scrape_record).execute()
-        
-        # Extract intelligence if requested
+        # Extract intelligence if requested (fast, single-pass)
         extracted_pois = 0
         extracted_experiences = 0
-        
-        if request.extract_intelligence and scrape_result["content"]:
-            intelligence = await extract_all_intelligence(
-                scrape_result["content"]
-            )
-            
-            # Save to database
-            await save_intelligence_to_db(
-                supabase=supabase,
-                intelligence=intelligence,
-                source_type="url_scrape",
-                source_id=scrape_id,
-                uploaded_by=None  # System upload
-            )
-            
-            extracted_pois = len(intelligence.get("pois", []))
-            extracted_experiences = len(intelligence.get("experiences", []))
-            
-            # Update scrape record with extraction results
-            supabase.table("scraped_urls").update({
-                "extraction_completed": True,
-                "extracted_pois_count": extracted_pois,
-                "extracted_experiences_count": extracted_experiences
-            }).eq("id", scrape_id).execute()
+        extracted = None
+        contract = None
+        real_counts = {}
+        est_counts = {}
+
+        if request.extract_intelligence and scrape_result.get("content"):
+            content_redacted, pii_stats = redact_pii(scrape_result["content"])
+
+            contract = await run_fast_extraction(content_redacted, {
+                "upload_id": scrape_id,
+                "filename": str(request.url),
+                "file_type": "url",
+                "text_length": len(content_redacted),
+            })
+            final_package = contract.get("final_package", {}) or {}
+
+            # Local legacy mapping (minimal; aligned with Captain upload editor)
+            def _safe_list(v):
+                return v if isinstance(v, list) else []
+
+            pois = []
+            for venue in _safe_list(final_package.get("venues")):
+                pois.append({
+                    "name": venue.get("name"),
+                    "type": venue.get("kind") or venue.get("type"),
+                    "location": venue.get("location"),
+                    "description": venue.get("description"),
+                    "category": ", ".join(venue.get("tags", [])) if venue.get("tags") else None,
+                    "address": None,
+                    "coordinates": venue.get("coordinates") or {"lat": None, "lng": None},
+                    "confidence": venue.get("confidence"),
+                })
+
+            experiences = []
+            for exp in _safe_list(final_package.get("sub_experiences")):
+                experiences.append({
+                    "experience_title": exp.get("title") or exp.get("moment") or exp.get("name"),
+                    "experience_type": exp.get("category") or exp.get("type"),
+                    "description": exp.get("description"),
+                    "location": exp.get("location"),
+                    "duration": exp.get("duration"),
+                    "unique_elements": ", ".join(exp.get("highlights", [])) if exp.get("highlights") else None,
+                    "emotional_goal": exp.get("emotional_goal"),
+                    "target_audience": exp.get("target_audience"),
+                    "estimated_budget": exp.get("estimated_budget"),
+                    "confidence": exp.get("confidence"),
+                })
+
+            providers = []
+            for provider in _safe_list(final_package.get("service_providers")):
+                providers.append({
+                    "name": provider.get("name") or provider.get("provider"),
+                    "service_type": provider.get("kind") or provider.get("type") or provider.get("category"),
+                    "description": provider.get("description") or provider.get("role") or provider.get("context") or provider.get("service"),
+                    "website": provider.get("website"),
+                    "notes": provider.get("notes") or (", ".join(provider.get("services", [])) if provider.get("services") else None),
+                    "confidence": provider.get("confidence"),
+                })
+
+            extracted = {
+                "pois": pois,
+                "experiences": experiences,
+                "trends": [],
+                "client_insights": [],
+                "price_intelligence": {},
+                "competitor_analysis": [],
+                "operational_learnings": [],
+                "service_providers": providers,
+                "emotional_map": final_package.get("emotional_map", []),
+                "metadata": final_package.get("metadata", {}),
+            }
+
+            extracted_pois = len(pois)
+            extracted_experiences = len(experiences)
+            counts = (final_package.get("counts", {}) if isinstance(final_package, dict) else {}) or {}
+            real_counts = counts.get("real_extracted", {}) if isinstance(counts, dict) else {}
+            est_counts = counts.get("estimated_potential", {}) if isinstance(counts, dict) else {}
+
+            # Update scraped_urls row (best effort)
+            try:
+                supabase.table("scraped_urls").update({
+                    "scraping_status": "success",
+                    "content_length": len(content_redacted),
+                    "pois_discovered": extracted_pois,
+                    "relationships_discovered": len(final_package.get("relationships", []) or []),
+                    "metadata": {
+                        **(scrape_result.get("metadata", {}) or {}),
+                        "pii_redaction": pii_stats,
+                        "counts_real": real_counts,
+                        "counts_estimated": est_counts,
+                        "captain_summary": (final_package.get("metadata", {}) or {}).get("captain_summary"),
+                        "report_markdown": (final_package.get("metadata", {}) or {}).get("report_markdown"),
+                        "extraction_contract": contract,
+                        "extracted_data": extracted,
+                    },
+                }).eq("id", scrape_id).execute()
+            except Exception:
+                pass
         
         return ScrapeURLResponse(
             scrape_id=scrape_id,
             url=str(request.url),
             status="completed",
-            content_length=len(scrape_result["content"]),
+            content_length=len(scrape_result.get("content", "")),
             subpage_count=scrape_result.get("subpage_count"),
-            extracted_pois=extracted_pois if request.extract_intelligence else None,
-            extracted_experiences=extracted_experiences if request.extract_intelligence else None,
+            pois_extracted=extracted_pois,
+            intelligence_extracted={
+                "pois": extracted_pois,
+                "experiences": extracted_experiences,
+                "service_providers": len((extracted or {}).get("service_providers", []) if isinstance(extracted, dict) else []),
+            } if request.extract_intelligence else None,
+            extracted_data=extracted,
+            extraction_contract=contract,
+            counts_real=real_counts,
+            counts_estimated=est_counts,
             message="URL scraped successfully"
         )
         

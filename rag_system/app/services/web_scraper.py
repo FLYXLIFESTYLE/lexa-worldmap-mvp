@@ -16,6 +16,7 @@ class WebScraper:
     def __init__(self):
         self.timeout = 30.0
         self.max_subpages = 50
+        self.max_pages_default = 25
     
     async def scrape_url(self, url: str, extract_subpages: bool = True) -> Dict:
         """
@@ -131,6 +132,57 @@ class WebScraper:
                     subpages.add(clean_url)
         
         return sorted(list(subpages))
+
+    async def scrape_url_with_subpages_content(
+        self,
+        url: str,
+        max_pages: int | None = None,
+    ) -> Dict:
+        """
+        Scrape a URL and ALSO fetch content from discovered subpages.
+        This is used for provider pages where details live across sub-pages.
+        """
+        max_pages = max_pages or self.max_pages_default
+        base = await self.scrape_url(url, extract_subpages=True)
+
+        subpages: List[str] = base.get("subpages", []) or []
+        subpages = subpages[: max_pages - 1]  # keep room for root page
+
+        pages: List[Dict[str, str]] = [{"url": url, "content": base.get("content", "")}]
+
+        async def _fetch_one(u: str) -> Optional[Dict[str, str]]:
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
+                    r = await client.get(u)
+                    r.raise_for_status()
+                    soup = BeautifulSoup(r.text, "lxml")
+                    content = self._extract_text_content(soup)
+                    return {"url": u, "content": content}
+            except Exception:
+                return None
+
+        # Fetch concurrently (but keep it simple)
+        tasks = [_fetch_one(u) for u in subpages]
+        results = await asyncio.gather(*tasks)
+        for item in results:
+            if item and item.get("content"):
+                pages.append(item)
+
+        # Build combined content with clear boundaries for citations/debugging
+        combined = []
+        for p in pages:
+            combined.append(f"\n\n--- PAGE: {p['url']} ---\n{p['content']}")
+        combined_text = "\n".join(combined).strip()
+
+        return {
+            "url": url,
+            "subpages": subpages,
+            "subpage_count": len(subpages),
+            "pages_fetched": len(pages),
+            "content": combined_text,
+            "metadata": base.get("metadata", {}),
+            "word_count": len(combined_text.split()),
+        }
 
 
 # Global instance

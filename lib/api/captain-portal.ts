@@ -3,6 +3,8 @@
  * Connects frontend to backend FastAPI endpoints
  */
 
+import { createClient } from '@/lib/supabase/client-browser';
+
 // Backend base URL
 // Use env when provided; otherwise fall back to Render (prod) to avoid localhost connection errors.
 const API_BASE_URL =
@@ -20,11 +22,17 @@ async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
+  // Attach Supabase access token so backend can enforce per-user access.
+  const supabase = createClient();
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+
   const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options.headers,
     },
   });
@@ -84,9 +92,16 @@ export const uploadAPI = {
     const formData = new FormData();
     formData.append('file', file);
 
+    const supabase = createClient();
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+
     const response = await fetch(`${API_BASE_URL}/api/captain/upload/`, {
       method: 'POST',
       body: formData,
+      headers: {
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
     });
 
     if (!response.ok) {
@@ -111,8 +126,23 @@ export const uploadAPI = {
    * Get upload history
    */
   getHistory: async (skip = 0, limit = 50) => {
-    return apiRequest(`/api/captain/upload/history?skip=${skip}&limit=${limit}`, {
+    return apiRequest(`/api/captain/upload/history?offset=${skip}&limit=${limit}`, {
       method: 'GET',
+    });
+  },
+
+  getUpload: async (uploadId: string) => {
+    return apiRequest<{ upload: any }>(`/api/captain/upload/${uploadId}`, { method: 'GET' });
+  },
+
+  deleteUpload: async (uploadId: string) => {
+    return apiRequest<{ success: boolean; deleted: string }>(`/api/captain/upload/${uploadId}`, { method: 'DELETE' });
+  },
+
+  updateUpload: async (uploadId: string, updates: { keep_file?: boolean; metadata?: any }) => {
+    return apiRequest<{ success: boolean; upload_id: string }>(`/api/captain/upload/${uploadId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
     });
   },
 };
@@ -128,7 +158,7 @@ export const scrapingAPI = {
   scrapeURL: async (url: string, extractIntelligence = true) => {
     return apiRequest('/api/captain/scrape/url', {
       method: 'POST',
-      body: JSON.stringify({ url, extract_intelligence: extractIntelligence }),
+      body: JSON.stringify({ url, extract_subpages: true, extract_intelligence: extractIntelligence }),
     });
   },
 

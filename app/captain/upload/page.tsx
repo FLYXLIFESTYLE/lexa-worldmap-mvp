@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
 import { uploadAPI, scrapingAPI } from '@/lib/api/captain-portal';
@@ -37,6 +38,7 @@ interface YachtDestination {
 
 export default function CaptainUploadPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   // Upload confidence policy: extracted items default to 80% and are capped at 80%
@@ -105,6 +107,46 @@ export default function CaptainUploadPage() {
     }
     checkAuth();
   }, [router, supabase.auth]);
+
+  // Open an upload from history: /captain/upload?open=<upload_id>
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+
+    (async () => {
+      try {
+        const res = await uploadAPI.getUpload(openId);
+        const row = (res as any).upload;
+        const meta = row?.metadata || {};
+        const extracted = meta?.extracted_data;
+        const contract = meta?.extraction_contract;
+
+        if (!extracted || !contract) {
+          alert('This upload has no cached extraction data yet.');
+          return;
+        }
+
+        const openedFile: UploadedFile = {
+          name: row.filename,
+          size: row.file_size || 0,
+          type: row.file_type || 'unknown',
+          status: row.processing_status === 'completed' ? 'done' : 'error',
+          confidenceScore: row.confidence_score || 80,
+          uploadId: row.id,
+          extractedData: normalizeExtractedData(extracted),
+          countsReal: contract?.final_package?.counts?.real_extracted || row.counts_real || {},
+          countsEstimated: contract?.final_package?.counts?.estimated_potential || row.counts_estimated || {},
+          extractionContract: contract,
+          keepDecision: row.keep_file ? 'keep' : 'dump',
+        };
+
+        setEditingFile(openedFile);
+      } catch (e: any) {
+        console.error('Failed to open upload:', e);
+        alert(`Failed to open upload: ${e.message}`);
+      }
+    })();
+  }, [searchParams]);
 
   // FILE UPLOAD HANDLERS
   const handleFileUpload = async (uploadedFiles: FileList | null) => {
@@ -227,11 +269,31 @@ export default function CaptainUploadPage() {
 
     setLoading(true);
     try {
-      // TODO: Call backend scraping API
-      alert(`🌐 Scraping ${urls.length} URL(s)... This will be implemented soon.`);
+      for (const targetUrl of urls) {
+        const result: any = await scrapingAPI.scrapeURL(targetUrl, true);
+        const extractedDataNormalized = normalizeExtractedData(result.extracted_data);
+
+        const newFile: UploadedFile = {
+          name: targetUrl,
+          size: result.content_length || 0,
+          type: 'url',
+          status: 'done',
+          confidenceScore: 80,
+          uploadId: result.scrape_id || result.upload_id,
+          extractedData: extractedDataNormalized,
+          countsReal: result.counts_real,
+          countsEstimated: result.counts_estimated,
+          extractionContract: result.extraction_contract,
+          keepDecision: 'keep',
+        };
+
+        setFiles(prev => [...prev, newFile]);
+        setEditingFile(newFile);
+      }
+
       setUrls([]);
-    } catch (error) {
-      alert('❌ Scraping failed');
+    } catch (error: any) {
+      alert(`❌ Scraping failed: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -1447,8 +1509,26 @@ export default function CaptainUploadPage() {
                   onClick={() => {
                     const updated = { ...editingFile, keepDecision: 'dump' as const };
                     setFiles(prev => prev.map(f => f.name === editingFile.name ? updated : f));
-                    alert(`🗑️ Marked "${editingFile.name}" to dump (remove original file).`);
-                    setEditingFile(null);
+                    setLoading(true);
+                    (async () => {
+                      try {
+                        if (editingFile.uploadId) {
+                          await uploadAPI.updateUpload(editingFile.uploadId, {
+                            keep_file: false,
+                            metadata: {
+                              extracted_data: updated.extractedData,
+                              extraction_contract: updated.extractionContract,
+                            },
+                          });
+                        }
+                        alert(`🗑️ Marked "${editingFile.name}" as DUMP (remove original file).`);
+                        setEditingFile(null);
+                      } catch (error: any) {
+                        alert(`❌ Failed to update dump status: ${error.message || 'Unknown error'}`);
+                      } finally {
+                        setLoading(false);
+                      }
+                    })();
                   }}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700"
                 >
@@ -1468,10 +1548,21 @@ export default function CaptainUploadPage() {
                       setFiles(prev => prev.map(f => f.name === editingFile.name ? updated : f));
                       setLoading(true);
                       try {
-                        alert(`✅ Saved edits with ${editingFile.confidenceScore}% confidence. Marked as KEEP.`);
+                        if (editingFile.uploadId) {
+                          await uploadAPI.updateUpload(editingFile.uploadId, {
+                            keep_file: true,
+                            metadata: {
+                              extracted_data: updated.extractedData,
+                              extraction_contract: updated.extractionContract,
+                              captain_summary: updated.extractionContract?.final_package?.metadata?.captain_summary,
+                              report_markdown: updated.extractionContract?.final_package?.metadata?.report_markdown,
+                            },
+                          });
+                        }
+                        alert('✅ Saved edits. Marked as KEEP.');
                         setEditingFile(null);
-                      } catch (error) {
-                        alert('❌ Failed to save data');
+                      } catch (error: any) {
+                        alert(`❌ Failed to save data: ${error.message || 'Unknown error'}`);
                       } finally {
                         setLoading(false);
                       }

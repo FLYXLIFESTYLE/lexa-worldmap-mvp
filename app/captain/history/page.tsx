@@ -19,15 +19,13 @@ interface UploadRecord {
   uploaded_at: string;
   uploaded_by: string;
   pois_extracted: number;
-  relationships_created: number;
-  destinations_found: number;
+  experiences_extracted?: number;
   processing_status: 'pending' | 'processing' | 'completed' | 'failed';
-  confidence_score_avg: number;
+  confidence_score?: number;
   error_message?: string;
-  extracted_destinations?: string[];
-  extracted_categories?: string[];
   keep_file: boolean;
   file_url?: string;
+  metadata?: any;
 }
 
 type StatusFilter = 'all' | 'completed' | 'processing' | 'failed';
@@ -81,89 +79,22 @@ export default function CaptainHistoryPage() {
   const fetchUploads = async (email: string) => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call filtered by user email
-      // Mock data for now
-      const mockUploads: UploadRecord[] = [
-        {
-          id: '1',
-          filename: 'Monaco_Luxury_Hotels.pdf',
-          file_type: 'application/pdf',
-          file_size: 2457600, // 2.4 MB
-          uploaded_at: new Date('2024-12-30T10:30:00').toISOString(),
-          uploaded_by: email,
-          pois_extracted: 15,
-          relationships_created: 45,
-          destinations_found: 3,
-          processing_status: 'completed',
-          confidence_score_avg: 85,
-          extracted_destinations: ['Monaco', 'Monte Carlo', 'Cap d\'Ail'],
-          extracted_categories: ['hotel', 'restaurant', 'attraction'],
-          keep_file: true,
-          file_url: '/files/monaco_hotels.pdf'
-        },
-        {
-          id: '2',
-          filename: 'French_Riviera_Restaurants.xlsx',
-          file_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          file_size: 156800, // 156 KB
-          uploaded_at: new Date('2024-12-29T14:15:00').toISOString(),
-          uploaded_by: email,
-          pois_extracted: 8,
-          relationships_created: 12,
-          destinations_found: 5,
-          processing_status: 'completed',
-          confidence_score_avg: 78,
-          extracted_destinations: ['Nice', 'Cannes', 'Saint-Tropez', 'Antibes', 'Monaco'],
-          extracted_categories: ['restaurant'],
-          keep_file: false
-        },
-        {
-          id: '3',
-          filename: 'Yacht_Activities.txt',
-          file_type: 'text/plain',
-          file_size: 45600, // 45 KB
-          uploaded_at: new Date('2024-12-28T09:00:00').toISOString(),
-          uploaded_by: email,
-          pois_extracted: 0,
-          relationships_created: 0,
-          destinations_found: 0,
-          processing_status: 'failed',
-          confidence_score_avg: 0,
-          error_message: 'Failed to extract structured data from text file. Format not recognized.',
-          keep_file: true,
-          file_url: '/files/yacht_activities.txt'
-        },
-        {
-          id: '4',
-          filename: 'Luxury_Experiences_Screenshot.png',
-          file_type: 'image/png',
-          file_size: 1890000, // 1.9 MB
-          uploaded_at: new Date('2024-12-27T16:45:00').toISOString(),
-          uploaded_by: email,
-          pois_extracted: 0,
-          relationships_created: 0,
-          destinations_found: 0,
-          processing_status: 'processing',
-          confidence_score_avg: 0,
-          keep_file: true
-        }
-      ];
-      
-      setUploads(mockUploads);
-      
-      // Calculate stats
-      const total = mockUploads.length;
-      const completed = mockUploads.filter(u => u.processing_status === 'completed').length;
-      const failed = mockUploads.filter(u => u.processing_status === 'failed').length;
-      const processing = mockUploads.filter(u => u.processing_status === 'processing' || u.processing_status === 'pending').length;
-      const totalPOIs = mockUploads.reduce((sum, u) => sum + u.pois_extracted, 0);
-      const totalRelations = mockUploads.reduce((sum, u) => sum + u.relationships_created, 0);
-      const totalDestinations = mockUploads.reduce((sum, u) => sum + u.destinations_found, 0);
-      const completedUploads = mockUploads.filter(u => u.processing_status === 'completed');
+      const res = await uploadAPI.getHistory(0, 200);
+      const rows: UploadRecord[] = (res as any).uploads || [];
+      setUploads(rows);
+
+      const total = rows.length;
+      const completed = rows.filter(u => u.processing_status === 'completed').length;
+      const failed = rows.filter(u => u.processing_status === 'failed').length;
+      const processing = rows.filter(u => u.processing_status === 'processing' || u.processing_status === 'pending').length;
+      const totalPOIs = rows.reduce((sum, u) => sum + (u.pois_extracted || 0), 0);
+      const totalRelations = 0;
+      const totalDestinations = 0;
+      const completedUploads = rows.filter(u => u.processing_status === 'completed');
       const avgConfidence = completedUploads.length > 0
-        ? completedUploads.reduce((sum, u) => sum + u.confidence_score_avg, 0) / completedUploads.length
+        ? completedUploads.reduce((sum, u) => sum + (u.confidence_score || 80), 0) / completedUploads.length
         : 0;
-      
+
       setStats({ total, completed, failed, processing, totalPOIs, totalRelations, totalDestinations, avgConfidence });
     } catch (error) {
       console.error('Failed to fetch uploads:', error);
@@ -227,7 +158,7 @@ export default function CaptainHistoryPage() {
     }
     
     try {
-      // TODO: Call backend API
+      await uploadAPI.deleteUpload(id);
       setUploads(prev => prev.filter(u => u.id !== id));
       alert('✅ Upload deleted!');
     } catch (error) {
@@ -278,6 +209,14 @@ export default function CaptainHistoryPage() {
   // Format file type
   const formatFileType = (mimeType: string) => {
     const typeMap: { [key: string]: string } = {
+      // Backend normalized types
+      'pdf': 'PDF',
+      'word': 'Word',
+      'excel': 'Excel',
+      'image': 'Image',
+      'text': 'Text',
+      'paste': 'Paste',
+      // MIME types (older)
       'application/pdf': 'PDF',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel',
@@ -449,7 +388,13 @@ export default function CaptainHistoryPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{upload.filename}</h3>
+                        <button
+                          onClick={() => router.push(`/captain/upload?open=${upload.id}`)}
+                          className="text-lg font-semibold text-gray-900 hover:underline text-left"
+                          title="Open extraction details"
+                        >
+                          {upload.filename}
+                        </button>
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(upload.processing_status)}`}>
                           {upload.processing_status.toUpperCase()}
                         </span>
@@ -468,13 +413,10 @@ export default function CaptainHistoryPage() {
                             📍 {upload.pois_extracted} POIs
                           </span>
                           <span className="text-blue-600 font-semibold">
-                            🔗 {upload.relationships_created} Relations
-                          </span>
-                          <span className="text-purple-600 font-semibold">
-                            🗺️ {upload.destinations_found} Destinations
+                            ✨ {upload.experiences_extracted || 0} Experiences
                           </span>
                           <span className="text-orange-600 font-semibold">
-                            📊 {upload.confidence_score_avg}% Avg Confidence
+                            📊 {(upload.confidence_score || 80)}% Confidence
                           </span>
                         </div>
                       )}

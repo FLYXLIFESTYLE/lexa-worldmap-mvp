@@ -2,7 +2,7 @@
 Captain Portal - File Upload & Intelligence Extraction API
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, Request
 from pydantic import BaseModel
 from typing import List, Optional
 import uuid
@@ -12,7 +12,9 @@ import os
 from app.services.file_processor import process_file_auto
 from app.services.multipass_extractor import run_multipass_extraction, run_fast_extraction
 from app.services.intelligence_storage import save_intelligence_to_db
+from app.services.pii_redactor import redact_pii
 from app.services.supabase_client import get_supabase
+from app.services.supabase_auth import get_current_user
 
 router = APIRouter(prefix="/api/captain/upload", tags=["Upload"])
 
@@ -36,6 +38,11 @@ class UploadResponse(BaseModel):
     extracted_experiences: int
     file_size_kb: float
     message: str
+
+
+class UpdateUploadRequest(BaseModel):
+    keep_file: Optional[bool] = None
+    metadata: Optional[dict] = None
 
 
 def _package_to_legacy(intel_package: dict) -> dict:
@@ -136,6 +143,7 @@ def _package_to_legacy(intel_package: dict) -> dict:
 @router.post("/")
 async def upload_file(
     file: UploadFile = File(...),
+    request: Request = None,
     supabase = Depends(get_supabase)
 ):
     """
@@ -183,10 +191,18 @@ async def upload_file(
         with open(temp_path, 'wb') as f:
             f.write(content)
         
+        # Resolve user (required - personal uploads/history)
+        user = await get_current_user(request)
+        user_id = user.get("id")
+        user_email = (user.get("email") or "").lower()
+
         # Process file
         print(f"=== PROCESSING FILE ===")
         print(f"Temp path: {temp_path}")
         extracted_text, metadata = await process_file_auto(temp_path)
+
+        # Redact common personal data BEFORE sending to LLM
+        extracted_text, pii_stats = redact_pii(extracted_text)
         
         # Clean up temp file
         if os.path.exists(temp_path):
@@ -208,20 +224,21 @@ async def upload_file(
             )
         
         # Create upload record FIRST with default confidence_score=80
-        # Note: uploaded_by and uploaded_by_email are required, using placeholder for now
         try:
             upload_record = {
                 "id": upload_id,
+                "uploaded_by": user_id,
+                "uploaded_by_email": user_email,
                 "filename": file.filename,
                 "file_type": metadata.get("file_type", "unknown"),
                 "file_size": file_size,
                 "processing_status": "processing",
                 "confidence_score": 80,  # Default 80% for uploads
-                # uploaded_by and uploaded_by_email are nullable until auth is implemented
                 "metadata": {
                     "filename": file.filename,
                     "file_size": file_size,
                     "file_type": metadata.get("file_type"),
+                    "pii_redaction": pii_stats,
                     **metadata
                 }
             }
@@ -254,6 +271,7 @@ async def upload_file(
                 extraction_contract = await run_multipass_extraction(extracted_text, source_meta)
             final_package = extraction_contract.get("final_package", {}) or {}
             intelligence = _package_to_legacy(final_package)
+            pkg_meta = (final_package.get("metadata", {}) if isinstance(final_package, dict) else {}) or {}
 
             print(f"=== MULTIPASS EXTRACTION RETURNED ===")
             print(f"Passes: {len(extraction_contract.get('passes', []))}")
@@ -307,7 +325,7 @@ async def upload_file(
                     "file_type": metadata.get("file_type"),
                     **metadata
                 },
-                uploaded_by=None  # TODO: Get from auth when implemented
+                uploaded_by=user_id
             )
         except Exception as e:
             print(f"Database save failed: {str(e)}")
@@ -344,7 +362,16 @@ async def upload_file(
                 "processing_status": "completed",
                 "pois_extracted": pois_count,
                 "experiences_extracted": experiences_count,
-                "trends_extracted": trends_count
+                "trends_extracted": trends_count,
+                "metadata": {
+                    **(upload_record.get("metadata", {}) if isinstance(upload_record, dict) else {}),
+                    "pii_redaction": pii_stats,
+                    # Persist for history + open-from-history
+                    "extraction_contract": extraction_contract,
+                    "extracted_data": intelligence,
+                    "captain_summary": pkg_meta.get("captain_summary"),
+                    "report_markdown": pkg_meta.get("report_markdown"),
+                },
             }).eq("id", upload_id).execute()
         except Exception as e:
             print(f"Failed to update upload record: {str(e)}")
@@ -384,6 +411,7 @@ async def upload_file(
 @router.post("/text")
 async def upload_text(
     request: UploadTextRequest,
+    http_request: Request,
     supabase = Depends(get_supabase)
 ):
     """
@@ -407,23 +435,51 @@ async def upload_text(
                 detail="Text too short (minimum 50 characters)"
             )
         
+        user = await get_current_user(http_request)
+        user_id = user.get("id")
+        user_email = (user.get("email") or "").lower()
+
         upload_id = str(uuid.uuid4())
+        text_redacted, pii_stats = redact_pii(request.text)
+
+        # Create upload record (paste)
+        try:
+            supabase.table("captain_uploads").insert({
+                "id": upload_id,
+                "uploaded_by": user_id,
+                "uploaded_by_email": user_email,
+                "filename": f"{request.title}.txt",
+                "file_type": "paste",
+                "file_size": len(text_redacted.encode("utf-8")),
+                "processing_status": "processing",
+                "confidence_score": 80,
+                "extracted_text_length": len(text_redacted),
+                "metadata": {
+                    "title": request.title,
+                    "description": request.source_description,
+                    "text_length": len(text_redacted),
+                    "pii_redaction": pii_stats,
+                },
+            }).execute()
+        except Exception:
+            pass
         
         # Extract intelligence via multipass
         source_meta = {
             "upload_id": upload_id,
             "filename": request.title,
             "file_type": "text",
-            "text_length": len(request.text)
+            "text_length": len(text_redacted)
         }
         env = (os.getenv("ENVIRONMENT") or "").lower()
         multipass_enabled = (os.getenv("LEXA_MULTIPASS") or "").strip().lower() in {"1", "true", "yes"}
         if env == "production" or not multipass_enabled:
-            extraction_contract = await run_fast_extraction(request.text, source_meta)
+            extraction_contract = await run_fast_extraction(text_redacted, source_meta)
         else:
-            extraction_contract = await run_multipass_extraction(request.text, source_meta)
+            extraction_contract = await run_multipass_extraction(text_redacted, source_meta)
         final_package = extraction_contract.get("final_package", {}) or {}
         intelligence = _package_to_legacy(final_package)
+        pkg_meta = (final_package.get("metadata", {}) if isinstance(final_package, dict) else {}) or {}
         
         # Save to database
         await save_intelligence_to_db(
@@ -434,9 +490,9 @@ async def upload_text(
             source_metadata={
                 "title": request.title,
                 "description": request.source_description,
-                "text_length": len(request.text)
+                "text_length": len(text_redacted)
             },
-            uploaded_by=None  # TODO: Get from auth when implemented
+            uploaded_by=user_id
         )
         
         # Map to frontend-expected format
@@ -452,6 +508,27 @@ async def upload_text(
         real_counts = counts_meta.get("real_extracted", {}) if isinstance(counts_meta, dict) else {}
         estimated_counts = counts_meta.get("estimated_potential", {}) if isinstance(counts_meta, dict) else {}
         
+        # Update upload record with final status + cached extraction for history
+        try:
+            supabase.table("captain_uploads").update({
+                "processing_status": "completed",
+                "pois_extracted": pois_count,
+                "experiences_extracted": experiences_count,
+                "trends_extracted": trends_count,
+                "metadata": {
+                    "title": request.title,
+                    "description": request.source_description,
+                    "text_length": len(text_redacted),
+                    "pii_redaction": pii_stats,
+                    "extraction_contract": extraction_contract,
+                    "extracted_data": intelligence,
+                    "captain_summary": pkg_meta.get("captain_summary"),
+                    "report_markdown": pkg_meta.get("report_markdown"),
+                },
+            }).eq("id", upload_id).execute()
+        except Exception:
+            pass
+
         return {
             "success": True,
             "upload_id": upload_id,
@@ -471,7 +548,7 @@ async def upload_text(
             "counts_real": real_counts,
             "counts_estimated": estimated_counts,
             "extraction_contract": extraction_contract,
-            "file_size_kb": len(request.text.encode('utf-8')) / 1024,
+            "file_size_kb": len(text_redacted.encode('utf-8')) / 1024,
             "message": "Text processed successfully"
         }
         
@@ -485,6 +562,7 @@ async def upload_text(
 async def get_upload_history(
     limit: int = 50,
     offset: int = 0,
+    request: Request = None,
     supabase = Depends(get_supabase)
 ):
     """
@@ -499,9 +577,13 @@ async def get_upload_history(
     - Total count for pagination
     """
     try:
-        # Get uploads from captain_uploads table
+        user = await get_current_user(request)
+        user_id = user.get("id")
+
+        # Get uploads from captain_uploads table (only this user's uploads)
         response = supabase.table("captain_uploads")\
             .select("*")\
+            .eq("uploaded_by", user_id)\
             .order("uploaded_at", desc=True)\
             .range(offset, offset + limit - 1)\
             .execute()
@@ -509,6 +591,7 @@ async def get_upload_history(
         # Get total count
         count_response = supabase.table("captain_uploads")\
             .select("id", count="exact")\
+            .eq("uploaded_by", user_id)\
             .execute()
         
         total_count = count_response.count if hasattr(count_response, 'count') else len(count_response.data)
@@ -522,6 +605,100 @@ async def get_upload_history(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
+
+
+@router.get("/{upload_id}")
+async def get_upload_detail(
+    upload_id: str,
+    request: Request,
+    supabase = Depends(get_supabase),
+):
+    """
+    Fetch one upload (owned by current user) including cached extraction data in metadata.
+    """
+    user = await get_current_user(request)
+    user_id = user.get("id")
+
+    resp = supabase.table("captain_uploads")\
+        .select("*")\
+        .eq("id", upload_id)\
+        .eq("uploaded_by", user_id)\
+        .limit(1)\
+        .execute()
+
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    return {"upload": resp.data[0]}
+
+
+@router.delete("/{upload_id}")
+async def delete_upload(
+    upload_id: str,
+    request: Request,
+    supabase = Depends(get_supabase),
+):
+    """
+    Delete one upload record (owned by current user).
+    NOTE: Extracted knowledge may remain in other tables depending on DB config.
+    """
+    user = await get_current_user(request)
+    user_id = user.get("id")
+
+    # Ensure ownership
+    existing = supabase.table("captain_uploads")\
+        .select("id")\
+        .eq("id", upload_id)\
+        .eq("uploaded_by", user_id)\
+        .limit(1)\
+        .execute()
+
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    supabase.table("captain_uploads").delete().eq("id", upload_id).execute()
+    return {"success": True, "deleted": upload_id}
+
+
+@router.put("/{upload_id}")
+async def update_upload(
+    upload_id: str,
+    body: UpdateUploadRequest,
+    request: Request,
+    supabase = Depends(get_supabase),
+):
+    """
+    Update an upload record (owned by current user).
+    Used to persist keep/dump decisions and edited extracted data (cached in metadata).
+    """
+    user = await get_current_user(request)
+    user_id = user.get("id")
+
+    existing = supabase.table("captain_uploads")\
+        .select("id, metadata")\
+        .eq("id", upload_id)\
+        .eq("uploaded_by", user_id)\
+        .limit(1)\
+        .execute()
+
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    updates = {}
+    if body.keep_file is not None:
+        updates["keep_file"] = body.keep_file
+    if body.metadata is not None and isinstance(body.metadata, dict):
+        # Merge metadata shallowly
+        current_meta = existing.data[0].get("metadata") or {}
+        if not isinstance(current_meta, dict):
+            current_meta = {}
+        updates["metadata"] = {**current_meta, **body.metadata}
+
+    if not updates:
+        return {"success": True, "upload_id": upload_id}
+
+    supabase.table("captain_uploads").update(updates).eq("id", upload_id).execute()
+    return {"success": True, "upload_id": upload_id}
 
 
 @router.get("/health")

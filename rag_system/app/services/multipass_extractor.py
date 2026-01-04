@@ -123,6 +123,7 @@ class MultipassExtractor:
                 # Goal: match Claude-quality extraction richness in a single call (production-safe).
                 "Extract with Claude-level richness when the source supports it (target 50+ sub_experiences for multi-day itineraries).",
                 "Prefer source-backed specificity over generic filler. If something is inferred, mark it `generic`: true and lower confidence.",
+                "Do NOT extract or output personal data (names of individuals, emails, phone numbers, passport/ID numbers, booking references). If present in the source, ignore it.",
                 "Populate script_seed (no venue names in signature_highlights).",
                 "Add per-item confidence 0–1 and include citations (snippets) for concrete claims.",
                 "Fill counts.real_extracted for citation-backed items; counts.estimated_potential for likely but not explicit items.",
