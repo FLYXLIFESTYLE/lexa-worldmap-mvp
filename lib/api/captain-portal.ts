@@ -3,7 +3,11 @@
  * Connects frontend to backend FastAPI endpoints
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://lexa-worldmap-mvp-rlss.onrender.com';
+// Backend base URL
+// Use env when provided; otherwise fall back to Render (prod) to avoid localhost connection errors.
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  'https://lexa-worldmap-mvp-rlss.onrender.com';
 
 // Debug log (remove after testing)
 if (typeof window !== 'undefined') {
@@ -51,7 +55,8 @@ export interface UploadResponse {
     insights: number;
     prices: number;
     competitors: number;
-    learnings: number;
+  learnings: number;
+  service_providers?: number;
   };
   extracted_data?: {
     pois?: any[];
@@ -61,7 +66,12 @@ export interface UploadResponse {
     price_intelligence?: any;
     competitor_analysis?: any[];
     operational_learnings?: any[];
+  service_providers?: any[];
+  emotional_map?: any[];
   };
+  counts_real?: Record<string, number>;
+  counts_estimated?: Record<string, number>;
+  extraction_contract?: any;
   file_size_kb?: number;
   message?: string;
 }
@@ -93,7 +103,7 @@ export const uploadAPI = {
   uploadText: async (title: string, content: string): Promise<UploadResponse> => {
     return apiRequest('/api/captain/upload/text', {
       method: 'POST',
-      body: JSON.stringify({ title, content }),
+      body: JSON.stringify({ title, text: content }),
     });
   },
 

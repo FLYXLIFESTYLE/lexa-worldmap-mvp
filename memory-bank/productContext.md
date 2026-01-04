@@ -147,6 +147,19 @@ A 4-part narrative (NOT an itinerary):
   - 💆 Couples Spa Ritual - Rose oil treatments with coastal views
   - 🌅 Sunrise Together - Coffee on your terrace before the world wakes
 
+**Tiered Upsells (JSON-first engine)**
+- Base script: Theme, Hook, Emotional Description, Signature Highlights
+- Tier 1: Day-by-day flow
+- Tier 2: Booking links + coordinates + venue candidates
+- Tier 3: Planning service
+- Tier 4: White glove (plan/book/execute with concierge onsite)
+
+## Claude-Quality Ingestion & World Context
+- **Ingestion priorities**: Crawl provider sites (with sub-pages) and file uploads → multi-pass extraction (outline → expand → validate/dedupe) → confidence scoring → captain approval → Neo4j + pgvector.
+- **Source-backed only**: Concrete claims must have sources; generic fallbacks must be labeled as generic.
+- **Counts**: Separate real extracted counts from estimated potential coverage.
+- **World context (later/paid)**: Tavily + reliable APIs (weather, advisories, events) for “right now” suggestions, gated to paid tier when implemented.
+
 ## The Knowledge Graph (Neo4j)
 
 ### Why Graph Database?

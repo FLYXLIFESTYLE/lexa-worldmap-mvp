@@ -25,6 +25,21 @@
    - Database (Neo4j): Knowledge graph relationships
    - Database (Supabase): Transactional data, auth, vector search
 
+5. **Ingestion → Multi-Pass Extraction → Approval → Graph**
+   - Crawl/provider URLs (with sub-pages) and file uploads
+   - Multi-pass extraction: outline → expand → validate/dedupe → report writer
+   - Captain approval required to exceed 80% confidence
+   - Write canonical nodes/edges to Neo4j; keep audit + embeddings in Postgres/pgvector
+
+6. **Source-Backed or Clearly Generic**
+   - Concrete claims require citations; generic ideas must be labeled
+   - Separate real counts from estimated potential coverage
+
+7. **Security by Default**
+   - Block schema/architecture exfiltration and “list all” queries
+   - Rate limits and role-based access for ingestion/approval
+   - Chat uses read-only, bounded Neo4j queries
+
 ## System Components
 
 ### Frontend (Next.js 16 + TypeScript)
@@ -94,7 +109,7 @@
    - User message → `/api/v1/ailessia/converse`
    - Extract intent & emotion
    - Query Neo4j for relevant POIs
-   - Pass context to Claude 3.5 Sonnet
+   - Pass context to Claude Sonnet 4
    - Generate response with real data
 
 3. **Neo4j Query Patterns**:
@@ -119,13 +134,28 @@
    
    # 3. Call Claude with grounded context
    response = anthropic_client.messages.create(
-       model="claude-3-5-sonnet-20241022",
+       model="claude-sonnet-4-20250514",
        messages=[{"role": "user", "content": prompt}]
    )
    
    # 4. Return response (no hallucinations)
    return response
    ```
+
+### Hybrid Retrieval (2026)
+- Graph first: Neo4j facts/relationships (captain-verified prioritized)
+- Vector next: pgvector for narrative/long-text similarity
+- Composer: Claude merges retrieved context; generic fallback must be labeled as generic
+- Ranking: by confidence + emotion fit + verification status
+
+### Script Engine (JSON-first)
+- Base: Theme, Hook, Emotional Description, Signature Highlights (no venue names)
+- Upsells: Day-by-day flow → Booking links/coordinates → Planning service → White glove (onsite concierge)
+- Templates stored/versioned in Postgres; captain/admin UI can edit prompts and examples
+
+### World Context (Paid Tier, later)
+- Tavily + dedicated APIs (weather, advisories, events/open-now)
+- Only for “Right now” concierge; not live yet
 
 ### Database Layer
 

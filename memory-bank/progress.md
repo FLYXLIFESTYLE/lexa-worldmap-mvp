@@ -96,137 +96,29 @@
 
 ## What's Left to Build 🚧
 
-### High Priority (Q1 2026)
+### High Priority (Goal 1: Feed the Brain)
+- Crawl provider URLs (with sub-pages) + file uploads
+- Multi-pass extraction (outline → expand → validate/dedupe → report)
+- Confidence scoring; >80% only after captain approval
+- Write canonical nodes/edges to Neo4j; audit trail + embeddings in Postgres/pgvector
+- Separate real counts vs. estimated potential coverage; source-backed claims only
 
-#### 1. POI Collection Automation ✅
-**Status**: ✅ COMPLETE (Dec 2025)
-**Components Built**:
-- [x] `/admin/poi-collection` admin UI page
-- [x] `/api/admin/places/collector/start` - Create new collection job
-- [x] `/api/admin/places/collector/tick` - Process POIs in safe batches
-- [x] `/api/admin/places/collector/pause` - Manual pause
-- [x] `/api/admin/places/collector/resume` - Resume after pause
-- [x] `/api/admin/places/collector/stats` - Real-time statistics
-- [x] Priority queue management (destinations ordered by luxury score)
-- [x] Budget tracker with quota detection
-- [x] Category selection (14 categories: restaurants, hotels, activities, etc.)
-- [x] Dual storage: Supabase (`google_places_places`) + Neo4j (POI nodes)
-- [x] Auto-relationship creation: `(POI)-[:LOCATED_IN]->(destination)`, `(POI)-[:HAS_CATEGORY]->(category)`
-- [x] Real-time progress dashboard with live stats
-- [x] Configurable parameters (max requests/tick, max places/destination)
+### High Priority (Goal 2: Communication + Profiles)
+- Enforce response format: reflection + 3–6 first ideas + 1 clarifying question
+- Continuously update user emotional profile/preferences from conversations and outcomes
+- Tone: warm, confident, luxury; generic ideas must be labeled as generic
 
-**Key Features**:
-- **Tick-based execution**: Safe, pauseable, resumable
-- **Quota-aware**: Automatically pauses when Google budget exhausted
-- **Category queries**: Custom query templates per category (e.g., "Michelin restaurant", "luxury hotel")
-- **Quality filters**: Rating ≥ 4.0, price level ≥ $$
-- **Geocoding**: Auto-discovers destination coordinates
-- **Progress tracking**: Destinations → Categories → POIs discovered/fetched/upserted
+### High Priority (Goal 3: Grounded Retrieval & Recommendations)
+- Hybrid Neo4j + pgvector retrieval
+- Ranking by confidence + emotion fit + captain verification
+- Explainable recommendations with citations
 
-#### 1b. Testing + learning sprint (captains)
-**Status**: Active now
-**Goal**: Improve LEXA by heavy real-world use and high-quality uploads while destination data expands in parallel.
-**Inputs**:
-- Captains + Chris chat with LEXA heavily
-- Upload scripts/itineraries/transcripts/PDFs and ingest URLs
-- Add POIs manually when needed
+### Revenue Workstreams (Planned)
+- Upsell system: Tiered scripts → day-by-day → booking links/coords → planning → white glove concierge
+- Affiliate dashboard: GoHighLevel integration, attribution, payouts
 
-#### 2. Upsell System
-**Status**: Planned
-**Effort**: 3-4 weeks
-**Components**:
-- [ ] Detailed day-by-day script generator ($497 tier)
-- [ ] Specific POI recommendations with reservations
-- [ ] Timing & logistics planning
-- [ ] Concierge service booking ($2,997+ tier)
-- [ ] All bookings made by team
-- [ ] 24/7 support during trip
-- [ ] Payment integration (Stripe)
-- [ ] Offer presentation UI
-- [ ] Conversion tracking
-
-**Blockers**: Need business decision on pricing & packages
-
-#### 3. Affiliate Dashboard
-**Status**: Planned
-**Effort**: 2-3 weeks
-**Components**:
-- [ ] Broker/agent signup flow
-- [ ] GoHighLevel integration
-- [ ] Co-pilot client experiences (view client sessions)
-- [ ] Commission attribution tracking
-- [ ] Payout management
-- [ ] Performance analytics
-- [ ] Client emotional profile sharing
-
-**Blockers**: Need GoHighLevel account & API access
-
-### Medium Priority (Q2 2026)
-
-#### 4. Mobile App (React Native)
-**Status**: Planned
-**Effort**: 6-8 weeks
-**Components**:
-- [ ] React Native setup
-- [ ] Voice input for hands-free
-- [ ] Photo upload for inspiration
-- [ ] Push notifications for trip updates
-- [ ] Offline mode (cached data)
-- [ ] iOS & Android builds
-
-**Blockers**: Need mobile developer
-
-#### 5. Multi-Language Support
-**Status**: Planned
-**Effort**: 3-4 weeks
-**Components**:
-- [ ] i18n framework integration
-- [ ] French translation
-- [ ] Italian translation
-- [ ] Spanish translation
-- [ ] German translation
-- [ ] Cultural adaptation (not just translation)
-- [ ] Language selector UI
-
-**Blockers**: Need professional translators
-
-#### 6. Real-Time Collaboration
-**Status**: Planned
-**Effort**: 2-3 weeks
-**Components**:
-- [ ] WebSocket setup (Supabase Realtime)
-- [ ] Couples can co-design experiences
-- [ ] Agents can join client sessions
-- [ ] Live cursor positions
-- [ ] Chat synchronization
-- [ ] Conflict resolution
-
-**Blockers**: None
-
-### Low Priority (Q3-Q4 2026)
-
-#### 7. Advanced Analytics
-**Status**: Planned
-**Effort**: 2-3 weeks
-**Components**:
-- [ ] User behavior tracking (PostHog or Mixpanel)
-- [ ] Conversion funnel analysis
-- [ ] Theme preference insights
-- [ ] POI popularity heatmaps
-- [ ] Revenue attribution
-- [ ] A/B testing framework
-
-**Blockers**: Need analytics platform account
-
-#### 8. API for Partners
-**Status**: Planned
-**Effort**: 3-4 weeks
-**Components**:
-- [ ] Public API documentation
-- [ ] API key management
-- [ ] Rate limiting per partner
-- [ ] Webhook notifications
-- [ ] SDK for common languages (JS, Python, Ruby)
+### Deferred
+- “Right now” concierge: Tavily + real-time APIs (weather, advisories, events/open-now) — paid tier, build later
 
 **Blockers**: Need legal review for terms of service
 
@@ -441,7 +333,7 @@ Based on pitch deck preparation and investor readiness:
 
 ---
 
-**Last Updated**: December 31, 2025  
-**Next Review**: After pitch deck completion  
-**Status**: 🟢 On track for Q1 2026 goals
+**Last Updated**: January 4, 2026  
+**Next Review**: After ingestion/extraction pipeline milestone  
+**Status**: 🟡 Focused on Goal 1 (ingestion → extraction → approval → graph)
 

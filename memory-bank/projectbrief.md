@@ -140,18 +140,29 @@ Transform luxury travel from transactional booking to emotional experience desig
 - ✅ Yacht destination upload system
 
 ### Next 6 Months:
-1. POI Collection Automation (40,000 luxury POIs)
-2. Upsell system ($497-$2,997 packages)
-3. Affiliate dashboard (GoHighLevel integration)
-4. Mobile app (React Native)
-5. Multi-language support
-6. Real-time collaboration
+1. **Ingestion & Extraction (Top Priority)**: High-throughput crawl/upload → multi-pass extraction → confidence scoring → Neo4j + pgvector writes with captain approval
+2. **Communication Quality**: Claude-style responses (acknowledge + first ideas + clarifying question), data-driven emotional profiling
+3. **Grounded Retrieval & Recommendation**: Hybrid Neo4j + pgvector, ranking by emotion fit and confidence
+4. Upsell system ($497-$2,997 packages)
+5. Affiliate dashboard (GoHighLevel integration)
+6. Mobile app (React Native)
+7. Multi-language support
+8. Real-time collaboration
 
 ### Out of Scope (For Now):
 - Direct booking (handoff to partners)
 - Payment processing
 - Customer service chat
 - Hotel/airline inventory
+- “Right now” live concierge (will be a paid tier later)
+
+## Strategic Priorities (2026)
+1) **Feed the Brain**: Crawl/provider ingestion + file uploads → multi-pass extraction → captain approval → Neo4j canonical graph with audit trail in Postgres/pgvector. Counts separated into real vs. estimated. No hallucinations; concrete claims must be source-backed.
+2) **Claude-Quality Communication**: Immediate reflection + 3–6 first ideas + 1 clarifying question. Tone: warm, confident, luxury. Uses grounded context only; generic ideas must be labeled as such.
+3) **Personalization**: Continuously learn user emotional profile and preferences from conversations, selections, and outcomes.
+4) **Recommendations**: Hybrid retrieval (graph + vector) ranked by confidence and emotion fit, using captain-verified data first.
+5) **Security by Default**: Anti-exfiltration and prompt-injection defenses; role-based access; rate limits; deny “list all” or schema/architecture probing.
+6) **Real-Time World Context (Later/Paid)**: Tavily + reliable APIs (weather, advisories, events) for “right now” suggestions, gated to paid tier when built.
 
 ## Constraints
 

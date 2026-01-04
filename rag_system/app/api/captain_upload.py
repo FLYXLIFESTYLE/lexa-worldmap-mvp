@@ -10,7 +10,7 @@ from datetime import datetime
 import os
 
 from app.services.file_processor import process_file_auto
-from app.services.intelligence_extractor import extract_all_intelligence
+from app.services.multipass_extractor import run_multipass_extraction
 from app.services.intelligence_storage import save_intelligence_to_db
 from app.services.supabase_client import get_supabase
 
@@ -36,6 +36,101 @@ class UploadResponse(BaseModel):
     extracted_experiences: int
     file_size_kb: float
     message: str
+
+
+def _package_to_legacy(intel_package: dict) -> dict:
+    """
+    Convert multipass final_package into the legacy intelligence shape
+    expected by save_intelligence_to_db.
+    """
+    if not intel_package:
+        return {
+            "pois": [],
+            "experiences": [],
+            "trends": [],
+            "client_insights": [],
+            "price_intelligence": {},
+            "competitor_analysis": [],
+            "operational_learnings": [],
+            "metadata": {},
+        }
+
+    def _safe_list(value):
+        return value if isinstance(value, list) else []
+
+    pois = []
+    for venue in _safe_list(intel_package.get("venues")):
+        pois.append({
+            "name": venue.get("name"),
+            "type": venue.get("kind") or venue.get("type"),
+            "location": venue.get("location"),
+            "description": venue.get("description"),
+            "category": ", ".join(venue.get("tags", [])) if venue.get("tags") else None,
+            "address": None,
+            "coordinates": venue.get("coordinates") or {"lat": None, "lng": None},
+            "confidence": venue.get("confidence"),
+        })
+    for dest in _safe_list(intel_package.get("destinations")):
+        pois.append({
+            "name": dest.get("name"),
+            "type": dest.get("kind") or "destination",
+            "location": dest.get("location"),
+            "description": dest.get("description"),
+            "category": ", ".join(dest.get("tags", [])) if dest.get("tags") else None,
+            "address": None,
+            "coordinates": dest.get("coordinates") or {"lat": None, "lng": None},
+            "confidence": dest.get("confidence"),
+        })
+
+    experiences = []
+    for exp in _safe_list(intel_package.get("sub_experiences")):
+        experiences.append({
+            "experience_title": exp.get("title"),
+            "experience_type": exp.get("category"),
+            "description": exp.get("description"),
+            "location": exp.get("location"),
+            "duration": exp.get("duration"),
+            "unique_elements": ", ".join(exp.get("highlights", [])) if exp.get("highlights") else None,
+            "emotional_goal": exp.get("emotional_goal"),
+            "target_audience": exp.get("target_audience"),
+            "estimated_budget": exp.get("estimated_budget"),
+            "confidence": exp.get("confidence"),
+        })
+
+    client_insights = []
+    for archetype in _safe_list(intel_package.get("client_archetypes")):
+        client_insights.append({
+            "insight_category": "client_archetype",
+            "client_segment": archetype.get("name"),
+            "insight_description": archetype.get("description"),
+            "emotional_drivers": archetype.get("emotional_drivers"),
+            "pain_points": archetype.get("pain_points"),
+            "confidence": archetype.get("confidence"),
+        })
+
+    service_providers = []
+    for provider in _safe_list(intel_package.get("service_providers")):
+        service_providers.append({
+            "name": provider.get("name"),
+            "service_type": provider.get("kind"),
+            "description": provider.get("description"),
+            "website": provider.get("website"),
+            "notes": provider.get("notes"),
+            "confidence": provider.get("confidence"),
+        })
+
+    return {
+        "pois": pois,
+        "experiences": experiences,
+        "trends": [],
+        "client_insights": client_insights,
+        "price_intelligence": {},
+        "competitor_analysis": [],  # service providers are no longer forced into competitors
+        "operational_learnings": [],
+        "service_providers": service_providers,
+        "emotional_map": intel_package.get("emotional_map", []),
+        "metadata": intel_package.get("metadata", {}),
+    }
 
 
 @router.post("/")
@@ -137,21 +232,27 @@ async def upload_file(
             traceback.print_exc()
             # Continue anyway - we'll update the record later
         
-        # Extract intelligence with Claude AI
-        print(f"=== STARTING INTELLIGENCE EXTRACTION ===")
+        # Extract intelligence with multipass pipeline
+        print(f"=== STARTING MULTIPASS INTELLIGENCE EXTRACTION ===")
         print(f"Text length to analyze: {len(extracted_text)}")
         print(f"First 500 chars of text:\n{extracted_text[:500]}")
         
         try:
-            intelligence = await extract_all_intelligence(extracted_text, source_file=file.filename)
-            print(f"=== INTELLIGENCE EXTRACTION RETURNED ===")
-            print(f"Intelligence type: {type(intelligence)}")
-            print(f"Intelligence keys: {list(intelligence.keys()) if isinstance(intelligence, dict) else 'NOT A DICT'}")
-            print(f"POIs count: {len(intelligence.get('pois', []))}")
-            print(f"Experiences count: {len(intelligence.get('experiences', []))}")
-            print(f"Competitors count: {len(intelligence.get('competitor_analysis', []))}")
+            source_meta = {
+                "upload_id": upload_id,
+                "filename": file.filename,
+                "file_type": metadata.get("file_type"),
+                "file_size": file_size,
+            }
+            extraction_contract = await run_multipass_extraction(extracted_text, source_meta)
+            final_package = extraction_contract.get("final_package", {}) or {}
+            intelligence = _package_to_legacy(final_package)
+
+            print(f"=== MULTIPASS EXTRACTION RETURNED ===")
+            print(f"Passes: {len(extraction_contract.get('passes', []))}")
+            print(f"Legacy POIs: {len(intelligence.get('pois', []))}")
+            print(f"Legacy Experiences: {len(intelligence.get('experiences', []))}")
             
-            # Check if extraction actually returned data
             total_items = (
                 len(intelligence.get('pois', [])) +
                 len(intelligence.get('experiences', [])) +
@@ -160,16 +261,8 @@ async def upload_file(
             )
             
             if total_items == 0:
-                error_msg = "Extraction returned ZERO items. This could mean: Claude API failed, JSON parsing failed, or text doesn't contain extractable content."
+                error_msg = "Multipass extraction returned ZERO items. Possible causes: Claude API empty, JSON parse failure, or unextractable content."
                 print(f"⚠️ WARNING: {error_msg}")
-                print("This could mean:")
-                print("  1. Claude API returned empty JSON")
-                print("  2. JSON parsing failed")
-                print("  3. Text doesn't contain extractable content")
-                print("  4. Prompt format issue")
-                print("  5. Model name incorrect (check logs for 404 errors)")
-                
-                # Update upload record to failed status
                 try:
                     supabase.table("captain_uploads").update({
                         "processing_status": "failed",
@@ -177,11 +270,8 @@ async def upload_file(
                     }).eq("id", upload_id).execute()
                 except:
                     pass
-                
-                # Still return response but with warning - don't fail completely
-                # Frontend can show the error message
         except Exception as e:
-            print(f"❌ ERROR: Intelligence extraction failed: {str(e)}")
+            print(f"❌ ERROR: Multipass extraction failed: {str(e)}")
             import traceback
             traceback.print_exc()
             # Update upload record to failed status
@@ -237,6 +327,10 @@ async def upload_file(
         prices_count = len(intelligence.get("price_intelligence", {}).keys()) if isinstance(intelligence.get("price_intelligence"), dict) else 0
         competitors_count = len(intelligence.get("competitor_analysis", []))
         learnings_count = len(intelligence.get("operational_learnings", []))
+        providers_count = len(intelligence.get("service_providers", []))
+        counts_meta = (final_package.get("counts", {}) if isinstance(final_package, dict) else {}) or {}
+        real_counts = counts_meta.get("real_extracted", {}) if isinstance(counts_meta, dict) else {}
+        estimated_counts = counts_meta.get("estimated_potential", {}) if isinstance(counts_meta, dict) else {}
         
         try:
             supabase.table("captain_uploads").update({
@@ -263,9 +357,13 @@ async def upload_file(
                 "insights": insights_count,
                 "prices": prices_count,
                 "competitors": competitors_count,
-                "learnings": learnings_count
+                "learnings": learnings_count,
+                "service_providers": providers_count,
             },
+            "counts_real": real_counts,
+            "counts_estimated": estimated_counts,
             "extracted_data": intelligence,  # Return full intelligence for editing
+            "extraction_contract": extraction_contract,
             "file_size_kb": file_size / 1024,
             "message": "File processed successfully"
         }
@@ -304,8 +402,16 @@ async def upload_text(
         
         upload_id = str(uuid.uuid4())
         
-        # Extract intelligence
-        intelligence = await extract_all_intelligence(request.text)
+        # Extract intelligence via multipass
+        source_meta = {
+            "upload_id": upload_id,
+            "filename": request.title,
+            "file_type": "text",
+            "text_length": len(request.text)
+        }
+        extraction_contract = await run_multipass_extraction(request.text, source_meta)
+        final_package = extraction_contract.get("final_package", {}) or {}
+        intelligence = _package_to_legacy(final_package)
         
         # Save to database
         await save_intelligence_to_db(
@@ -329,6 +435,10 @@ async def upload_text(
         prices_count = len(intelligence.get("price_intelligence", {}).keys()) if isinstance(intelligence.get("price_intelligence"), dict) else 0
         competitors_count = len(intelligence.get("competitor_analysis", []))
         learnings_count = len(intelligence.get("operational_learnings", []))
+        providers_count = len(intelligence.get("service_providers", []))
+        counts_meta = (final_package.get("counts", {}) if isinstance(final_package, dict) else {}) or {}
+        real_counts = counts_meta.get("real_extracted", {}) if isinstance(counts_meta, dict) else {}
+        estimated_counts = counts_meta.get("estimated_potential", {}) if isinstance(counts_meta, dict) else {}
         
         return {
             "success": True,
@@ -343,8 +453,12 @@ async def upload_text(
                 "insights": insights_count,
                 "prices": prices_count,
                 "competitors": competitors_count,
-                "learnings": learnings_count
+                "learnings": learnings_count,
+                "service_providers": providers_count,
             },
+            "counts_real": real_counts,
+            "counts_estimated": estimated_counts,
+            "extraction_contract": extraction_contract,
             "file_size_kb": len(request.text.encode('utf-8')) / 1024,
             "message": "Text processed successfully"
         }

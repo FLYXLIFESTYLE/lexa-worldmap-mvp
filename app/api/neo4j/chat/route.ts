@@ -31,6 +31,20 @@ interface QueryResult {
   rowCount: number;
 }
 
+function isDisallowedQuestion(question: string): boolean {
+  const q = question.toLowerCase();
+  const blocked = [
+    'schema',
+    'list all',
+    'list every',
+    'dump',
+    'show all nodes',
+    'show all relationships',
+    'describe database',
+  ];
+  return blocked.some(keyword => q.includes(keyword));
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Authentication
@@ -45,6 +59,14 @@ export async function POST(req: NextRequest) {
 
     if (!question || question.trim().length === 0) {
       return NextResponse.json({ error: 'Question is required' }, { status: 400 });
+    }
+
+    // Basic anti-exfiltration guardrails
+    if (isDisallowedQuestion(question)) {
+      return NextResponse.json({
+        error: 'Query not allowed',
+        message: 'This endpoint is read-only for travel answers. Schema/listing requests are blocked.',
+      }, { status: 403 });
     }
 
     // Generate Cypher query using Claude

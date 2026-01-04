@@ -21,6 +21,10 @@ interface UploadedFile {
   confidenceScore: number;
   uploadId?: string;
   extractedData?: any; // Full intelligence data for editing
+  countsReal?: Record<string, number>;
+  countsEstimated?: Record<string, number>;
+  extractionContract?: any;
+  keepDecision?: 'keep' | 'dump';
 }
 
 interface YachtDestination {
@@ -42,6 +46,9 @@ export default function CaptainUploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [editingFile, setEditingFile] = useState<UploadedFile | null>(null); // File being edited
+  const [selectedPois, setSelectedPois] = useState<Set<number>>(new Set());
+  const [selectedExperiences, setSelectedExperiences] = useState<Set<number>>(new Set());
+  const [selectedProviders, setSelectedProviders] = useState<Set<number>>(new Set());
   
   // URL Scraping State
   const [url, setUrl] = useState('');
@@ -88,7 +95,8 @@ export default function CaptainUploadPage() {
           size: file.size,
           type: file.type,
           status: 'processing',
-          confidenceScore: 0
+          confidenceScore: 0,
+          keepDecision: 'keep'
         };
         setFiles(prev => [...prev, newFile]);
   
@@ -103,7 +111,11 @@ export default function CaptainUploadPage() {
                 status: 'done', 
                 confidenceScore: result.confidence_score || 80,
                 uploadId: result.upload_id,
-                extractedData: result.extracted_data // Store for editing
+                extractedData: result.extracted_data, // Store for editing
+                countsReal: result.counts_real,
+                countsEstimated: result.counts_estimated,
+                extractionContract: result.extraction_contract,
+                keepDecision: 'keep'
               }
             : f
         ));
@@ -119,7 +131,11 @@ export default function CaptainUploadPage() {
             status: 'done' as const,
             confidenceScore: result.confidence_score || 80,
             uploadId: result.upload_id,
-            extractedData: result.extracted_data
+            extractedData: result.extracted_data,
+            countsReal: result.counts_real,
+            countsEstimated: result.counts_estimated,
+            extractionContract: result.extraction_contract,
+            keepDecision: 'keep' as const
           };
           setEditingFile(updatedFile);
         } else {
@@ -387,6 +403,34 @@ export default function CaptainUploadPage() {
     }
   };
 
+  // Normalize providers: if service_providers is empty but competitor_analysis exists, seed providers
+  useEffect(() => {
+    if (!editingFile) return;
+    const hasProviders = Array.isArray(editingFile.extractedData?.service_providers) && editingFile.extractedData.service_providers.length > 0;
+    const hasCompetitors = Array.isArray(editingFile.extractedData?.competitor_analysis) && editingFile.extractedData.competitor_analysis.length > 0;
+    if (!hasProviders && hasCompetitors) {
+      const updated = { ...editingFile, extractedData: { ...editingFile.extractedData, service_providers: [...editingFile.extractedData.competitor_analysis] } };
+      setEditingFile(updated);
+    }
+  }, [editingFile]);
+
+  // Helpers for bulk selection
+  const toggleSelection = (setFn: React.Dispatch<React.SetStateAction<Set<number>>>, current: Set<number>, idx: number) => {
+    const next = new Set(current);
+    if (next.has(idx)) {
+      next.delete(idx);
+    } else {
+      next.add(idx);
+    }
+    setFn(next);
+  };
+
+  const clearSelections = () => {
+    setSelectedPois(new Set());
+    setSelectedExperiences(new Set());
+    setSelectedProviders(new Set());
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -506,10 +550,24 @@ export default function CaptainUploadPage() {
                       <p className="text-sm text-gray-500">
                         {(file.size / 1024).toFixed(2)} KB • Confidence: {file.confidenceScore}%
                       </p>
+                      {file.extractedData && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Summary: POIs {file.extractedData.pois?.length ?? 0} • Experiences {file.extractedData.experiences?.length ?? 0} • Providers {file.extractedData.service_providers?.length ?? 0}
+                        </p>
+                      )}
                     </div>
-                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                      {file.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {file.keepDecision && (
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          file.keepDecision === 'keep' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {file.keepDecision === 'keep' ? 'Keep' : 'Dump'}
+                        </span>
+                      )}
+                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                        {file.status}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -886,7 +944,7 @@ export default function CaptainUploadPage() {
                     ✏️ Edit Extracted Data: {editingFile.name}
                   </h2>
                   <p className="text-sm text-gray-600 mt-1">
-                    Review and enhance extracted intelligence. Set confidence score and save.
+                    Review and enhance extracted intelligence. Set confidence and save.
                   </p>
                 </div>
                 <button
@@ -899,26 +957,51 @@ export default function CaptainUploadPage() {
 
               {/* Content - Scrollable */}
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Confidence Score */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Confidence Score: {editingFile.confidenceScore}%
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={editingFile.confidenceScore}
-                    onChange={(e) => setEditingFile({
-                      ...editingFile,
-                      confidenceScore: parseInt(e.target.value)
-                    })}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>0% (Unverified)</span>
-                    <span>80% (Default Upload)</span>
-                    <span>100% (Captain Approved)</span>
+                {/* Summary & Keep/Dump */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-2">Quick Summary</h3>
+                    {(() => {
+                      const countsReal = editingFile.countsReal || {};
+                      const countsEst = editingFile.countsEstimated || {};
+                      const getCount = (key: string, fallback: number) =>
+                        countsReal[key] ?? countsEst[key] ?? fallback;
+                      const pois = getCount('pois', editingFile.extractedData.pois?.length || 0);
+                      const exps = getCount('experiences', editingFile.extractedData.experiences?.length || 0);
+                      const providers = getCount('service_providers', editingFile.extractedData.service_providers?.length || 0);
+                      return (
+                        <ul className="text-sm text-gray-700 space-y-1">
+                          <li>POIs: <span className="font-semibold">{pois}</span></li>
+                          <li>Experiences: <span className="font-semibold">{exps}</span></li>
+                          <li>Providers: <span className="font-semibold">{providers}</span></li>
+                        </ul>
+                      );
+                    })()}
+                  </div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-2">Keep or Dump?</h3>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          const updated = { ...editingFile, keepDecision: 'keep' as const };
+                          setEditingFile(updated);
+                          setFiles(prev => prev.map(f => f.name === editingFile.name ? updated : f));
+                        }}
+                        className={`px-4 py-2 rounded-lg font-semibold ${editingFile.keepDecision === 'keep' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                      >
+                        ✅ Keep
+                      </button>
+                      <button
+                        onClick={() => {
+                          const updated = { ...editingFile, keepDecision: 'dump' as const };
+                          setEditingFile(updated);
+                          setFiles(prev => prev.map(f => f.name === editingFile.name ? updated : f));
+                        }}
+                        className={`px-4 py-2 rounded-lg font-semibold ${editingFile.keepDecision === 'dump' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                      >
+                        🗑️ Dump
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -928,9 +1011,62 @@ export default function CaptainUploadPage() {
                     <h3 className="text-lg font-bold text-gray-900 mb-4">
                       📍 POIs ({editingFile.extractedData.pois.length})
                     </h3>
+                    <div className="flex items-center gap-3 mb-3 text-sm">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedPois.size === editingFile.extractedData.pois.length}
+                          onChange={(e) => {
+                            const next = new Set<number>();
+                            if (e.target.checked) {
+                              editingFile.extractedData.pois.forEach((_: any, idx: number) => next.add(idx));
+                            }
+                            setSelectedPois(next);
+                          }}
+                        />
+                        Select all
+                      </label>
+                      <button
+                        onClick={() => {
+                          if (!editingFile) return;
+                          if (selectedPois.size === 0) return;
+                          const remaining = editingFile.extractedData.pois.filter((_: any, idx: number) => !selectedPois.has(idx));
+                          const updated = { ...editingFile, extractedData: { ...editingFile.extractedData, pois: remaining } };
+                          setEditingFile(updated);
+                          setSelectedPois(new Set());
+                        }}
+                        className="text-red-600 hover:underline disabled:text-gray-400"
+                        disabled={selectedPois.size === 0}
+                      >
+                        Delete selected ({selectedPois.size})
+                      </button>
+                    </div>
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                       {editingFile.extractedData.pois.map((poi: any, idx: number) => (
                         <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="flex items-center gap-2 text-sm text-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={selectedPois.has(idx)}
+                                onChange={() => toggleSelection(setSelectedPois, selectedPois, idx)}
+                              />
+                              Select
+                            </label>
+                            <button
+                              onClick={() => {
+                                const remaining = editingFile.extractedData.pois.filter((_: any, i: number) => i !== idx);
+                                const updated = { ...editingFile, extractedData: { ...editingFile.extractedData, pois: remaining } };
+                                setEditingFile(updated);
+                                const next = new Set(selectedPois);
+                                next.delete(idx);
+                                setSelectedPois(next);
+                              }}
+                              className="text-red-600 text-xs hover:underline"
+                            >
+                              🗑 Delete
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={poi.name || ''}
@@ -977,6 +1113,24 @@ export default function CaptainUploadPage() {
                             className="w-full mt-2 px-2 py-1 border border-gray-300 rounded text-sm"
                             rows={2}
                           />
+                          <div className="mt-2 flex items-center gap-2 text-sm">
+                            <span className="text-gray-600">Confidence</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={1}
+                              value={typeof poi.confidence === 'number' ? Math.round(poi.confidence * 100) : 80}
+                              onChange={(e) => {
+                                const updated = { ...editingFile };
+                                const val = parseFloat(e.target.value);
+                                updated.extractedData.pois[idx].confidence = isNaN(val) ? undefined : val / 100;
+                                setEditingFile(updated);
+                              }}
+                              className="w-24 px-2 py-1 border border-gray-300 rounded"
+                              placeholder="0-100"
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -989,9 +1143,61 @@ export default function CaptainUploadPage() {
                     <h3 className="text-lg font-bold text-gray-900 mb-4">
                       ✨ Experiences ({editingFile.extractedData.experiences.length})
                     </h3>
+                    <div className="flex items-center gap-3 mb-3 text-sm">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedExperiences.size === editingFile.extractedData.experiences.length}
+                          onChange={(e) => {
+                            const next = new Set<number>();
+                            if (e.target.checked) {
+                              editingFile.extractedData.experiences.forEach((_: any, idx: number) => next.add(idx));
+                            }
+                            setSelectedExperiences(next);
+                          }}
+                        />
+                        Select all
+                      </label>
+                      <button
+                        onClick={() => {
+                          if (selectedExperiences.size === 0) return;
+                          const remaining = editingFile.extractedData.experiences.filter((_: any, idx: number) => !selectedExperiences.has(idx));
+                          const updated = { ...editingFile, extractedData: { ...editingFile.extractedData, experiences: remaining } };
+                          setEditingFile(updated);
+                          setSelectedExperiences(new Set());
+                        }}
+                        className="text-red-600 hover:underline disabled:text-gray-400"
+                        disabled={selectedExperiences.size === 0}
+                      >
+                        Delete selected ({selectedExperiences.size})
+                      </button>
+                    </div>
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                       {editingFile.extractedData.experiences.map((exp: any, idx: number) => (
                         <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="flex items-center gap-2 text-sm text-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={selectedExperiences.has(idx)}
+                                onChange={() => toggleSelection(setSelectedExperiences, selectedExperiences, idx)}
+                              />
+                              Select
+                            </label>
+                            <button
+                              onClick={() => {
+                                const remaining = editingFile.extractedData.experiences.filter((_: any, i: number) => i !== idx);
+                                const updated = { ...editingFile, extractedData: { ...editingFile.extractedData, experiences: remaining } };
+                                setEditingFile(updated);
+                                const next = new Set(selectedExperiences);
+                                next.delete(idx);
+                                setSelectedExperiences(next);
+                              }}
+                              className="text-red-600 text-xs hover:underline"
+                            >
+                              🗑 Delete
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={exp.experience_title || ''}
@@ -1014,32 +1220,142 @@ export default function CaptainUploadPage() {
                             className="w-full mt-2 px-2 py-1 border border-gray-300 rounded text-sm"
                             rows={2}
                           />
+                          <div className="mt-2 flex items-center gap-2 text-sm">
+                            <span className="text-gray-600">Confidence</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={1}
+                              value={typeof exp.confidence === 'number' ? Math.round(exp.confidence * 100) : 80}
+                              onChange={(e) => {
+                                const updated = { ...editingFile };
+                                const val = parseFloat(e.target.value);
+                                updated.extractedData.experiences[idx].confidence = isNaN(val) ? undefined : val / 100;
+                                setEditingFile(updated);
+                              }}
+                              className="w-24 px-2 py-1 border border-gray-300 rounded"
+                              placeholder="0-100"
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Competitors Section */}
-                {editingFile.extractedData.competitor_analysis && editingFile.extractedData.competitor_analysis.length > 0 && (
+                {/* Service Providers Section */}
+                {editingFile.extractedData.service_providers && editingFile.extractedData.service_providers.length > 0 && (
                   <div className="border border-gray-200 rounded-lg p-4">
                     <h3 className="text-lg font-bold text-gray-900 mb-4">
-                      🏢 Competitors ({editingFile.extractedData.competitor_analysis.length})
+                      🧑‍⚕️ Service Providers ({editingFile.extractedData.service_providers.length})
                     </h3>
+                    <div className="flex items-center gap-3 mb-3 text-sm">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedProviders.size === editingFile.extractedData.service_providers.length}
+                          onChange={(e) => {
+                            const next = new Set<number>();
+                            if (e.target.checked) {
+                              editingFile.extractedData.service_providers.forEach((_: any, idx: number) => next.add(idx));
+                            }
+                            setSelectedProviders(next);
+                          }}
+                        />
+                        Select all
+                      </label>
+                      <button
+                        onClick={() => {
+                          if (selectedProviders.size === 0) return;
+                          const remaining = editingFile.extractedData.service_providers.filter((_: any, idx: number) => !selectedProviders.has(idx));
+                          const updated = { ...editingFile, extractedData: { ...editingFile.extractedData, service_providers: remaining } };
+                          setEditingFile(updated);
+                          setSelectedProviders(new Set());
+                        }}
+                        className="text-red-600 hover:underline disabled:text-gray-400"
+                        disabled={selectedProviders.size === 0}
+                      >
+                        Delete selected ({selectedProviders.size})
+                      </button>
+                    </div>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {editingFile.extractedData.competitor_analysis.map((comp: any, idx: number) => (
-                        <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                      {editingFile.extractedData.service_providers.map((provider: any, idx: number) => (
+                        <div key={idx} className="bg-gray-50 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 text-sm text-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={selectedProviders.has(idx)}
+                                onChange={() => toggleSelection(setSelectedProviders, selectedProviders, idx)}
+                              />
+                              Select
+                            </label>
+                            <button
+                              onClick={() => {
+                                const remaining = editingFile.extractedData.service_providers.filter((_: any, i: number) => i !== idx);
+                                const updated = { ...editingFile, extractedData: { ...editingFile.extractedData, service_providers: remaining } };
+                                setEditingFile(updated);
+                                const next = new Set(selectedProviders);
+                                next.delete(idx);
+                                setSelectedProviders(next);
+                              }}
+                              className="text-red-600 text-xs hover:underline"
+                            >
+                              🗑 Delete
+                            </button>
+                          </div>
                           <input
                             type="text"
-                            value={comp.competitor_name || ''}
+                            value={provider.name || ''}
                             onChange={(e) => {
                               const updated = { ...editingFile };
-                              updated.extractedData.competitor_analysis[idx].competitor_name = e.target.value;
+                              updated.extractedData.service_providers[idx].name = e.target.value;
                               setEditingFile(updated);
                             }}
-                            placeholder="Competitor Name"
+                            placeholder="Provider Name"
                             className="w-full font-semibold px-2 py-1 border border-gray-300 rounded"
                           />
+                          <input
+                            type="text"
+                            value={provider.service_type || ''}
+                            onChange={(e) => {
+                              const updated = { ...editingFile };
+                              updated.extractedData.service_providers[idx].service_type = e.target.value;
+                              setEditingFile(updated);
+                            }}
+                            placeholder="Service Type"
+                            className="w-full text-sm px-2 py-1 border border-gray-300 rounded"
+                          />
+                          <textarea
+                            value={provider.description || ''}
+                            onChange={(e) => {
+                              const updated = { ...editingFile };
+                              updated.extractedData.service_providers[idx].description = e.target.value;
+                              setEditingFile(updated);
+                            }}
+                            placeholder="Description"
+                            className="w-full text-sm px-2 py-1 border border-gray-300 rounded"
+                            rows={2}
+                          />
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-gray-600">Confidence</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={1}
+                              value={typeof provider.confidence === 'number' ? Math.round(provider.confidence * 100) : 80}
+                              onChange={(e) => {
+                                const updated = { ...editingFile };
+                                const val = parseFloat(e.target.value);
+                                updated.extractedData.service_providers[idx].confidence = isNaN(val) ? undefined : val / 100;
+                                setEditingFile(updated);
+                              }}
+                              className="w-24 px-2 py-1 border border-gray-300 rounded"
+                              placeholder="0-100"
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1051,9 +1367,10 @@ export default function CaptainUploadPage() {
               <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
                 <button
                   onClick={() => {
-                    // TODO: Implement dump/delete functionality
+                    const updated = { ...editingFile, keepDecision: 'dump' as const };
+                    setFiles(prev => prev.map(f => f.name === editingFile.name ? updated : f));
+                    alert(`🗑️ Marked "${editingFile.name}" to dump (remove original file).`);
                     setEditingFile(null);
-                    setFiles(prev => prev.filter(f => f.name !== editingFile.name));
                   }}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700"
                 >
@@ -1068,11 +1385,12 @@ export default function CaptainUploadPage() {
                   </button>
                   <button
                     onClick={async () => {
-                      // TODO: Save edited data with confidence score
+                      // Save edited data locally and keep file
+                      const updated = { ...editingFile, keepDecision: 'keep' as const };
+                      setFiles(prev => prev.map(f => f.name === editingFile.name ? updated : f));
                       setLoading(true);
                       try {
-                        // Call API to update with edited data and confidence score
-                        alert(`✅ Data saved with ${editingFile.confidenceScore}% confidence!`);
+                        alert(`✅ Saved edits with ${editingFile.confidenceScore}% confidence. Marked as KEEP.`);
                         setEditingFile(null);
                       } catch (error) {
                         alert('❌ Failed to save data');

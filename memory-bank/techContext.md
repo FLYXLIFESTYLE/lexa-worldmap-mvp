@@ -40,10 +40,11 @@
 - CORS enabled for frontend communication
 
 **AI/ML**:
-- `anthropic` - Claude 3.5 Sonnet API client
-- Model: `claude-3-5-sonnet-20241022`
-- Max tokens: 1024 per response
-- Temperature: 0.7 (balanced creativity/consistency)
+- `anthropic` - Claude Sonnet API client
+- Model (current): `claude-sonnet-4-20250514`
+- Max tokens: sized per task (higher for extraction passes)
+- Temperature: 0.3–0.7 (low for extraction, higher for narrative)
+- Pattern: **multi-pass extraction** (outline → expand → validate/dedupe → report writer), captain approval, source-backed claims; generic fallbacks must be labeled as such.
 
 **Key Libraries**:
 - `neo4j` - Graph database driver
@@ -78,6 +79,11 @@
 - Endpoint: `https://api.anthropic.com/v1/messages`
 - Rate limit: 50 requests/minute (tier-dependent)
 - Cost: $3 per million input tokens, $15 per million output tokens
+
+**Tavily + External Real-Time APIs (planned/paid tier)**
+- Tavily web search for citations
+- Dedicated APIs when more reliable (weather, advisories, events/places “open now”)
+- Gated for “Right now” concierge tier (not live yet)
 
 **Google Places API**
 - Nearby Search: $32 per 1,000 requests
@@ -389,6 +395,9 @@ pydantic==2.10.5
 - HTTPS only in production (Vercel automatic)
 - API key restrictions (domain-based)
 - Input validation (TypeScript + Pydantic)
+- Neo4j read-only chat endpoints with strict query limits; block “list all/schema” prompts
+- Separation of source-backed vs. generic output; no hallucinated facts
+- Role-based access for ingestion/approval flows (captain/admin)
 
 ### Future:
 - Rate limiting on API endpoints
