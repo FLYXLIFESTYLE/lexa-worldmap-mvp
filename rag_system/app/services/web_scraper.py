@@ -17,6 +17,17 @@ class WebScraper:
         self.timeout = 30.0
         self.max_subpages = 50
         self.max_pages_default = 25
+        # Many sites return empty/blocked content to default http clients.
+        # Use a conservative, browser-like User-Agent everywhere.
+        self._default_headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/121.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
 
         # Heuristic keywords to prioritize relevant pages when crawling sitemaps
         self._preferred_path_keywords = [
@@ -52,7 +63,7 @@ class WebScraper:
         """
         try:
             async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-                response = await client.get(url)
+                response = await client.get(url, headers=self._default_headers)
                 response.raise_for_status()
                 
                 # Parse HTML
@@ -167,7 +178,7 @@ class WebScraper:
 
         async def _fetch_one_sitemap(client: httpx.AsyncClient, sitemap_url: str) -> List[str]:
             try:
-                r = await client.get(sitemap_url, headers={"User-Agent": "LEXA-Scraper/1.0"})
+                r = await client.get(sitemap_url, headers=self._default_headers)
                 if r.status_code != 200 or not r.text:
                     return []
                 soup = BeautifulSoup(r.text, "xml")
@@ -283,7 +294,7 @@ class WebScraper:
         async def _fetch_one(u: str) -> Optional[Dict[str, str]]:
             try:
                 async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-                    r = await client.get(u)
+                    r = await client.get(u, headers=self._default_headers)
                     r.raise_for_status()
                     soup = BeautifulSoup(r.text, "lxml")
                     content = self._extract_text_content(soup)
