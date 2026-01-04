@@ -607,7 +607,7 @@ async def get_upload_history(
         raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
 
 
-@router.get("/{upload_id}")
+@router.get("/id/{upload_id}")
 async def get_upload_detail(
     upload_id: uuid.UUID,
     request: Request,
@@ -632,7 +632,7 @@ async def get_upload_detail(
     return {"upload": resp.data[0]}
 
 
-@router.delete("/{upload_id}")
+@router.delete("/id/{upload_id}")
 async def delete_upload(
     upload_id: uuid.UUID,
     request: Request,
@@ -660,7 +660,7 @@ async def delete_upload(
     return {"success": True, "deleted": str(upload_id)}
 
 
-@router.put("/{upload_id}")
+@router.put("/id/{upload_id}")
 async def update_upload(
     upload_id: uuid.UUID,
     body: UpdateUploadRequest,

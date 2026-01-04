@@ -132,15 +132,15 @@ export const uploadAPI = {
   },
 
   getUpload: async (uploadId: string) => {
-    return apiRequest<{ upload: any }>(`/api/captain/upload/${uploadId}`, { method: 'GET' });
+    return apiRequest<{ upload: any }>(`/api/captain/upload/id/${uploadId}`, { method: 'GET' });
   },
 
   deleteUpload: async (uploadId: string) => {
-    return apiRequest<{ success: boolean; deleted: string }>(`/api/captain/upload/${uploadId}`, { method: 'DELETE' });
+    return apiRequest<{ success: boolean; deleted: string }>(`/api/captain/upload/id/${uploadId}`, { method: 'DELETE' });
   },
 
   updateUpload: async (uploadId: string, updates: { keep_file?: boolean; metadata?: any }) => {
-    return apiRequest<{ success: boolean; upload_id: string }>(`/api/captain/upload/${uploadId}`, {
+    return apiRequest<{ success: boolean; upload_id: string }>(`/api/captain/upload/id/${uploadId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
