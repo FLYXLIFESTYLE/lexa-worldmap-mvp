@@ -22,6 +22,22 @@ router = APIRouter(prefix="/api/captain/upload", tags=["Upload"])
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
+def _safe_err_msg(e: Exception) -> str:
+    """
+    Produce a useful error string even when str(e) is empty.
+    """
+    try:
+        msg = str(e).strip()
+    except Exception:
+        msg = ""
+    if msg:
+        return msg
+    try:
+        return repr(e)
+    except Exception:
+        return e.__class__.__name__
+
+
 class UploadTextRequest(BaseModel):
     """Request model for text paste upload"""
     text: str
@@ -299,6 +315,16 @@ async def upload_file(
                     status_code=502,
                     detail="No data extracted from this file. This usually means the document has little/no readable text (e.g., mostly images), or the AI response couldn't be parsed. Try exporting as PDF with selectable text, or paste text, or use Manual Entry."
                 )
+        except HTTPException as e:
+            # Preserve the original detail/status (don't wrap into a generic 500).
+            try:
+                supabase.table("captain_uploads").update({
+                    "processing_status": "failed",
+                    "error_message": getattr(e, "detail", "HTTPException"),
+                }).eq("id", upload_id).execute()
+            except Exception:
+                pass
+            raise
         except Exception as e:
             print(f"❌ ERROR: Multipass extraction failed: {str(e)}")
             import traceback
@@ -307,13 +333,13 @@ async def upload_file(
             try:
                 supabase.table("captain_uploads").update({
                     "processing_status": "failed",
-                    "error_message": str(e)
+                    "error_message": f"{e.__class__.__name__}: {_safe_err_msg(e)}"
                 }).eq("id", upload_id).execute()
             except:
                 pass
             raise HTTPException(
                 status_code=500,
-                detail=f"Intelligence extraction failed: {str(e)}"
+                detail=f"Intelligence extraction failed: {e.__class__.__name__}: {_safe_err_msg(e)}"
             )
         
         # Save extracted intelligence to database
@@ -477,10 +503,33 @@ async def upload_text(
         }
         env = (os.getenv("ENVIRONMENT") or "").lower()
         multipass_enabled = (os.getenv("LEXA_MULTIPASS") or "").strip().lower() in {"1", "true", "yes"}
-        if env == "production" or not multipass_enabled:
-            extraction_contract = await run_fast_extraction(text_redacted, source_meta)
-        else:
-            extraction_contract = await run_multipass_extraction(text_redacted, source_meta)
+        try:
+            if env == "production" or not multipass_enabled:
+                extraction_contract = await run_fast_extraction(text_redacted, source_meta)
+            else:
+                extraction_contract = await run_multipass_extraction(text_redacted, source_meta)
+        except HTTPException as e:
+            # Preserve original detail/status
+            try:
+                supabase.table("captain_uploads").update({
+                    "processing_status": "failed",
+                    "error_message": getattr(e, "detail", "HTTPException"),
+                }).eq("id", upload_id).execute()
+            except Exception:
+                pass
+            raise
+        except Exception as e:
+            try:
+                supabase.table("captain_uploads").update({
+                    "processing_status": "failed",
+                    "error_message": f"{e.__class__.__name__}: {_safe_err_msg(e)}",
+                }).eq("id", upload_id).execute()
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=500,
+                detail=f"Intelligence extraction failed: {e.__class__.__name__}: {_safe_err_msg(e)}"
+            )
         final_package = extraction_contract.get("final_package", {}) or {}
         intelligence = _package_to_legacy(final_package)
         pkg_meta = (final_package.get("metadata", {}) if isinstance(final_package, dict) else {}) or {}
@@ -578,7 +627,10 @@ async def upload_text(
     except HTTPException as e:
         raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Processing failed: {e.__class__.__name__}: {_safe_err_msg(e)}"
+        )
 
 
 @router.get("/history")
