@@ -99,9 +99,17 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     else:
         headers = {}
     
+    # NOTE: `exc.body` can be bytes, which is not JSON serializable.
+    body_value = exc.body
+    if isinstance(body_value, (bytes, bytearray)):
+        try:
+            body_value = body_value.decode("utf-8", errors="replace")
+        except Exception:
+            body_value = "<binary>"
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": exc.errors(), "body": exc.body},
+        content={"detail": exc.errors(), "body": body_value},
         headers=headers
     )
 

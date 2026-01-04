@@ -106,6 +106,36 @@ class MultipassExtractor:
         }
         return contract
 
+    async def extract_fast(self, text: str, source: Dict[str, object]) -> ExtractionContract:
+        """
+        Fast extraction mode (single LLM call).
+        Designed for production request/response flows to avoid timeouts.
+        """
+        if not self.client:
+            raise RuntimeError("Anthropic client not initialized.")
+
+        contract = empty_contract(source=source)
+        expand = await self._run_pass(
+            pass_name="expand",
+            text=text,
+            previous_package=None,
+            extra_rules=[
+                "Expand to detailed fields; extract venues, providers, archetypes, sub_experiences where possible.",
+                "Populate script_seed (no venue names in signature_highlights).",
+                "Add per-item confidence 0–1 where possible.",
+                "Return strict JSON with package + findings + warnings + status.",
+            ],
+        )
+        contract["passes"].append(expand)
+        contract["final_package"] = expand.get("package", {})  # type: ignore
+        contract["report"] = {
+            "warnings": expand.get("warnings", []),
+            "findings": expand.get("findings", []),
+            "generated_at": datetime.utcnow().isoformat(),
+            "mode": "fast",
+        }
+        return contract
+
     async def _run_pass(
         self,
         pass_name: str,
@@ -227,3 +257,8 @@ def get_multipass_extractor() -> MultipassExtractor:
 async def run_multipass_extraction(text: str, source: Dict[str, object]) -> ExtractionContract:
     extractor = get_multipass_extractor()
     return await extractor.extract(text, source)
+
+
+async def run_fast_extraction(text: str, source: Dict[str, object]) -> ExtractionContract:
+    extractor = get_multipass_extractor()
+    return await extractor.extract_fast(text, source)

@@ -49,6 +49,7 @@ export default function CaptainUploadPage() {
   const [selectedPois, setSelectedPois] = useState<Set<number>>(new Set());
   const [selectedExperiences, setSelectedExperiences] = useState<Set<number>>(new Set());
   const [selectedProviders, setSelectedProviders] = useState<Set<number>>(new Set());
+  const isProcessing = loading || files.some(f => f.status === 'processing');
   
   // URL Scraping State
   const [url, setUrl] = useState('');
@@ -539,6 +540,15 @@ export default function CaptainUploadPage() {
                 </p>
               </label>
             </div>
+
+            {isProcessing && (
+              <div className="mt-4 w-full">
+                <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-2 w-1/2 bg-blue-500 animate-pulse" />
+                </div>
+                <p className="text-sm text-gray-600 mt-2">Processing… extracting data from your file.</p>
+              </div>
+            )}
 
             {files.length > 0 && (
               <div className="mt-6 space-y-2">

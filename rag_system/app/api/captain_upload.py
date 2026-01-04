@@ -10,7 +10,7 @@ from datetime import datetime
 import os
 
 from app.services.file_processor import process_file_auto
-from app.services.multipass_extractor import run_multipass_extraction
+from app.services.multipass_extractor import run_multipass_extraction, run_fast_extraction
 from app.services.intelligence_storage import save_intelligence_to_db
 from app.services.supabase_client import get_supabase
 
@@ -244,7 +244,11 @@ async def upload_file(
                 "file_type": metadata.get("file_type"),
                 "file_size": file_size,
             }
-            extraction_contract = await run_multipass_extraction(extracted_text, source_meta)
+            # In production (Render), use fast single-pass extraction to avoid timeouts.
+            if (os.getenv("ENVIRONMENT") or "").lower() == "production":
+                extraction_contract = await run_fast_extraction(extracted_text, source_meta)
+            else:
+                extraction_contract = await run_multipass_extraction(extracted_text, source_meta)
             final_package = extraction_contract.get("final_package", {}) or {}
             intelligence = _package_to_legacy(final_package)
 
@@ -409,7 +413,10 @@ async def upload_text(
             "file_type": "text",
             "text_length": len(request.text)
         }
-        extraction_contract = await run_multipass_extraction(request.text, source_meta)
+        if (os.getenv("ENVIRONMENT") or "").lower() == "production":
+            extraction_contract = await run_fast_extraction(request.text, source_meta)
+        else:
+            extraction_contract = await run_multipass_extraction(request.text, source_meta)
         final_package = extraction_contract.get("final_package", {}) or {}
         intelligence = _package_to_legacy(final_package)
         
