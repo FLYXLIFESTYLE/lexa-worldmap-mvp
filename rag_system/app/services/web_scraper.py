@@ -164,28 +164,63 @@ class WebScraper:
         candidates = [f"{root}/wp-sitemap.xml", f"{root}/sitemap.xml"]
 
         urls: List[str] = []
+
+        async def _fetch_one_sitemap(client: httpx.AsyncClient, sitemap_url: str) -> List[str]:
+            try:
+                r = await client.get(sitemap_url, headers={"User-Agent": "LEXA-Scraper/1.0"})
+                if r.status_code != 200 or not r.text:
+                    return []
+                soup = BeautifulSoup(r.text, "xml")
+                locs = [loc.get_text(strip=True) for loc in soup.find_all("loc")]
+                out: List[str] = []
+                for u in locs:
+                    try:
+                        u_parsed = urlparse(u)
+                        if u_parsed.netloc != parsed.netloc:
+                            continue
+                        clean = u.split("#")[0].split("?")[0]
+                        if clean:
+                            out.append(clean)
+                    except Exception:
+                        continue
+                return out
+            except Exception:
+                return []
+
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             for sm in candidates:
-                try:
-                    r = await client.get(sm, headers={"User-Agent": "LEXA-Scraper/1.0"})
-                    if r.status_code != 200 or not r.text:
-                        continue
-                    soup = BeautifulSoup(r.text, "xml")
-                    locs = [loc.get_text(strip=True) for loc in soup.find_all("loc")]
-                    for u in locs:
-                        try:
-                            u_parsed = urlparse(u)
-                            if u_parsed.netloc != parsed.netloc:
-                                continue
-                            clean = u.split("#")[0].split("?")[0]
-                            if clean:
-                                urls.append(clean)
-                        except Exception:
-                            continue
-                    if urls:
-                        break
-                except Exception:
+                locs = await _fetch_one_sitemap(client, sm)
+                if not locs:
                     continue
+
+                # WordPress often returns a sitemap index (locs ending with .xml).
+                # If so, follow a limited number of sub-sitemaps to get real page URLs.
+                xml_locs = [u for u in locs if u.lower().endswith(".xml")]
+                non_xml_locs = [u for u in locs if not u.lower().endswith(".xml")]
+
+                collected: List[str] = []
+                collected.extend(non_xml_locs)
+
+                if xml_locs and not non_xml_locs:
+                    # Treat as sitemap index
+                    seen_sitemaps = set()
+                    # Limit: don't crawl huge sites accidentally
+                    for sub_sm in xml_locs[:8]:
+                        if sub_sm in seen_sitemaps:
+                            continue
+                        seen_sitemaps.add(sub_sm)
+                        sub_locs = await _fetch_one_sitemap(client, sub_sm)
+                        # Keep only non-xml entries (real pages)
+                        for u in sub_locs:
+                            if u.lower().endswith(".xml"):
+                                continue
+                            collected.append(u)
+                        if len(collected) >= 800:
+                            break
+
+                if collected:
+                    urls.extend(collected)
+                    break
 
         # De-dupe while preserving order
         seen = set()
