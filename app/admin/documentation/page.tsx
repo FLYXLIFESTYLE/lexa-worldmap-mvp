@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import AdminNav from '@/components/admin/admin-nav';
+import PortalShell from '@/components/portal/portal-shell';
 
 export default function DocumentationPage() {
   const [architecture, setArchitecture] = useState('');
@@ -44,35 +45,23 @@ export default function DocumentationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                📖 Platform Architecture & Documentation
-              </h1>
-              <p className="text-gray-600 mb-4">
-                Complete system architecture, features, and technical documentation
-              </p>
-              
-              {/* Why - What - How */}
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-1.5 max-w-2xl">
-                <div className="text-sm">
-                  <strong className="text-purple-900">WHY:</strong> <span className="text-gray-700">Understand LEXA's architecture for effective contribution and troubleshooting</span>
-                </div>
-                <div className="text-sm">
-                  <strong className="text-purple-900">WHAT:</strong> <span className="text-gray-700">Complete system overview, components, scoring, relationships, and data flow</span>
-                </div>
-                <div className="text-sm">
-                  <strong className="text-purple-900">HOW:</strong> <span className="text-gray-700">Scroll through sections or use browser search (Ctrl+F) to find specific topics</span>
-                </div>
-              </div>
-            </div>
-            <AdminNav />
-          </div>
-        </div>
+    <PortalShell
+      icon="📖"
+      title="Platform Architecture"
+      subtitle="System overview and technical documentation"
+      backLink={{ href: '/admin/dashboard', label: 'Back to Admin' }}
+      topRight={<AdminNav />}
+      mission={[
+        { label: 'WHY', text: "Understand LEXA's architecture for faster troubleshooting." },
+        { label: 'WHAT', text: 'System overview, components, scoring, relationships, and data flow.' },
+        { label: 'HOW', text: 'Use Ctrl+F to find topics, or scroll through headings.' },
+      ]}
+      quickTips={[
+        'If you change a flow (upload → extract → verify → promote), update this doc the same day.',
+        'Keep architecture sections short: link out to deeper docs when needed.',
+        'Prefer “source-backed” knowledge and audit trails for anything critical.',
+      ]}
+    >
 
         {/* Content */}
         <div className="bg-white rounded-lg shadow-sm p-8">
@@ -168,8 +157,7 @@ export default function DocumentationPage() {
             </p>
           </a>
         </div>
-      </div>
-    </div>
+    </PortalShell>
   );
 }
 

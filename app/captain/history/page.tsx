@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
 import { uploadAPI } from '@/lib/api/captain-portal';
+import PortalShell from '@/components/portal/portal-shell';
 
 interface UploadRecord {
   id: string;
@@ -243,36 +244,23 @@ export default function CaptainHistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              📊 Your Upload History
-            </h1>
-            <p className="text-lg text-gray-600 mb-4">
-              Track your uploads, extraction statistics, and manage your files
-            </p>
-            
-            {/* Info Box */}
-            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 space-y-2 max-w-3xl">
-              <div className="text-sm">
-                <strong className="text-indigo-900">PERSONAL VIEW:</strong>{' '}
-                <span className="text-gray-700">Only YOUR uploads are shown here</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-indigo-900">FILE STORAGE:</strong>{' '}
-                <span className="text-gray-700">Kept files can be downloaded, deleted files retain extracted knowledge</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-indigo-900">RE-PROCESS:</strong>{' '}
-                <span className="text-gray-700">Failed uploads can be re-processed to try again</span>
-              </div>
-            </div>
-          </div>
-          <AdminNav />
-        </div>
+    <PortalShell
+      icon="📊"
+      title="Your Upload History"
+      subtitle="Track your uploads, extraction statistics, and manage your files"
+      backLink={{ href: '/captain', label: 'Back to Captain Portal' }}
+      topRight={<AdminNav />}
+      mission={[
+        { label: 'PERSONAL VIEW', text: 'Only YOUR uploads are shown here.' },
+        { label: 'FILE STORAGE', text: 'Deleted files can still keep extracted knowledge.' },
+        { label: 'RE-PROCESS', text: 'If an upload fails, you can try again with a better source file.' },
+      ]}
+      quickTips={[
+        'If extraction returns 0 items, the file likely has no readable text (scan/image). Try a text-based PDF.',
+        'Deleting an upload removes the record; extracted knowledge may remain depending on the data type.',
+        'Use “Keep file” if you want to download the source later.',
+      ]}
+    >
 
         {/* Stats Dashboard */}
         <div className="grid grid-cols-4 md:grid-cols-8 gap-4 mb-8">
@@ -539,17 +527,6 @@ export default function CaptainHistoryPage() {
             ))
           )}
         </div>
-
-        {/* Back Button */}
-        <div className="mt-8">
-          <button
-            onClick={() => router.push('/captain')}
-            className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-          >
-            ← Back to Captain Portal
-          </button>
-        </div>
-      </div>
-    </div>
+    </PortalShell>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AdminNav from '@/components/admin/admin-nav';
 import { ReleaseDay, ReleaseNote, SortOrder, FilterScope } from '@/lib/release-notes/types';
+import PortalShell from '@/components/portal/portal-shell';
 
 const categoryColors = {
   feature: 'bg-blue-100 text-blue-800',
@@ -106,33 +107,23 @@ export default function ReleaseNotesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              Release Notes
-            </h1>
-            <p className="text-lg text-gray-600 mb-4">
-              Daily changelog and feature updates
-            </p>
-            
-            {/* Why - What - How */}
-            <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 space-y-2 max-w-2xl">
-              <div className="text-sm">
-                <strong className="text-teal-900">WHY:</strong> <span className="text-gray-700">Track LEXA's evolution and stay informed about new features and improvements</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-teal-900">WHAT:</strong> <span className="text-gray-700">Chronological log of features, enhancements, bug fixes, and system changes</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-teal-900">HOW:</strong> <span className="text-gray-700">Sort by date, filter by scope (internal/published), and expand days to see details</span>
-              </div>
-            </div>
-          </div>
-          <AdminNav />
-        </div>
+    <PortalShell
+      icon="📝"
+      title="Release Notes"
+      subtitle="Daily changelog and feature updates"
+      backLink={{ href: '/admin/dashboard', label: 'Back to Admin' }}
+      topRight={<AdminNav />}
+      mission={[
+        { label: 'WHY', text: "Track LEXA's evolution and stay informed about improvements." },
+        { label: 'WHAT', text: 'Chronological log of features, enhancements, bug fixes, and system changes.' },
+        { label: 'HOW', text: 'Sort by date, filter by visibility, and expand a day for details.' },
+      ]}
+      quickTips={[
+        'Write one short entry per day (even if it’s “no changes”).',
+        'Mark internal items as internal until ready to publish.',
+        'Link changes to the tool/page that was affected.',
+      ]}
+    >
 
         {/* Filters & Sort */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -332,8 +323,7 @@ export default function ReleaseNotesPage() {
             })}
           </div>
         )}
-      </div>
-    </div>
+    </PortalShell>
   );
 }
 

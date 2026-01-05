@@ -11,6 +11,7 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
 import { uploadAPI, scrapingAPI } from '@/lib/api/captain-portal';
+import PortalShell from '@/components/portal/portal-shell';
 
 type UploadMode = 'file' | 'url' | 'manual' | 'yacht';
 
@@ -825,34 +826,23 @@ function CaptainUploadPageInner() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              📤 Upload & Manual Entry
-            </h1>
-            <p className="text-lg text-gray-600 mb-4">
-              Upload documents, scrape URLs, enter POIs manually, or upload yacht destinations
-            </p>
-            
-            {/* Info Box */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2 max-w-3xl">
-              {mode === 'file' && (
-                <div className="text-sm">
-                  <strong className="text-blue-900">UPLOAD FORMATS:</strong>{' '}
-                  <span className="text-gray-700">PDF, Word, Excel, .txt, Images (.png, .jpg, .jpeg), or paste text</span>
-                </div>
-              )}
-              <div className="text-sm">
-                <strong className="text-blue-900">CONFIDENCE SCORE:</strong>{' '}
-                <span className="text-gray-700">Defaults to 80% (maximum for uploads). Captain approval required for higher scores.</span>
-              </div>
-            </div>
-          </div>
-          <AdminNav />
-        </div>
+    <PortalShell
+      icon="📤"
+      title="Upload & Manual Entry"
+      subtitle="Upload documents, scrape URLs, enter POIs manually, or upload yacht destinations"
+      backLink={{ href: '/captain', label: 'Back to Captain Portal' }}
+      topRight={<AdminNav />}
+      mission={[
+        { label: 'UPLOAD FORMATS', text: 'PDF, Word, Excel, .txt, Images (.png, .jpg, .jpeg), or paste text.' },
+        { label: 'CONFIDENCE SCORE', text: 'Uploads default to 80% (max). Verification is required for higher scores.' },
+        { label: 'WORKFLOW', text: 'Upload → review/edit → keep/dump → (later) promote to official knowledge.' },
+      ]}
+      quickTips={[
+        'If an upload extracts 0 items, your file likely has no readable text (scan/image). Try a text-based PDF.',
+        'For URLs, use “Force” if you need to refresh cached results.',
+        'Saving edits also marks the item as KEEP (so you can find it again later).',
+      ]}
+    >
 
         {/* Mode Selector */}
         <div className="flex flex-wrap gap-3 mb-8">
@@ -2229,18 +2219,7 @@ function CaptainUploadPageInner() {
             </div>
           </div>
         )}
-
-        {/* Back Button */}
-        <div className="mt-8">
-          <button
-            onClick={() => router.push('/captain')}
-            className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-          >
-            ← Back to Captain Portal
-          </button>
-        </div>
-      </div>
-    </div>
+    </PortalShell>
   );
 }
 

@@ -10,22 +10,24 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
 import { poisAPI } from '@/lib/api/captain-portal';
+import PortalShell from '@/components/portal/portal-shell';
 
 interface POI {
   id: string;
   name: string;
-  category: string;
-  description: string;
-  location: string;
+  destination: string | null;
+  category: string | null;
+  description: string | null;
   confidence_score: number;
-  data_quality: 'excellent' | 'good' | 'fair' | 'poor';
   verified: boolean;
   enhanced: boolean;
+  promoted_to_main: boolean;
   created_at: string;
   updated_at: string;
   created_by: string;
-  luxury_score?: number;
-  tags: string[];
+  luxury_score?: number | null;
+  keywords?: string[] | null;
+  themes?: string[] | null;
 }
 
 type ViewMode = 'list' | 'edit';
@@ -54,7 +56,6 @@ export default function CaptainBrowsePage() {
   const [editedConfidence, setEditedConfidence] = useState(80);
   const [editedLuxuryScore, setEditedLuxuryScore] = useState(0);
   const [editedTags, setEditedTags] = useState('');
-  const [requestingApproval, setRequestingApproval] = useState(false);
 
   // Stats
   const [stats, setStats] = useState({
@@ -82,69 +83,34 @@ export default function CaptainBrowsePage() {
   const fetchPOIs = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // Mock data for now
-      const mockPOIs: POI[] = [
-        {
-          id: '1',
-          name: 'Le Louis XV - Alain Ducasse',
-          category: 'restaurant',
-          description: '3 Michelin stars. Exceptional Mediterranean cuisine in an opulent Belle Époque setting.',
-          location: 'Monaco',
-          confidence_score: 95,
-          data_quality: 'excellent',
-          verified: true,
-          enhanced: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          created_by: 'captain@lexa.com',
-          luxury_score: 95,
-          tags: ['fine-dining', 'michelin', 'french-cuisine']
-        },
-        {
-          id: '2',
-          name: 'Hotel de Paris Monte-Carlo',
-          category: 'hotel',
-          description: 'Legendary palace hotel since 1864.',
-          location: 'Monaco',
-          confidence_score: 75,
-          data_quality: 'fair',
-          verified: false,
-          enhanced: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          created_by: 'captain@lexa.com',
-          luxury_score: 90,
-          tags: ['luxury', 'historic']
-        },
-        {
-          id: '3',
-          name: 'Yacht Charter Experience',
-          category: 'activity',
-          description: 'Private yacht charter along the French Riviera.',
-          location: 'Nice',
-          confidence_score: 60,
-          data_quality: 'poor',
-          verified: false,
-          enhanced: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          created_by: 'system',
-          tags: ['yacht', 'charter']
-        }
-      ];
-      
-      setPois(mockPOIs);
-      setFilteredPois(mockPOIs);
-      
+      const res = await poisAPI.getPOIs({ skip: 0, limit: 100 });
+      const list = (res.pois || []) as POI[];
+
+      // Normalize arrays (keywords/themes can be null)
+      const normalized = list.map((p) => ({
+        ...p,
+        keywords: Array.isArray(p.keywords) ? p.keywords : [],
+        themes: Array.isArray(p.themes) ? p.themes : [],
+      }));
+
+      setPois(normalized);
+      setFilteredPois(normalized);
+
       // Calculate stats
-      const total = mockPOIs.length;
-      const verified = mockPOIs.filter(p => p.verified).length;
-      const needsVerification = total - verified;
-      const lowQuality = mockPOIs.filter(p => p.data_quality === 'poor' || p.data_quality === 'fair').length;
-      const avgConfidence = mockPOIs.reduce((sum, p) => sum + p.confidence_score, 0) / total;
-      
-      setStats({ total, verified, needsVerification, lowQuality, avgConfidence });
+      const total = normalized.length;
+      const verifiedCount = normalized.filter((p) => p.verified).length;
+      const needsVerification = total - verifiedCount;
+      const lowQuality = normalized.filter((p) => p.confidence_score < 80).length;
+      const avgConfidence =
+        total === 0 ? 0 : normalized.reduce((sum, p) => sum + (p.confidence_score || 0), 0) / total;
+
+      setStats({
+        total,
+        verified: verifiedCount,
+        needsVerification,
+        lowQuality,
+        avgConfidence,
+      });
     } catch (error) {
       console.error('Failed to fetch POIs:', error);
     } finally {
@@ -160,8 +126,8 @@ export default function CaptainBrowsePage() {
     if (searchQuery) {
       filtered = filtered.filter(poi =>
         poi.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        poi.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        poi.location.toLowerCase().includes(searchQuery.toLowerCase())
+        (poi.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (poi.destination || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     
@@ -172,7 +138,7 @@ export default function CaptainBrowsePage() {
     
     // Quality
     if (qualityFilter !== 'all') {
-      filtered = filtered.filter(poi => poi.data_quality === qualityFilter);
+      filtered = filtered.filter(poi => getQualityFromScore(poi.confidence_score) === qualityFilter);
     }
     
     // Score
@@ -191,12 +157,12 @@ export default function CaptainBrowsePage() {
   const handleEdit = (poi: POI) => {
     setSelectedPoi(poi);
     setEditedName(poi.name);
-    setEditedDescription(poi.description);
-    setEditedLocation(poi.location);
-    setEditedCategory(poi.category);
+    setEditedDescription(poi.description || '');
+    setEditedLocation(poi.destination || '');
+    setEditedCategory(poi.category || 'restaurant');
     setEditedConfidence(poi.confidence_score);
     setEditedLuxuryScore(poi.luxury_score || 0);
-    setEditedTags(poi.tags.join(', '));
+    setEditedTags((poi.keywords || []).join(', '));
     setViewMode('edit');
   };
 
@@ -204,43 +170,44 @@ export default function CaptainBrowsePage() {
   const handleSave = async () => {
     if (!selectedPoi) return;
     
-    // Check if confidence score increased beyond 80%
-    const needsApproval = editedConfidence > 80 && editedConfidence > selectedPoi.confidence_score;
-    
-    if (needsApproval && !requestingApproval) {
-      if (confirm('Increasing confidence beyond 80% requires captain approval. Request approval?')) {
-        setRequestingApproval(true);
-      } else {
-        return;
-      }
-    }
-    
     try {
-      // TODO: Call backend API to save POI
-      const updatedPoi: POI = {
-        ...selectedPoi,
-        name: editedName,
-        description: editedDescription,
-        location: editedLocation,
-        category: editedCategory,
-        confidence_score: needsApproval ? selectedPoi.confidence_score : editedConfidence,
-        luxury_score: editedLuxuryScore,
-        tags: editedTags.split(',').map(t => t.trim()).filter(t => t),
-        enhanced: true,
-        updated_at: new Date().toISOString()
-      };
-      
-      setPois(prev => prev.map(p => p.id === selectedPoi.id ? updatedPoi : p));
-      
-      if (needsApproval && requestingApproval) {
-        alert('✅ Changes saved! Confidence score increase submitted for approval.');
+      const nextKeywords = editedTags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const wantsHighConfidence = editedConfidence > 80;
+
+      let updatedPoi: POI | null = null;
+
+      // Rule: scores >80 require verification (this is the "Captain approval")
+      if (wantsHighConfidence && !selectedPoi.verified) {
+        const ok = confirm(
+          'To set confidence above 80%, you must VERIFY this POI (Captain approval). Verify now?'
+        );
+        if (!ok) return;
+
+        const res = await poisAPI.verifyPOI(selectedPoi.id, true, editedConfidence);
+        updatedPoi = (res as any).poi as POI;
       } else {
-        alert('✅ POI updated successfully!');
+        const res = await poisAPI.updatePOI(selectedPoi.id, {
+          name: editedName,
+          destination: editedLocation,
+          category: editedCategory,
+          description: editedDescription,
+          confidence_score: wantsHighConfidence ? editedConfidence : editedConfidence,
+          luxury_score: editedLuxuryScore || undefined,
+          keywords: nextKeywords,
+          enhanced: true,
+        });
+        updatedPoi = (res as any).poi as POI;
       }
+
+      setPois((prev) => prev.map((p) => (p.id === selectedPoi.id ? { ...p, ...updatedPoi! } : p)));
+      alert('✅ POI saved successfully!');
       
       setViewMode('list');
       setSelectedPoi(null);
-      setRequestingApproval(false);
     } catch (error) {
       alert('❌ Failed to save POI');
     }
@@ -251,14 +218,44 @@ export default function CaptainBrowsePage() {
     if (!confirm(`Mark "${poi.name}" as verified?`)) return;
     
     try {
-      // TODO: Call backend API
-      setPois(prev => prev.map(p => 
-        p.id === poi.id ? { ...p, verified: true, updated_at: new Date().toISOString() } : p
-      ));
+      const res = await poisAPI.verifyPOI(poi.id, true);
+      const updated = (res as any).poi as POI;
+      setPois((prev) => prev.map((p) => (p.id === poi.id ? { ...p, ...updated } : p)));
       alert('✅ POI verified!');
     } catch (error) {
       alert('❌ Failed to verify POI');
     }
+  };
+
+  const handlePromote = async (poi: POI) => {
+    if (!poi.verified) {
+      alert('⚠️ Please verify this POI first.');
+      return;
+    }
+    if (poi.promoted_to_main) {
+      alert('✅ This POI is already promoted.');
+      return;
+    }
+    if (!confirm(`Promote "${poi.name}" to official knowledge (Neo4j)?`)) return;
+
+    try {
+      await poisAPI.promotePOI(poi.id);
+      setPois((prev) =>
+        prev.map((p) =>
+          p.id === poi.id ? { ...p, promoted_to_main: true, updated_at: new Date().toISOString() } : p
+        )
+      );
+      alert('✅ POI promoted! It is now official knowledge.');
+    } catch (error: any) {
+      alert(`❌ Failed to promote POI: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const getQualityFromScore = (score: number): 'excellent' | 'good' | 'fair' | 'poor' => {
+    if (score >= 90) return 'excellent';
+    if (score >= 80) return 'good';
+    if (score >= 60) return 'fair';
+    return 'poor';
   };
 
   // Get quality badge color
@@ -291,36 +288,23 @@ export default function CaptainBrowsePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              🔍 Browse, Verify & Enhance
-            </h1>
-            <p className="text-lg text-gray-600 mb-4">
-              Review POIs, verify data quality, enhance descriptions, and manage confidence scores
-            </p>
-            
-            {/* Info Box */}
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-2 max-w-3xl">
-              <div className="text-sm">
-                <strong className="text-purple-900">VERIFY:</strong>{' '}
-                <span className="text-gray-700">Check POI accuracy and mark as verified</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-purple-900">ENHANCE:</strong>{' '}
-                <span className="text-gray-700">Improve descriptions, add details, update information</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-purple-900">CONFIDENCE:</strong>{' '}
-                <span className="text-gray-700">Scores &gt;80% require captain approval to increase</span>
-              </div>
-            </div>
-          </div>
-          <AdminNav />
-        </div>
+    <PortalShell
+      icon="🔍"
+      title="Browse, Verify & Enhance"
+      subtitle="Review POIs, verify data quality, enhance descriptions, and manage confidence scores"
+      backLink={{ href: '/captain', label: 'Back to Captain Portal' }}
+      topRight={<AdminNav />}
+      mission={[
+        { label: 'VERIFY', text: 'Check POI accuracy and mark as verified.' },
+        { label: 'ENHANCE', text: 'Improve descriptions and add missing details.' },
+        { label: 'CONFIDENCE', text: 'Scores >80% require captain verification.' },
+      ]}
+      quickTips={[
+        'Verify first, then increase confidence above 80%.',
+        'Use tags to make search and matching easier for LEXA.',
+        'Only promote POIs after they are verified and clean.',
+      ]}
+    >
 
         {/* Stats Dashboard */}
         <div className="grid grid-cols-5 gap-4 mb-8">
@@ -450,6 +434,11 @@ export default function CaptainBrowsePage() {
                               ✓ Verified
                             </span>
                           )}
+                          {poi.promoted_to_main && (
+                            <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
+                              ★ Promoted
+                            </span>
+                          )}
                           {poi.enhanced && (
                             <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
                               ✨ Enhanced
@@ -459,10 +448,10 @@ export default function CaptainBrowsePage() {
                         
                         <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
                           <span className="flex items-center gap-1">
-                            📍 {poi.location}
+                            📍 {poi.destination || '—'}
                           </span>
                           <span className="flex items-center gap-1">
-                            🏷️ {poi.category}
+                            🏷️ {poi.category || '—'}
                           </span>
                         </div>
                       </div>
@@ -476,21 +465,21 @@ export default function CaptainBrowsePage() {
                     </div>
                     
                     <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                      {poi.description}
+                      {poi.description || '—'}
                     </p>
                     
                     <div className="flex items-center gap-3 mb-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getQualityColor(poi.data_quality)}`}>
-                        {poi.data_quality.toUpperCase()}
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getQualityColor(getQualityFromScore(poi.confidence_score))}`}>
+                        {getQualityFromScore(poi.confidence_score).toUpperCase()}
                       </span>
                       
-                      {poi.luxury_score && (
+                      {poi.luxury_score !== null && poi.luxury_score !== undefined && (
                         <span className="px-3 py-1 bg-lexa-gold/10 text-lexa-navy rounded-full text-xs font-semibold">
                           ⭐ Luxury: {poi.luxury_score}
                         </span>
                       )}
                       
-                      {poi.tags.map((tag, idx) => (
+                      {(poi.keywords || []).slice(0, 6).map((tag, idx) => (
                         <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
                           #{tag}
                         </span>
@@ -509,6 +498,14 @@ export default function CaptainBrowsePage() {
                             className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
                           >
                             ✓ Verify
+                          </button>
+                        )}
+                        {poi.verified && !poi.promoted_to_main && (
+                          <button
+                            onClick={() => handlePromote(poi)}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors"
+                          >
+                            ★ Promote
                           </button>
                         )}
                         <button
@@ -610,8 +607,8 @@ export default function CaptainBrowsePage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Confidence Score: {editedConfidence}%
-                    {editedConfidence > 80 && editedConfidence > selectedPoi.confidence_score && (
-                      <span className="ml-2 text-orange-600 text-xs">⚠️ Requires Approval</span>
+                    {editedConfidence > 80 && !selectedPoi.verified && (
+                      <span className="ml-2 text-orange-600 text-xs">⚠️ Requires Verification</span>
                     )}
                   </label>
                   <input
@@ -623,7 +620,7 @@ export default function CaptainBrowsePage() {
                     className="w-full"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Scores &gt;80% require captain approval to increase
+                    Scores &gt;80% require verification (captain approval)
                   </p>
                 </div>
 
@@ -634,7 +631,7 @@ export default function CaptainBrowsePage() {
                   <input
                     type="range"
                     min="0"
-                    max="100"
+                    max="10"
                     value={editedLuxuryScore}
                     onChange={(e) => setEditedLuxuryScore(parseInt(e.target.value))}
                     className="w-full"
@@ -666,16 +663,6 @@ export default function CaptainBrowsePage() {
           </div>
         )}
 
-        {/* Back Button */}
-        <div className="mt-8">
-          <button
-            onClick={() => router.push('/captain')}
-            className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-          >
-            ← Back to Captain Portal
-          </button>
-        </div>
-      </div>
-    </div>
+    </PortalShell>
   );
 }

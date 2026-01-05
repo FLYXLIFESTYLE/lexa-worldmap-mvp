@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import AdminNav from '@/components/admin/admin-nav';
+import PortalShell from '@/components/portal/portal-shell';
 
 type ToolCard = {
   id: string;
@@ -179,18 +180,22 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-lexa-cream via-white to-zinc-50 px-6 py-12">
-      <div className="mx-auto max-w-7xl">
-        {/* Top Nav */}
-        <AdminNav />
-
-        {/* Blue top section (Captain Portal style) */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
-          <h1 className="text-4xl font-bold text-lexa-navy mb-2">Admin Dashboard</h1>
-          <p className="text-zinc-700">
-            Keep this page clean. Most daily work happens in the Captain&apos;s Knowledge Portal.
-          </p>
-        </div>
+    <PortalShell
+      icon="📊"
+      title="Admin Dashboard"
+      subtitle="Keep this page clean — most daily work happens in the Captain Portal."
+      topRight={<AdminNav />}
+      mission={[
+        { label: 'FOCUS', text: 'Use Captain Portal for daily knowledge work.' },
+        { label: 'ADMIN', text: 'Use this page to manage users, bug reports, and documentation.' },
+        { label: 'SAFETY', text: 'Deactivate access quickly if needed.' },
+      ]}
+      quickTips={[
+        'If something feels “too busy”, it probably belongs in the Captain Portal, not Admin.',
+        'Bug Reports are your fastest signal for what’s broken right now.',
+        'Documentation should stay short and updated daily (Release Notes).',
+      ]}
+    >
 
         {/* Captain Portal card on top */}
         <div className="mt-6 bg-white rounded-xl shadow-lg border border-zinc-200 overflow-hidden">
@@ -256,8 +261,7 @@ export default function AdminDashboard() {
             {inactiveTools.map(renderToolCard)}
           </div>
         </div>
-      </div>
-    </div>
+    </PortalShell>
   );
 }
 

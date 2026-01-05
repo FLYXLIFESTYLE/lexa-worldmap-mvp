@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
 import { scrapingAPI } from '@/lib/api/captain-portal';
+import PortalShell from '@/components/portal/portal-shell';
 
 interface ScrapedURL {
   id: string;
@@ -251,36 +252,23 @@ export default function CaptainURLsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              🌐 Scraped URLs
-            </h1>
-            <p className="text-lg text-gray-600 mb-4">
-              All scraped URLs from the system (visible to all captains)
-            </p>
-            
-            {/* Info Box */}
-            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 space-y-2 max-w-3xl">
-              <div className="text-sm">
-                <strong className="text-indigo-900">SHARED VIEW:</strong>{' '}
-                <span className="text-gray-700">ALL captains can see ALL scraped URLs, regardless of who added them</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-indigo-900">RE-SCRAPE:</strong>{' '}
-                <span className="text-gray-700">Any captain can re-scrape a URL to refresh data</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-indigo-900">SUBPAGES:</strong>{' '}
-                <span className="text-gray-700">System automatically discovers and scrapes related pages</span>
-              </div>
-            </div>
-          </div>
-          <AdminNav />
-        </div>
+    <PortalShell
+      icon="🌐"
+      title="Scraped URLs"
+      subtitle="All scraped URLs from the system (visible to all captains)"
+      backLink={{ href: '/captain', label: 'Back to Captain Portal' }}
+      topRight={<AdminNav />}
+      mission={[
+        { label: 'SHARED VIEW', text: 'All captains can see all scraped URLs.' },
+        { label: 'RE-SCRAPE', text: 'You can refresh a URL to capture new changes.' },
+        { label: 'SUBPAGES', text: 'LEXA discovers and scrapes related pages automatically.' },
+      ]}
+      quickTips={[
+        'If a site blocks scraping, try a different page on the same domain or use a PDF source instead.',
+        '“Force” re-scrape bypasses cached results.',
+        'Scraped URLs are shared: treat them as a collaborative knowledge feed.',
+      ]}
+    >
 
         {/* Stats Dashboard */}
         <div className="grid grid-cols-4 md:grid-cols-8 gap-4 mb-8">
@@ -528,17 +516,6 @@ export default function CaptainURLsPage() {
             ))
           )}
         </div>
-
-        {/* Back Button */}
-        <div className="mt-8">
-          <button
-            onClick={() => router.push('/captain')}
-            className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-          >
-            ← Back to Captain Portal
-          </button>
-        </div>
-      </div>
-    </div>
+    </PortalShell>
   );
 }

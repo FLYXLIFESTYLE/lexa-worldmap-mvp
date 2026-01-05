@@ -198,12 +198,18 @@ export interface POI {
   destination?: string;
   category?: string;
   description?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
   confidence_score: number;
-  luxury_score?: number;
+  luxury_score?: number | null;
   verified: boolean;
   enhanced: boolean;
   promoted_to_main: boolean;
   created_at: string;
+  updated_at?: string;
+  keywords?: string[] | null;
+  themes?: string[] | null;
 }
 
 export const poisAPI = {
@@ -267,10 +273,13 @@ export const poisAPI = {
    * Promote POI to main database
    */
   promotePOI: async (poiId: string) => {
-    return apiRequest(`/api/captain/pois/${poiId}/promote`, {
-      method: 'POST',
-      body: JSON.stringify({ promote: true }),
-    });
+    // Promotion is handled inside Next.js (needs Neo4j access on node runtime).
+    const response = await fetch(`/api/captain/pois/${poiId}/promote`, { method: 'POST' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || data.details || 'Failed to promote POI');
+    }
+    return data;
   },
 
   /**

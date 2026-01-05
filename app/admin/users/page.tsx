@@ -7,6 +7,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import AdminNav from '@/components/admin/admin-nav';
+import PortalShell from '@/components/portal/portal-shell';
 
 interface CaptainUser {
   id: string;
@@ -110,197 +112,195 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-100">
-      <div className="max-w-7xl mx-auto p-8">
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={() => router.push('/admin/knowledge')}
-            className="text-lexa-navy hover:text-lexa-gold mb-4 flex items-center gap-2"
-          >
-            ← Back to Portal
-          </button>
-          <div className="flex justify-between items-center">
+    <PortalShell
+      icon="👥"
+      title="User Management"
+      subtitle="Manage captain users and permissions"
+      backLink={{ href: '/admin/dashboard', label: 'Back to Admin' }}
+      topRight={<AdminNav />}
+      mission={[
+        { label: 'YOUR MISSION', text: 'Manage who can access and improve LEXA knowledge.' },
+        { label: 'ROLES', text: 'Admins can manage everything. Other roles are access-limited.' },
+        { label: 'SAFETY', text: 'Deactivate users immediately if access should be revoked.' },
+      ]}
+      quickTips={[
+        'Use “Create New Captain” to invite a new team member (they will receive a password setup email).',
+        'Commission rate is optional (0% is fine for internal users).',
+        'Deactivate removes access, but keeps historical contributions for audit.',
+      ]}
+    >
+      {/* Page Actions */}
+      <div className="flex items-center justify-end mb-6">
+        <button
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className="px-6 py-3 bg-gradient-to-r from-lexa-navy to-lexa-gold text-white rounded-xl font-semibold hover:shadow-lg transition-all"
+        >
+          {showCreateForm ? 'Cancel' : '+ Create New Captain'}
+        </button>
+      </div>
+
+      {/* Create Form */}
+      {showCreateForm && (
+        <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+          <h2 className="text-2xl font-bold text-lexa-navy mb-6">
+            Create New Captain User
+          </h2>
+
+          <div className="space-y-4">
             <div>
-              <h1 className="text-4xl font-bold text-lexa-navy mb-2">
-                User Management
-              </h1>
-              <p className="text-zinc-600">
-                Manage captain users and permissions
+              <label className="block text-sm font-semibold text-zinc-700 mb-2">
+                Email Address *
+              </label>
+              <input
+                type="email"
+                value={newUser.email}
+                onChange={(e) => setNewUser((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="captain@example.com"
+                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-lexa-gold focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-zinc-700 mb-2">
+                Display Name *
+              </label>
+              <input
+                type="text"
+                value={newUser.displayName}
+                onChange={(e) => setNewUser((prev) => ({ ...prev, displayName: e.target.value }))}
+                placeholder="Captain Name"
+                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-lexa-gold focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-zinc-700 mb-2">
+                Role *
+              </label>
+              <select
+                value={newUser.role}
+                onChange={(e) => setNewUser((prev) => ({ ...prev, role: e.target.value as any }))}
+                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-lexa-gold focus:border-transparent"
+              >
+                <option value="admin">Admin</option>
+                <option value="internal">Internal Team</option>
+                <option value="external_captain">External Captain</option>
+                <option value="yacht_crew">Yacht Crew</option>
+                <option value="expert">Travel Expert</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-zinc-700 mb-2">
+                Commission Rate (%)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={newUser.commissionRate}
+                onChange={(e) => setNewUser((prev) => ({ ...prev, commissionRate: e.target.value }))}
+                placeholder="0.00"
+                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-lexa-gold focus:border-transparent"
+              />
+              <p className="text-sm text-zinc-500 mt-1">
+                Set to 0 for internal team. For external contributors, typical rates are 3-10%.
               </p>
             </div>
-            <button
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              className="px-6 py-3 bg-gradient-to-r from-lexa-navy to-lexa-gold text-white rounded-xl font-semibold hover:shadow-lg transition-all"
-            >
-              {showCreateForm ? 'Cancel' : '+ Create New Captain'}
-            </button>
+
+            <div className="flex gap-4 pt-4">
+              <button
+                onClick={createUser}
+                disabled={isCreating}
+                className="flex-1 px-6 py-3 bg-lexa-navy text-white rounded-lg font-semibold hover:bg-lexa-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreating ? 'Creating...' : 'Create User'}
+              </button>
+              <button
+                onClick={() => setShowCreateForm(false)}
+                className="px-6 py-3 bg-zinc-200 text-zinc-700 rounded-lg font-semibold hover:bg-zinc-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Create Form */}
-        {showCreateForm && (
-          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-bold text-lexa-navy mb-6">
-              Create New Captain User
-            </h2>
+      {/* Users Table */}
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="px-8 py-6 border-b border-zinc-200">
+          <h2 className="text-2xl font-bold text-lexa-navy">
+            Captain Users ({users.length})
+          </h2>
+        </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-zinc-700 mb-2">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="captain@example.com"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-lexa-gold focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-zinc-700 mb-2">
-                  Display Name *
-                </label>
-                <input
-                  type="text"
-                  value={newUser.displayName}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, displayName: e.target.value }))}
-                  placeholder="Captain John Smith"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-lexa-gold focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-zinc-700 mb-2">
-                  Role *
-                </label>
-                <select
-                  value={newUser.role}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value as any }))}
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-lexa-gold focus:border-transparent"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="internal">Internal Team</option>
-                  <option value="external_captain">External Captain</option>
-                  <option value="yacht_crew">Yacht Crew</option>
-                  <option value="expert">Travel Expert</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-zinc-700 mb-2">
-                  Commission Rate (%)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={newUser.commissionRate}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, commissionRate: e.target.value }))}
-                  placeholder="0.00"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-lexa-gold focus:border-transparent"
-                />
-                <p className="text-sm text-zinc-500 mt-1">
-                  Set to 0 for internal team. For external contributors, typical rates are 3-10%.
-                </p>
-              </div>
-
-              <div className="flex gap-4 pt-4">
-                <button
-                  onClick={createUser}
-                  disabled={isCreating}
-                  className="flex-1 px-6 py-3 bg-lexa-navy text-white rounded-lg font-semibold hover:bg-lexa-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isCreating ? 'Creating...' : 'Create User'}
-                </button>
-                <button
-                  onClick={() => setShowCreateForm(false)}
-                  className="px-6 py-3 bg-zinc-200 text-zinc-700 rounded-lg font-semibold hover:bg-zinc-300 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+        {isLoading ? (
+          <div className="p-12 text-center text-zinc-500">
+            Loading users...
+          </div>
+        ) : users.length === 0 ? (
+          <div className="p-12 text-center text-zinc-500">
+            No users yet. Create your first captain user to get started.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-zinc-50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-700">
+                    Name
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-700">
+                    Role
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-700">
+                    Commission Rate
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-700">
+                    Created
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-700">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200">
+                {users.map((user) => (
+                  <tr key={user.id} className="hover:bg-zinc-50">
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-zinc-900">
+                        {user.display_name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-3 py-1 bg-lexa-navy text-white rounded-full text-sm">
+                        {user.role.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-zinc-700">
+                      {user.commission_rate}%
+                    </td>
+                    <td className="px-6 py-4 text-zinc-600 text-sm">
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => deactivateUser(user.user_id, user.display_name)}
+                        className="text-red-500 hover:text-red-700 text-sm font-semibold"
+                      >
+                        Deactivate
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-
-        {/* Users Table */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="px-8 py-6 border-b border-zinc-200">
-            <h2 className="text-2xl font-bold text-lexa-navy">
-              Captain Users ({users.length})
-            </h2>
-          </div>
-
-          {isLoading ? (
-            <div className="p-12 text-center text-zinc-500">
-              Loading users...
-            </div>
-          ) : users.length === 0 ? (
-            <div className="p-12 text-center text-zinc-500">
-              No users yet. Create your first captain user to get started.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-zinc-50">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-700">
-                      Name
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-700">
-                      Role
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-700">
-                      Commission Rate
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-700">
-                      Created
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-700">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200">
-                  {users.map(user => (
-                    <tr key={user.id} className="hover:bg-zinc-50">
-                      <td className="px-6 py-4">
-                        <div className="font-semibold text-zinc-900">
-                          {user.display_name}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-3 py-1 bg-lexa-navy text-white rounded-full text-sm">
-                          {user.role.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-zinc-700">
-                        {user.commission_rate}%
-                      </td>
-                      <td className="px-6 py-4 text-zinc-600 text-sm">
-                        {new Date(user.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => deactivateUser(user.user_id, user.display_name)}
-                          className="text-red-500 hover:text-red-700 text-sm font-semibold"
-                        >
-                          Deactivate
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
       </div>
-    </div>
+    </PortalShell>
   );
 }
 

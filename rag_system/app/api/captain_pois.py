@@ -3,12 +3,30 @@ Captain POI Management API
 Browse, edit, verify, and promote POIs
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from app.services.supabase_client import get_supabase
+from app.services.supabase_auth import get_current_user
 
 router = APIRouter(prefix="/api/captain/pois", tags=["POIs"])
+
+
+def _get_role(supabase, user_id: str) -> Optional[str]:
+    """
+    Resolve captain role from captain_profiles (best-effort).
+    """
+    try:
+        resp = supabase.table("captain_profiles").select("role").eq("user_id", user_id).limit(1).execute()
+        if resp.data and isinstance(resp.data, list) and resp.data[0]:
+            return resp.data[0].get("role")
+    except Exception:
+        pass
+    return None
+
+
+def _is_admin_role(role: Optional[str]) -> bool:
+    return (role or "").lower() == "admin"
 
 
 class POIUpdateRequest(BaseModel):
@@ -48,6 +66,7 @@ class POIPromoteRequest(BaseModel):
 
 @router.get("/")
 async def get_pois(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     destination: Optional[str] = None,
@@ -64,8 +83,18 @@ async def get_pois(
     Captains see only their own POIs unless they're admins
     """
     try:
+        # Auth required (so we can enforce ownership + audit trail)
+        user = await get_current_user(request)
+        user_id = user.get("id")
+        role = _get_role(supabase, user_id)
+        is_admin = _is_admin_role(role)
+
         # Start query
         query = supabase.table('extracted_pois').select('*', count='exact')
+
+        # Ownership: non-admins see only their own extracted POIs
+        if not is_admin:
+            query = query.eq("created_by", user_id)
         
         # Apply filters
         if destination:
@@ -103,9 +132,14 @@ async def get_pois(
 
 
 @router.get("/{poi_id}")
-async def get_poi(poi_id: str, supabase = Depends(get_supabase)):
+async def get_poi(poi_id: str, request: Request, supabase = Depends(get_supabase)):
     """Get a single POI by ID"""
     try:
+        user = await get_current_user(request)
+        user_id = user.get("id")
+        role = _get_role(supabase, user_id)
+        is_admin = _is_admin_role(role)
+
         result = supabase.table('extracted_pois')\
             .select('*')\
             .eq('id', poi_id)\
@@ -113,6 +147,9 @@ async def get_poi(poi_id: str, supabase = Depends(get_supabase)):
             .execute()
         
         if not result.data:
+            raise HTTPException(status_code=404, detail="POI not found")
+
+        if (not is_admin) and result.data.get("created_by") != user_id:
             raise HTTPException(status_code=404, detail="POI not found")
         
         return result.data
@@ -127,6 +164,7 @@ async def get_poi(poi_id: str, supabase = Depends(get_supabase)):
 async def update_poi(
     poi_id: str,
     update: POIUpdateRequest,
+    request: Request,
     supabase = Depends(get_supabase)
 ):
     """
@@ -135,6 +173,11 @@ async def update_poi(
     Captains can only update their own POIs unless they're admins
     """
     try:
+        user = await get_current_user(request)
+        user_id = user.get("id")
+        role = _get_role(supabase, user_id)
+        is_admin = _is_admin_role(role)
+
         # Build update dict (only non-None values)
         update_data = {k: v for k, v in update.dict().items() if v is not None}
         
@@ -144,11 +187,11 @@ async def update_poi(
         # Add updated timestamp
         update_data['updated_at'] = 'now()'
         
-        # Perform update
-        result = supabase.table('extracted_pois')\
-            .update(update_data)\
-            .eq('id', poi_id)\
-            .execute()
+        # Perform update (enforce ownership for non-admin)
+        q = supabase.table('extracted_pois').update(update_data).eq('id', poi_id)
+        if not is_admin:
+            q = q.eq("created_by", user_id)
+        result = q.execute()
         
         if not result.data:
             raise HTTPException(status_code=404, detail="POI not found or you don't have permission")
@@ -169,6 +212,7 @@ async def update_poi(
 async def verify_poi(
     poi_id: str,
     verify_request: POIVerifyRequest,
+    request: Request,
     supabase = Depends(get_supabase)
 ):
     """
@@ -178,9 +222,15 @@ async def verify_poi(
     Verification allows increasing confidence score above 80%
     """
     try:
+        user = await get_current_user(request)
+        user_id = user.get("id")
+        role = _get_role(supabase, user_id)
+        is_admin = _is_admin_role(role)
+
         update_data = {
             'verified': verify_request.verified,
             'verified_at': 'now()' if verify_request.verified else None,
+            'verified_by': user_id if verify_request.verified else None,
             'updated_at': 'now()'
         }
         
@@ -190,10 +240,10 @@ async def verify_poi(
                 raise HTTPException(status_code=400, detail="Confidence score must be between 0 and 100")
             update_data['confidence_score'] = verify_request.confidence_score
         
-        result = supabase.table('extracted_pois')\
-            .update(update_data)\
-            .eq('id', poi_id)\
-            .execute()
+        q = supabase.table('extracted_pois').update(update_data).eq('id', poi_id)
+        if not is_admin:
+            q = q.eq("created_by", user_id)
+        result = q.execute()
         
         if not result.data:
             raise HTTPException(status_code=404, detail="POI not found")
@@ -214,6 +264,7 @@ async def verify_poi(
 async def promote_poi(
     poi_id: str,
     promote_request: POIPromoteRequest,
+    request: Request,
     supabase = Depends(get_supabase)
 ):
     """
@@ -223,12 +274,16 @@ async def promote_poi(
     This marks the POI as ready for production use by LEXA
     """
     try:
+        user = await get_current_user(request)
+        user_id = user.get("id")
+        role = _get_role(supabase, user_id)
+        is_admin = _is_admin_role(role)
+
         # Get the POI
-        poi_result = supabase.table('extracted_pois')\
-            .select('*')\
-            .eq('id', poi_id)\
-            .single()\
-            .execute()
+        q = supabase.table('extracted_pois').select('*').eq('id', poi_id)
+        if not is_admin:
+            q = q.eq("created_by", user_id)
+        poi_result = q.single().execute()
         
         if not poi_result.data:
             raise HTTPException(status_code=404, detail="POI not found")
@@ -242,12 +297,21 @@ async def promote_poi(
                 detail="POI must be verified before promotion"
             )
         
-        # TODO: Actually promote to main POIs table and Neo4j
-        # For now, just mark as promoted
+        # NOTE: The actual "promote into Neo4j" is performed by the Next.js API
+        # route (node runtime). This endpoint marks the record as promoted.
+        current_meta = poi.get("metadata") or {}
+        if not isinstance(current_meta, dict):
+            current_meta = {}
+
         result = supabase.table('extracted_pois')\
             .update({
                 'promoted_to_main': promote_request.promote,
-                'updated_at': 'now()'
+                'metadata': {
+                    **current_meta,
+                    'promoted_by': user_id if promote_request.promote else None,
+                    'promoted_at': 'now()' if promote_request.promote else None,
+                },
+                'updated_at': 'now()',
             })\
             .eq('id', poi_id)\
             .execute()
@@ -265,17 +329,22 @@ async def promote_poi(
 
 
 @router.delete("/{poi_id}")
-async def delete_poi(poi_id: str, supabase = Depends(get_supabase)):
+async def delete_poi(poi_id: str, request: Request, supabase = Depends(get_supabase)):
     """
     Delete a POI
     
     Captains can only delete their own POIs unless they're admins
     """
     try:
-        result = supabase.table('extracted_pois')\
-            .delete()\
-            .eq('id', poi_id)\
-            .execute()
+        user = await get_current_user(request)
+        user_id = user.get("id")
+        role = _get_role(supabase, user_id)
+        is_admin = _is_admin_role(role)
+
+        q = supabase.table('extracted_pois').delete().eq('id', poi_id)
+        if not is_admin:
+            q = q.eq("created_by", user_id)
+        result = q.execute()
         
         if not result.data:
             raise HTTPException(status_code=404, detail="POI not found or you don't have permission")

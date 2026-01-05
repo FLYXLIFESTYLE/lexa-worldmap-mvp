@@ -5,6 +5,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import AdminNav from '@/components/admin/admin-nav';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import PortalShell from '@/components/portal/portal-shell';
 
 interface BacklogItem {
   id: string;
@@ -468,33 +469,23 @@ export default function BacklogPage() {
   const totalHours = items.reduce((sum, item) => sum + (item.estimated_hours || 0), 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              📋 Development Backlog
-            </h1>
-            <p className="text-lg text-gray-600 mb-4">
-              Drag & drop to reorder • Click Edit for inline editing
-            </p>
-            
-            {/* Why - What - How */}
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-2 max-w-2xl">
-              <div className="text-sm">
-                <strong className="text-purple-900">WHY:</strong> <span className="text-gray-700">Keep all tasks organized by priority for efficient development planning</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-purple-900">WHAT:</strong> <span className="text-gray-700">Drag to reorder within or between priority buckets, click Edit for inline changes</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-purple-900">HOW:</strong> <span className="text-gray-700">Grab ⋮⋮ icon to drag, click Edit button to modify, filter by status</span>
-              </div>
-            </div>
-          </div>
-          <AdminNav />
-        </div>
+    <PortalShell
+      icon="📋"
+      title="Backlog"
+      subtitle="Drag & drop to reorder • Edit items inline"
+      backLink={{ href: '/admin/dashboard', label: 'Back to Admin' }}
+      topRight={<AdminNav />}
+      mission={[
+        { label: 'WHY', text: 'Keep tasks organized by priority for faster execution.' },
+        { label: 'WHAT', text: 'Reorder within/between buckets and update details inline.' },
+        { label: 'HOW', text: 'Drag with the handle, edit, and filter by status.' },
+      ]}
+      quickTips={[
+        'Keep “Critical” small: it should be truly urgent.',
+        'Add estimated hours to help planning.',
+        'Use tags to group themes (workflow, UI, extraction, etc.).',
+      ]}
+    >
 
         {/* Stats & Filters */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
@@ -696,8 +687,7 @@ export default function BacklogPage() {
             <span>←</span> Back to Dashboard
           </Link>
         </div>
-      </div>
-    </div>
+    </PortalShell>
   );
 }
 

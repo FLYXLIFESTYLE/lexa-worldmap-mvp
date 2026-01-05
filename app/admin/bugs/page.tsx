@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import AdminNav from '@/components/admin/admin-nav';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import PortalShell from '@/components/portal/portal-shell';
 
 interface BugReport {
   id: string;
@@ -240,33 +241,23 @@ export default function BugReportsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              🐛 Bug Reports
-            </h1>
-            <p className="text-lg text-gray-600 mb-4">
-              User-reported bugs and issues
-            </p>
-            
-            {/* Why - What - How */}
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2 max-w-2xl">
-              <div className="text-sm">
-                <strong className="text-red-900">WHY:</strong> <span className="text-gray-700">Track and resolve user-reported bugs to improve LEXA</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-red-900">WHAT:</strong> <span className="text-gray-700">View all bug reports with details, severity, and status</span>
-              </div>
-              <div className="text-sm">
-                <strong className="text-red-900">HOW:</strong> <span className="text-gray-700">Review reports, mark as resolved, and track critical issues</span>
-              </div>
-            </div>
-          </div>
-          <AdminNav />
-        </div>
+    <PortalShell
+      icon="🐛"
+      title="Bug Reports"
+      subtitle="User-reported bugs and issues"
+      backLink={{ href: '/admin/dashboard', label: 'Back to Admin' }}
+      topRight={<AdminNav />}
+      mission={[
+        { label: 'WHY', text: 'Track and resolve user-reported bugs to improve LEXA.' },
+        { label: 'WHAT', text: 'Review bug details, severity, screenshots, and status.' },
+        { label: 'HOW', text: 'Resolve or mark duplicates to keep the backlog clean.' },
+      ]}
+      quickTips={[
+        'Open the screenshot in a new tab to inspect details.',
+        'Resolve quickly: it reduces noise and improves user trust.',
+        'If something repeats, mark it as duplicate and keep one primary ticket.',
+      ]}
+    >
 
         {/* Stats */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
@@ -337,8 +328,7 @@ export default function BugReportsPage() {
             <span>←</span> Back to Dashboard
           </Link>
         </div>
-      </div>
-    </div>
+    </PortalShell>
   );
 }
 
