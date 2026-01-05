@@ -68,6 +68,20 @@ These are the simple rules captains should follow when reviewing extracted POIs:
    - Verification should record: who verified + when.
    - Promotion should record: who promoted + when + the resulting Neo4j `poi_uid`.
 
+## Grounded Retrieval + Ranking (Neo4j first, drafts fallback) - Quick Tips
+
+1. **Prefer approved**
+   - If a result is marked **APPROVED**, it is safe to name in the user-facing response.
+
+2. **Drafts must be labeled**
+   - If you use a draft item, explicitly say: **“unapproved draft”**.
+
+3. **Never invent venues**
+   - If retrieval returns no matches, speak in concepts and avoid naming specific places.
+
+4. **Ranking is explainable**
+   - Order by: approval status + confidence + theme fit + recency + luxury (simple weighted score).
+
 ## System Components
 
 ### Frontend (Next.js 16 + TypeScript)

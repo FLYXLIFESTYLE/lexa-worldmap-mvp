@@ -13,7 +13,7 @@ import { processBriefingInput } from '@/lib/lexa/briefing-processor';
 import { createExperienceBriefFromState } from '@/lib/lexa/stages/handoff';
 import { profilePatchFromState, mergeProfileJson } from '@/lib/lexa/profile';
 import { formatThemeMenu } from '@/lib/lexa/themes';
-import { getNeo4jDriver } from '@/lib/neo4j/client';
+import { retrieveBrainCandidatesV2 } from '@/lib/brain/retrieve-v2';
 import {
   getWelcomeSystemPrompt,
   getDisarmSystemPrompt,
@@ -347,92 +347,48 @@ async function buildGroundedPoiContext(state: SessionState): Promise<string | nu
   const destination = (state.brief?.where_at?.destination || '').trim();
   if (!destination) return null;
 
-  const themes =
-    Array.isArray(state.brief?.themes) && state.brief.themes.length > 0
-      ? state.brief.themes
-      : state.brief?.theme
-        ? [state.brief.theme]
-        : [];
-
-  const driver = getNeo4jDriver();
-  const session = driver.session();
-
   try {
-    const query = themes.length
-      ? `
-        MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
-        WHERE toLower(d.name) CONTAINS toLower($destination)
-        OPTIONAL MATCH (p)-[:HAS_THEME]->(t:theme_category)
-        WITH p, d, collect(DISTINCT t.name) AS tnames
-        WHERE any(x IN tnames WHERE x IN $themes)
-        WITH p, d, tnames,
-             coalesce(p.luxury_score_base, p.luxury_score, 0.0) AS luxury,
-             coalesce(p.confidence_score, p.luxury_confidence, 0.8) AS confidence
-        WITH p, d, tnames, luxury, confidence, (luxury * confidence) AS score
-        RETURN p.name AS name,
-               coalesce(p.type, p.category, 'poi') AS type,
-               d.name AS destination_name,
-               luxury AS luxury,
-               confidence AS confidence,
-               tnames[0..3] AS matched_themes,
-               score AS score
-        ORDER BY score DESC
-        LIMIT 6
-      `
-      : `
-        MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
-        WHERE toLower(d.name) CONTAINS toLower($destination)
-        WITH p, d,
-             coalesce(p.luxury_score_base, p.luxury_score, 0.0) AS luxury,
-             coalesce(p.confidence_score, p.luxury_confidence, 0.8) AS confidence
-        WITH p, d, luxury, confidence, (luxury * confidence) AS score
-        RETURN p.name AS name,
-               coalesce(p.type, p.category, 'poi') AS type,
-               d.name AS destination_name,
-               luxury AS luxury,
-               confidence AS confidence,
-               score AS score
-        ORDER BY score DESC
-        LIMIT 6
-      `;
+    const selectedThemes =
+      state.brief?.themes?.length ? state.brief.themes : state.brief?.theme ? [state.brief.theme] : [];
 
-    const result = await session.run(query, { destination, themes });
-    const rows = result.records.map((r) => ({
-      name: String(r.get('name')),
-      type: String(r.get('type')),
-      destination_name: String(r.get('destination_name')),
-      matched_themes: (r.has('matched_themes') ? (r.get('matched_themes') as string[]) : []) || [],
-    }));
+    const res = await retrieveBrainCandidatesV2({
+      destination,
+      themes: selectedThemes,
+      limit: 8,
+      includeDrafts: true,
+    });
 
     const header = [
-      '## Grounded POI context (Neo4j)',
-      `Destination: ${destination}`,
-      themes.length ? `Themes: ${themes.join(', ')}` : '',
+      '## Grounded Knowledge (Neo4j first, drafts as fallback)',
+      `Destination: ${res.destination}`,
+      res.usedThemes.length ? `Themes: ${res.usedThemes.join(', ')}` : '',
       '',
-      'Use ONLY the venues below if you name specific places. Do not invent venue names.',
+      'Rules:',
+      '- If you name a specific venue, prefer APPROVED items.',
+      '- If you use a DRAFT item, explicitly label it as “unapproved draft”.',
+      '- Never invent venue names.',
+      '',
     ]
       .filter(Boolean)
       .join('\n');
 
-    if (rows.length === 0) {
-      return [
-        header,
-        '',
-        'No matching POIs were retrieved. If you mention venues, keep it generic and label it as a concept.',
-      ].join('\n');
+    if (!res.candidates.length) {
+      return (
+        header +
+        'No matching items were retrieved. Keep recommendations generic and label them as concepts (not factual venue picks).'
+      );
     }
 
-    const lines = rows.map((x, idx) => {
-      const themeNote = x.matched_themes.length ? ` • themes: ${x.matched_themes.join(', ')}` : '';
-      return `${idx + 1}. ${x.name} (${x.type}) — ${x.destination_name}${themeNote}`;
+    const lines = res.candidates.map((c, idx) => {
+      const tag = c.label === 'APPROVED' ? '[APPROVED]' : c.label === 'VERIFIED_DRAFT' ? '[VERIFIED DRAFT]' : '[DRAFT]';
+      const note = c.notes ? ` — ${c.notes}` : '';
+      return `${idx + 1}. ${tag} ${c.name} (${c.type}) — ${c.destination || res.destination}${note}`;
     });
 
     return [header, ...lines].join('\n');
   } catch {
     // If Neo4j retrieval fails, don't block chat — just omit grounding.
     return null;
-  } finally {
-    await session.close();
   }
 }
 

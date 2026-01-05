@@ -45,6 +45,19 @@
    - The LEXA chat now appends **Neo4j POI grounding context** to Claude system prompts when a destination exists.
    - Rule enforced via prompt: **Do not invent venue names**; only use retrieved POIs when naming venues.
 
+### January 2026 - Step 4: Grounded Retrieval + Ranking ✅
+
+**What was added:**
+1. **Brain v2 retrieval endpoint**: `/api/brain/retrieve-v2`
+   - **Neo4j first** (approved/trusted items ranked highest)
+   - **Fallback to drafts** from Supabase `extracted_pois` (clearly labeled as drafts)
+   - Ranking factors: approval status + confidence + theme fit + recency + luxury (simple, explainable scoring)
+
+2. **LEXA chat grounding now uses the same retrieval**
+   - The assistant receives a short “Grounded Knowledge” list:
+     - `[APPROVED]` items: safe to name as venues
+     - `[DRAFT]` items: must be labeled as unapproved
+
 ### December 2025 - POI Collection System & Production Deployment
 
 **MAJOR ADDITION: Automated POI Collection System** ✅

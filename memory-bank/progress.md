@@ -76,6 +76,7 @@
 - [x] Feedback capture (thumbs up/down) + interaction event logging (learning signals)
 - [x] Explainable retrieval endpoint (theme + destination -> ranked results with reasons)
 - [x] Grounded Neo4j retrieval injected into LEXA chat prompts when destination exists (prevents invented venue names)
+- [x] Step 4 (Brain v2): Grounded retrieval + ranking endpoint `/api/brain/retrieve-v2` (Neo4j first, drafts fallback, labeled)
 
 ### Captain Approval & Promotion (POIs)
 - [x] Verification audit trail on extracted POIs (`verified_by`, `verified_at`)
