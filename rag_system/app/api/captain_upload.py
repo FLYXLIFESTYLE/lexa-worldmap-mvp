@@ -61,6 +61,70 @@ class UpdateUploadRequest(BaseModel):
     metadata: Optional[dict] = None
 
 
+def _fallback_pois_from_text(text: str, limit: int = 40) -> List[dict]:
+    """
+    Very simple backup extractor used when the AI returns 0 items.
+
+    It tries to turn "list-style" documents into draft POIs so the Captain can
+    verify/clean them instead of the upload failing completely.
+    """
+    if not text:
+        return []
+
+    def clean_line(s: str) -> str:
+        s = (s or "").strip()
+        # strip common bullets / numbering
+        s = s.lstrip("-•* \t")
+        # "1) Foo" / "1. Foo"
+        if len(s) > 2 and s[0].isdigit():
+            s = s.lstrip("0123456789").lstrip("). -\t")
+        return s.strip()
+
+    # Prefer shorter, list-like lines
+    lines = [clean_line(l) for l in (text or "").splitlines()]
+    lines = [l for l in lines if 4 <= len(l) <= 140]
+
+    # Drop obvious non-POI lines
+    blacklist = ("http://", "https://", "@", "email", "phone", "tel:", "copyright", "all rights reserved")
+    lines = [l for l in lines if not any(b in l.lower() for b in blacklist)]
+
+    seen = set()
+    pois: List[dict] = []
+    for l in lines:
+        # Use part before common separators as a "name"
+        name = l
+        for sep in (" — ", " - ", " – ", ":", "|"):
+            if sep in name:
+                name = name.split(sep, 1)[0].strip()
+                break
+        # basic sanity
+        if len(name) < 3:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+
+        pois.append(
+            {
+                "name": name,
+                "type": None,
+                "location": None,
+                "description": l if l != name else None,
+                "category": None,
+                "address": None,
+                "coordinates": {"lat": None, "lng": None},
+                # Keep it clearly a draft: 50% confidence
+                "confidence": 0.5,
+                "metadata": {"fallback_extractor": True},
+            }
+        )
+        if len(pois) >= limit:
+            break
+
+    return pois
+
+
 def _package_to_legacy(intel_package: dict) -> dict:
     """
     Convert multipass final_package into the legacy intelligence shape
@@ -278,6 +342,7 @@ async def upload_file(
         print(f"Text length to analyze: {len(extracted_text)}")
         print(f"First 500 chars of text:\n{extracted_text[:500]}")
         
+        fallback_used = False
         try:
             source_meta = {
                 "upload_id": upload_id,
@@ -310,19 +375,27 @@ async def upload_file(
             )
             
             if total_items == 0:
-                error_msg = "Multipass extraction returned ZERO items. Possible causes: Claude API empty, JSON parse failure, or unextractable content."
-                print(f"⚠️ WARNING: {error_msg}")
-                try:
-                    supabase.table("captain_uploads").update({
-                        "processing_status": "failed",
-                        "error_message": error_msg
-                    }).eq("id", upload_id).execute()
-                except:
-                    pass
-                raise HTTPException(
-                    status_code=502,
-                    detail="No data extracted from this file. This usually means the document has little/no readable text (e.g., mostly images), or the AI response couldn't be parsed. Try exporting as PDF with selectable text, or paste text, or use Manual Entry."
-                )
+                # Backup plan: create draft POIs from list-like lines so the Captain can verify/clean.
+                fallback_pois = _fallback_pois_from_text(extracted_text, limit=40)
+                if fallback_pois:
+                    fallback_used = True
+                    intelligence["pois"] = fallback_pois
+                    total_items = len(fallback_pois)
+                    print(f"⚠️ WARNING: AI returned 0 items — using fallback POI extractor ({total_items} draft POIs).")
+                else:
+                    error_msg = "Extraction returned ZERO items (AI + fallback)."
+                    print(f"⚠️ WARNING: {error_msg}")
+                    try:
+                        supabase.table("captain_uploads").update({
+                            "processing_status": "failed",
+                            "error_message": error_msg
+                        }).eq("id", upload_id).execute()
+                    except Exception:
+                        pass
+                    raise HTTPException(
+                        status_code=502,
+                        detail="No data extracted from this file. This usually means the document has little/no readable text (e.g., mostly images), or the AI response couldn't be parsed. Try exporting as PDF with selectable text, or paste text, or use Manual Entry."
+                    )
         except HTTPException as e:
             # Preserve the original detail/status (don't wrap into a generic 500).
             try:
@@ -412,6 +485,7 @@ async def upload_file(
                     "extracted_data": intelligence,
                     "captain_summary": pkg_meta.get("captain_summary"),
                     "report_markdown": pkg_meta.get("report_markdown"),
+                    "fallback_extraction_used": fallback_used,
                 },
             }).eq("id", upload_id).execute()
         except Exception as e:
@@ -440,7 +514,7 @@ async def upload_file(
             "extracted_data": intelligence,  # Return full intelligence for editing
             "extraction_contract": extraction_contract,
             "file_size_kb": file_size / 1024,
-            "message": "File processed successfully"
+            "message": "File processed successfully" + (" (fallback draft POIs created — please verify/clean)" if fallback_used else "")
         }
         
     except HTTPException as e:
@@ -557,18 +631,25 @@ async def upload_text(
             len(intelligence.get('trends', [])) +
             len(intelligence.get('competitor_analysis', []))
         )
+        fallback_used = False
         if total_items == 0:
-            try:
-                supabase.table("captain_uploads").update({
-                    "processing_status": "failed",
-                    "error_message": "Extraction returned zero items."
-                }).eq("id", upload_id).execute()
-            except Exception:
-                pass
-            raise HTTPException(
-                status_code=502,
-                detail="No data extracted from this text. Please paste more detailed content (50+ characters) and try again."
-            )
+            fallback_pois = _fallback_pois_from_text(text_redacted, limit=40)
+            if fallback_pois:
+                fallback_used = True
+                intelligence["pois"] = fallback_pois
+                total_items = len(fallback_pois)
+            else:
+                try:
+                    supabase.table("captain_uploads").update({
+                        "processing_status": "failed",
+                        "error_message": "Extraction returned zero items."
+                    }).eq("id", upload_id).execute()
+                except Exception:
+                    pass
+                raise HTTPException(
+                    status_code=502,
+                    detail="No data extracted from this text. Please paste more detailed content (50+ characters) and try again."
+                )
         
         # Save to database
         await save_intelligence_to_db(
@@ -616,6 +697,7 @@ async def upload_text(
                     "extracted_data": intelligence,
                     "captain_summary": pkg_meta.get("captain_summary"),
                     "report_markdown": pkg_meta.get("report_markdown"),
+                    "fallback_extraction_used": fallback_used,
                 },
             }).eq("id", upload_id).execute()
         except Exception:
@@ -641,7 +723,7 @@ async def upload_text(
             "counts_estimated": estimated_counts,
             "extraction_contract": extraction_contract,
             "file_size_kb": len(text_redacted.encode('utf-8')) / 1024,
-            "message": "Text processed successfully"
+            "message": "Text processed successfully" + (" (fallback draft POIs created — please verify/clean)" if fallback_used else "")
         }
         
     except HTTPException as e:

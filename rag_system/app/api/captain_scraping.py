@@ -11,6 +11,7 @@ from datetime import datetime
 from app.services.web_scraper import web_scraper
 from app.services.multipass_extractor import run_fast_extraction
 from app.services.pii_redactor import redact_pii
+from app.services.intelligence_storage import save_intelligence_to_db
 from app.services.supabase_auth import get_current_user
 from app.services.supabase_client import get_supabase
 
@@ -82,6 +83,25 @@ async def scrape_url(
             if not isinstance(meta, dict):
                 meta = {}
             if (not request.force) and row.get("scraping_status") == "success" and meta.get("extraction_contract") and meta.get("extracted_data"):
+                # Best-effort: materialize cached extraction into extracted_pois so it shows up in Verify/Browse.
+                try:
+                    poi_exists = supabase.table("extracted_pois")\
+                        .select("id")\
+                        .eq("scrape_id", row.get("id"))\
+                        .limit(1)\
+                        .execute()
+                    if not getattr(poi_exists, "data", None):
+                        await save_intelligence_to_db(
+                            supabase=supabase,
+                            intelligence=meta.get("extracted_data") or {},
+                            source_type="url_scrape",
+                            source_id=row.get("id"),
+                            source_metadata={"filename": str(request.url)},
+                            uploaded_by=user_id,
+                        )
+                except Exception:
+                    pass
+
                 return ScrapeURLResponse(
                     scrape_id=row.get("id"),
                     url=str(request.url),
@@ -243,6 +263,19 @@ async def scrape_url(
                         "extracted_data": extracted,
                     },
                 }).eq("id", scrape_id).execute()
+            except Exception:
+                pass
+
+            # Materialize extracted POIs into `extracted_pois` so they can be verified/approved in the portal (best effort).
+            try:
+                await save_intelligence_to_db(
+                    supabase=supabase,
+                    intelligence=extracted,
+                    source_type="url_scrape",
+                    source_id=scrape_id,
+                    source_metadata={"filename": str(request.url)},
+                    uploaded_by=user_id,
+                )
             except Exception:
                 pass
         elif request.extract_intelligence and len(content_text) < 80:

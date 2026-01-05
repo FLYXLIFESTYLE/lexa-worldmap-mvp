@@ -240,6 +240,24 @@ export const poisAPI = {
   },
 
   /**
+   * Backfill extracted_pois from cached upload/scrape history.
+   * Useful if you have uploads completed before POIs were being materialized.
+   */
+  backfillFromHistory: async () => {
+    return apiRequest<{ success: boolean; created_pois: number; uploads_processed: number; urls_processed: number }>(
+      `/api/captain/pois/backfill`,
+      { method: 'POST' }
+    );
+  },
+
+  bulkVerify: async (ids: string[], verified = true) => {
+    return apiRequest<{ success: boolean; updated: number; requested: number }>(`/api/captain/pois/bulk-verify`, {
+      method: 'POST',
+      body: JSON.stringify({ ids, verified }),
+    });
+  },
+
+  /**
    * Get a single POI
    */
   getPOI: async (poiId: string): Promise<POI> => {

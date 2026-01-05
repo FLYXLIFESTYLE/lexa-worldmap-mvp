@@ -32,7 +32,12 @@ gotrue==2.4.2  # Compatible with supabase 2.3.0 and httpx 0.24.1
 postgrest==0.13.0  # Compatible with supabase 2.3.0
 realtime==1.0.3  # Compatible with supabase 2.3.0
 storage3==0.7.0  # Compatible with supabase 2.3.0
-psycopg2-binary==2.9.9
+# NOTE (Windows / Python 3.14):
+# psycopg2-binary does not currently provide wheels for Python 3.14, so pip
+# tries to compile it from source, which fails without PostgreSQL build tools.
+# We don't need psycopg2 for the Captain Portal (we use Supabase HTTP APIs),
+# so we skip it on Python 3.14+ to keep setup simple.
+psycopg2-binary==2.9.9; python_version < "3.14"
 
 # Utilities
 python-dotenv==1.0.0

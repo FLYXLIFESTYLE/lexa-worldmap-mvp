@@ -313,6 +313,14 @@ async def process_file_auto(file_path: str) -> Tuple[str, Dict]:
     if 'pdf' in mime_type:
         text, metadata = await process_pdf(file_path)
     elif 'wordprocessingml' in mime_type or 'msword' in mime_type:
+        # IMPORTANT:
+        # python-docx can only read modern .docx files (ZIP package).
+        # Old binary .doc files will fail with "Package not found".
+        if ext == '.doc':
+            raise Exception(
+                "Unsupported Word format: .doc (old Word). Please open it in Word/Google Docs and 'Save As' .docx, "
+                "or export as PDF, then upload again."
+            )
         text, metadata = await process_word(file_path)
     elif 'spreadsheetml' in mime_type or 'ms-excel' in mime_type:
         text, metadata = await process_excel(file_path)

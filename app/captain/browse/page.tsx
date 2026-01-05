@@ -37,6 +37,7 @@ export default function CaptainBrowsePage() {
   const supabase = createClient();
   
   const [loading, setLoading] = useState(true);
+  const [backfillLoading, setBackfillLoading] = useState(false);
   const [pois, setPois] = useState<POI[]>([]);
   const [filteredPois, setFilteredPois] = useState<POI[]>([]);
   
@@ -115,6 +116,38 @@ export default function CaptainBrowsePage() {
       console.error('Failed to fetch POIs:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBackfill = async () => {
+    setBackfillLoading(true);
+    try {
+      const res = await poisAPI.backfillFromHistory();
+      await fetchPOIs();
+      alert(
+        `✅ Imported ${res.created_pois} POIs from your uploads/URLs (uploads: ${res.uploads_processed}, URLs: ${res.urls_processed}).`
+      );
+    } catch (e: any) {
+      alert(`❌ Backfill failed: ${e?.message || 'Unknown error'}`);
+    } finally {
+      setBackfillLoading(false);
+    }
+  };
+
+  const handleBulkVerifyVisible = async () => {
+    const ids = filteredPois.filter((p) => !p.verified).map((p) => p.id);
+    if (!ids.length) {
+      alert('✅ All visible POIs are already verified.');
+      return;
+    }
+    if (!confirm(`Verify (approve) ${ids.length} POIs?`)) return;
+
+    try {
+      const res = await poisAPI.bulkVerify(ids, true);
+      await fetchPOIs();
+      alert(`✅ Verified ${res.updated} of ${res.requested} POIs.`);
+    } catch (e: any) {
+      alert(`❌ Bulk verify failed: ${e?.message || 'Unknown error'}`);
     }
   };
 
@@ -403,8 +436,35 @@ export default function CaptainBrowsePage() {
                 </div>
               </div>
               
-              <div className="mt-4 text-sm text-gray-600">
-                Showing {filteredPois.length} of {pois.length} POIs
+              <div className="mt-4 flex items-center justify-between gap-4">
+                <div className="text-sm text-gray-600">
+                  Showing {filteredPois.length} of {pois.length} POIs
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!loading && stats.total > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleBulkVerifyVisible}
+                      className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700"
+                      title="Verifies (approves) all visible, unverified POIs."
+                    >
+                      Verify all visible
+                    </button>
+                  )}
+
+                  {!loading && stats.total === 0 && (
+                    <button
+                      type="button"
+                      onClick={handleBackfill}
+                      disabled={backfillLoading}
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
+                      title="If you already uploaded/scraped data before, this imports it into the Verify list."
+                    >
+                      {backfillLoading ? 'Importing…' : 'Import POIs from History'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -417,8 +477,22 @@ export default function CaptainBrowsePage() {
                     No POIs Found
                   </h3>
                   <p className="text-gray-600">
-                    Try adjusting your search or filters
+                    {stats.total === 0
+                      ? 'You have no POIs yet. Upload a file / scrape a URL, or import from history.'
+                      : 'Try adjusting your search or filters'}
                   </p>
+                  {!loading && stats.total === 0 && (
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={handleBackfill}
+                        disabled={backfillLoading}
+                        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {backfillLoading ? 'Importing…' : 'Import POIs from History'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 filteredPois.map((poi) => (

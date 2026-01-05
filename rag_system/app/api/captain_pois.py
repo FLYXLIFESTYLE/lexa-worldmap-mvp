@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 from app.services.supabase_client import get_supabase
 from app.services.supabase_auth import get_current_user
+from app.services.intelligence_storage import save_intelligence_to_db
 
 router = APIRouter(prefix="/api/captain/pois", tags=["POIs"])
 
@@ -62,6 +63,11 @@ class POIVerifyRequest(BaseModel):
 class POIPromoteRequest(BaseModel):
     """Request to promote POI to main database"""
     promote: bool = True
+
+
+class POIBulkVerifyRequest(BaseModel):
+    ids: List[str]
+    verified: bool = True
 
 
 @router.get("/")
@@ -129,6 +135,123 @@ async def get_pois(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching POIs: {str(e)}")
+
+
+@router.post("/bulk-verify")
+async def bulk_verify_pois(body: POIBulkVerifyRequest, request: Request, supabase = Depends(get_supabase)):
+    """
+    Bulk verify POIs (Captain approval step).
+    Non-admins can only verify their own POIs.
+    """
+    try:
+        user = await get_current_user(request)
+        user_id = user.get("id")
+        role = _get_role(supabase, user_id)
+        is_admin = _is_admin_role(role)
+
+        ids = [i.strip() for i in (body.ids or []) if isinstance(i, str) and i.strip()]
+        if not ids:
+            raise HTTPException(status_code=400, detail="No POI ids provided")
+
+        update_data = {
+            "verified": body.verified,
+            "verified_at": "now()" if body.verified else None,
+            "verified_by": user_id if body.verified else None,
+            "updated_at": "now()",
+        }
+
+        updated = 0
+        for poi_id in ids:
+            q = supabase.table("extracted_pois").update(update_data).eq("id", poi_id)
+            if not is_admin:
+                q = q.eq("created_by", user_id)
+            res = q.execute()
+            if res.data:
+                updated += 1
+
+        return {"success": True, "updated": updated, "requested": len(ids)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bulk verify failed: {str(e)}")
+
+
+@router.post("/backfill")
+async def backfill_pois_from_history(request: Request, supabase = Depends(get_supabase)):
+    """
+    Backfill `extracted_pois` from cached extraction stored in:
+    - captain_uploads.metadata.extracted_data
+    - scraped_urls.metadata.extracted_data
+
+    This is useful if older uploads/scrapes were completed before POIs were
+    being materialized into `extracted_pois`.
+    """
+    try:
+        user = await get_current_user(request)
+        user_id = user.get("id")
+
+        created_pois = 0
+        sources = {"uploads_processed": 0, "urls_processed": 0}
+
+        # 1) Backfill from uploads (current user's uploads)
+        uploads = supabase.table("captain_uploads")\
+            .select("id,filename,metadata,processing_status")\
+            .eq("uploaded_by", user_id)\
+            .eq("processing_status", "completed")\
+            .execute()
+
+        for row in (uploads.data or []):
+            meta = row.get("metadata") if isinstance(row, dict) else {}
+            if not isinstance(meta, dict):
+                meta = {}
+            extracted = meta.get("extracted_data") or {}
+            if not isinstance(extracted, dict) or not extracted.get("pois"):
+                continue
+
+            sources["uploads_processed"] += 1
+            counts = await save_intelligence_to_db(
+                supabase=supabase,
+                intelligence=extracted,
+                source_type="file_upload",
+                source_id=row.get("id"),
+                source_metadata={"filename": row.get("filename")},
+                uploaded_by=user_id,
+            )
+            created_pois += int((counts or {}).get("pois") or 0)
+
+        # 2) Backfill from scraped URLs (current user's URLs)
+        urls = supabase.table("scraped_urls")\
+            .select("id,url,metadata,scraping_status")\
+            .eq("entered_by", user_id)\
+            .eq("scraping_status", "success")\
+            .execute()
+
+        for row in (urls.data or []):
+            meta = row.get("metadata") if isinstance(row, dict) else {}
+            if not isinstance(meta, dict):
+                meta = {}
+            extracted = meta.get("extracted_data") or {}
+            if not isinstance(extracted, dict) or not extracted.get("pois"):
+                continue
+
+            sources["urls_processed"] += 1
+            counts = await save_intelligence_to_db(
+                supabase=supabase,
+                intelligence=extracted,
+                source_type="url_scrape",
+                source_id=row.get("id"),
+                source_metadata={"filename": row.get("url")},
+                uploaded_by=user_id,
+            )
+            created_pois += int((counts or {}).get("pois") or 0)
+
+        return {
+            "success": True,
+            "created_pois": created_pois,
+            **sources,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backfill failed: {str(e)}")
 
 
 @router.get("/{poi_id}")

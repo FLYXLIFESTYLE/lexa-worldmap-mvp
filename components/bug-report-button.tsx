@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Bug Report Button - Available to ALL users
@@ -15,6 +15,8 @@ export default function BugReportButton() {
   const [submitted, setSubmitted] = useState(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pasteTargetRef = useRef<HTMLDivElement | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -80,12 +82,35 @@ export default function BugReportButton() {
         const file = item.getAsFile();
         if (file) {
           processImageFile(file);
-          alert('✅ Screenshot pasted! You can now submit the bug report.');
         }
         break;
       }
     }
   }
+
+  // Also support paste even when the dropzone isn't focused (common on Windows).
+  // This avoids the file-picker stealing focus when users click the upload box.
+  useEffect(() => {
+    if (!isOpen || isMinimized) return;
+
+    const onWindowPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type && item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) processImageFile(file);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('paste', onWindowPaste);
+    return () => window.removeEventListener('paste', onWindowPaste);
+  }, [isOpen, isMinimized]);
 
   function removeScreenshot() {
     setScreenshot(null);
@@ -230,11 +255,14 @@ export default function BugReportButton() {
 
                 {/* Screenshot Upload */}
                 <div 
-                  className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-4"
+                  ref={pasteTargetRef}
+                  tabIndex={0}
+                  className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-red-500"
                   onPaste={handlePaste}
+                  onClick={() => pasteTargetRef.current?.focus()}
                 >
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    📸 Screenshot (Optional) - Click to upload OR paste from clipboard!
+                    📸 Screenshot (Optional)
                   </label>
                   
                   {screenshot ? (
@@ -259,26 +287,41 @@ export default function BugReportButton() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <label className="flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors rounded-lg p-4">
+                      <div className="flex flex-col items-center justify-center rounded-lg p-4 text-center">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <span className="text-sm text-gray-600 font-medium">Click to upload screenshot</span>
-                        <span className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</span>
+                        <span className="text-sm text-gray-700 font-semibold">Paste works here</span>
+                        <span className="text-xs text-gray-500 mt-1">
+                          Click this box, then press <strong>Ctrl+V</strong> (or <strong>Cmd+V</strong>)
+                        </span>
+
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                          >
+                            Choose image file…
+                          </button>
+                          <span className="text-xs text-gray-500">PNG/JPG/GIF up to 5MB</span>
+                        </div>
+
                         <input
+                          ref={fileInputRef}
                           type="file"
                           accept="image/*"
                           onChange={handleFileChange}
                           className="hidden"
                         />
-                      </label>
+                      </div>
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                         <p className="text-xs text-blue-800 font-medium mb-1">
                           💡 Pro Tip: Paste directly from clipboard!
                         </p>
                         <p className="text-xs text-blue-700">
                           1. Take a screenshot (Win + Shift + S or Cmd + Shift + 4)<br/>
-                          2. Click in this upload area<br/>
+                          2. Click this box (it will highlight)<br/>
                           3. Press Ctrl+V (or Cmd+V) to paste
                         </p>
                       </div>
