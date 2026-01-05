@@ -43,6 +43,7 @@
 - [x] POI search & edit interface
 - [x] Theme seeding page
 - [x] User management interface
+- [x] Portal UI consistency: shared `PortalShell` across key Admin/Captain pages (dark hero + mission + quick tips)
 - [x] Admin-only user creation (no open registration)
 - [x] Yacht destination upload v2 (with OCR)
 - [x] Drag & drop functionality
@@ -74,6 +75,11 @@
 - [x] Durable user memory table (emotional profile + preferences)
 - [x] Feedback capture (thumbs up/down) + interaction event logging (learning signals)
 - [x] Explainable retrieval endpoint (theme + destination -> ranked results with reasons)
+- [x] Grounded Neo4j retrieval injected into LEXA chat prompts when destination exists (prevents invented venue names)
+
+### Captain Approval & Promotion (POIs)
+- [x] Verification audit trail on extracted POIs (`verified_by`, `verified_at`)
+- [x] Promotion to official Neo4j knowledge via `/api/captain/pois/[id]/promote` (writes canonical `:poi` + marks `extracted_pois.promoted_to_main`)
 
 ### Scripts & Tools
 - [x] French Riviera enrichment script (`scripts/enrich-french-riviera.ts`)
@@ -110,9 +116,9 @@
 - Tone: warm, confident, luxury; generic ideas must be labeled as generic
 
 ### High Priority (Goal 3: Grounded Retrieval & Recommendations)
-- Hybrid Neo4j + pgvector retrieval
-- Ranking by confidence + emotion fit + captain verification
-- Explainable recommendations with citations
+- Hybrid Neo4j + pgvector retrieval (next)
+- Ranking by confidence + emotion fit + captain verification (partially implemented: Neo4j grounding + POI verification/promotion)
+- Explainable recommendations with citations (next)
 
 ### Revenue Workstreams (Planned)
 - Upsell system: Tiered scripts → day-by-day → booking links/coords → planning → white glove concierge
@@ -334,7 +340,7 @@ Based on pitch deck preparation and investor readiness:
 
 ---
 
-**Last Updated**: January 4, 2026  
+**Last Updated**: January 5, 2026  
 **Next Review**: After ingestion/extraction pipeline milestone  
 **Status**: 🟡 Focused on Goal 1 (ingestion → extraction → approval → graph)
 

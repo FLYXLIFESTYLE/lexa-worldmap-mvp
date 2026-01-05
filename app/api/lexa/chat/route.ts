@@ -13,6 +13,7 @@ import { processBriefingInput } from '@/lib/lexa/briefing-processor';
 import { createExperienceBriefFromState } from '@/lib/lexa/stages/handoff';
 import { profilePatchFromState, mergeProfileJson } from '@/lib/lexa/profile';
 import { formatThemeMenu } from '@/lib/lexa/themes';
+import { getNeo4jDriver } from '@/lib/neo4j/client';
 import {
   getWelcomeSystemPrompt,
   getDisarmSystemPrompt,
@@ -198,7 +199,9 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Use Claude for conversational stages
-      const systemPrompt = getSystemPromptForStage(sessionState);
+      let systemPrompt = getSystemPromptForStage(sessionState);
+      const grounding = await buildGroundedPoiContext(sessionState);
+      if (grounding) systemPrompt = `${systemPrompt}\n\n${grounding}`;
       
       const claudeResponse = await generateResponseWithRetry({
         sessionState,
@@ -335,6 +338,101 @@ function getSystemPromptForStage(state: SessionState): string {
       return getFollowupSystemPrompt();
     default:
       return 'You are LEXA, a luxury travel experience designer.';
+  }
+}
+
+async function buildGroundedPoiContext(state: SessionState): Promise<string | null> {
+  // Step 3 (Brain v2): Grounded retrieval to avoid hallucinated venue names.
+  // Only run when we have a destination; keep results small to avoid token bloat.
+  const destination = (state.brief?.where_at?.destination || '').trim();
+  if (!destination) return null;
+
+  const themes =
+    Array.isArray(state.brief?.themes) && state.brief.themes.length > 0
+      ? state.brief.themes
+      : state.brief?.theme
+        ? [state.brief.theme]
+        : [];
+
+  const driver = getNeo4jDriver();
+  const session = driver.session();
+
+  try {
+    const query = themes.length
+      ? `
+        MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
+        WHERE toLower(d.name) CONTAINS toLower($destination)
+        OPTIONAL MATCH (p)-[:HAS_THEME]->(t:theme_category)
+        WITH p, d, collect(DISTINCT t.name) AS tnames
+        WHERE any(x IN tnames WHERE x IN $themes)
+        WITH p, d, tnames,
+             coalesce(p.luxury_score_base, p.luxury_score, 0.0) AS luxury,
+             coalesce(p.confidence_score, p.luxury_confidence, 0.8) AS confidence
+        WITH p, d, tnames, luxury, confidence, (luxury * confidence) AS score
+        RETURN p.name AS name,
+               coalesce(p.type, p.category, 'poi') AS type,
+               d.name AS destination_name,
+               luxury AS luxury,
+               confidence AS confidence,
+               tnames[0..3] AS matched_themes,
+               score AS score
+        ORDER BY score DESC
+        LIMIT 6
+      `
+      : `
+        MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
+        WHERE toLower(d.name) CONTAINS toLower($destination)
+        WITH p, d,
+             coalesce(p.luxury_score_base, p.luxury_score, 0.0) AS luxury,
+             coalesce(p.confidence_score, p.luxury_confidence, 0.8) AS confidence
+        WITH p, d, luxury, confidence, (luxury * confidence) AS score
+        RETURN p.name AS name,
+               coalesce(p.type, p.category, 'poi') AS type,
+               d.name AS destination_name,
+               luxury AS luxury,
+               confidence AS confidence,
+               score AS score
+        ORDER BY score DESC
+        LIMIT 6
+      `;
+
+    const result = await session.run(query, { destination, themes });
+    const rows = result.records.map((r) => ({
+      name: String(r.get('name')),
+      type: String(r.get('type')),
+      destination_name: String(r.get('destination_name')),
+      matched_themes: (r.has('matched_themes') ? (r.get('matched_themes') as string[]) : []) || [],
+    }));
+
+    const header = [
+      '## Grounded POI context (Neo4j)',
+      `Destination: ${destination}`,
+      themes.length ? `Themes: ${themes.join(', ')}` : '',
+      '',
+      'Use ONLY the venues below if you name specific places. Do not invent venue names.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    if (rows.length === 0) {
+      return [
+        header,
+        '',
+        'No matching POIs were retrieved. If you mention venues, keep it generic and label it as a concept.',
+      ].join('\n');
+    }
+
+    const lines = rows.map((x, idx) => {
+      const themeNote = x.matched_themes.length ? ` • themes: ${x.matched_themes.join(', ')}` : '';
+      return `${idx + 1}. ${x.name} (${x.type}) — ${x.destination_name}${themeNote}`;
+    });
+
+    return [header, ...lines].join('\n');
+  } catch {
+    // If Neo4j retrieval fails, don't block chat — just omit grounding.
+    return null;
+  } finally {
+    await session.close();
   }
 }
 

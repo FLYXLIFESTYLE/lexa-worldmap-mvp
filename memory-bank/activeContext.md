@@ -1,6 +1,6 @@
 # Active Context
 
-**Last Updated**: December 31, 2025
+**Last Updated**: January 5, 2026
 
 ## Current Focus: Testing + Learning Sprint (with captains) + Pitch Deck
 
@@ -21,6 +21,29 @@
 - Focus on outcomes: emotional intelligence + explainable recommendations + learning loop
 
 ## Recent Major Changes
+
+### January 2026 - Captain Approval + Promotion + Unified Portal UI ✅
+
+**What changed (high impact):**
+1. **Unified “Captain Portal” look across pages**
+   - New reusable wrapper: `components/portal/portal-shell.tsx`
+   - Applied to key Admin + Captain pages so everything has:
+     - Dark blue hero section (top)
+     - Mission box (WHY/WHAT/HOW style)
+     - “Quick Tips” box at the bottom
+
+2. **Captain approval workflow is now real for POIs**
+   - **Verify** is the approval step (required for confidence > 80).
+   - Verification now stores audit fields (`verified_by`, `verified_at`).
+   - Ownership enforced (non-admins only edit/verify their own extracted POIs).
+
+3. **Promotion is now real (official knowledge)**
+   - Verified POIs can be **Promoted** into Neo4j as canonical `:poi` nodes.
+   - Postgres `extracted_pois.promoted_to_main` is set and metadata stores promotion audit info (who/when + `neo4j_poi_uid`).
+
+4. **Grounded retrieval added to the main LEXA chat**
+   - The LEXA chat now appends **Neo4j POI grounding context** to Claude system prompts when a destination exists.
+   - Rule enforced via prompt: **Do not invent venue names**; only use retrieved POIs when naming venues.
 
 ### December 2025 - POI Collection System & Production Deployment
 

@@ -46,6 +46,28 @@
    - Providers are distinct from competitors (competitor data is mapped into providers when present)
    - Confidence captured per item via 0–100% UI (stored as 0–1 internally); removed top-level sliders and aggregate boxes
 
+## Captain Approval (Verify → Promote) - Quick Tips
+
+These are the simple rules captains should follow when reviewing extracted POIs:
+
+1. **Verify first**
+   - Verification = “Captain approval”.
+   - Only verified POIs should ever exceed **80% confidence**.
+
+2. **Raise confidence carefully**
+   - If you increase confidence above 80, do it only after verifying the POI is accurate and complete.
+
+3. **Promote only clean, verified POIs**
+   - Promotion writes a canonical POI into **Neo4j** (official knowledge).
+   - Only promote when name/destination/category/description are correct and keywords/themes are reasonable.
+
+4. **If LEXA can’t retrieve a POI, don’t hallucinate**
+   - When Neo4j retrieval returns no matches for a destination/theme, the assistant should speak in **generic concepts** and label them as such.
+
+5. **Audit trail matters**
+   - Verification should record: who verified + when.
+   - Promotion should record: who promoted + when + the resulting Neo4j `poi_uid`.
+
 ## System Components
 
 ### Frontend (Next.js 16 + TypeScript)
