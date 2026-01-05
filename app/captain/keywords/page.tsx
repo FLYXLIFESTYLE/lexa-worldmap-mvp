@@ -40,6 +40,7 @@ interface Article {
 export default function CaptainKeywordsPage() {
   const router = useRouter();
   const supabase = createClient();
+  const FEATURE_ENABLED = false; // Deactivate (requested)
   
   const [loading, setLoading] = useState(true);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
@@ -74,6 +75,10 @@ export default function CaptainKeywordsPage() {
   // Auth check
   useEffect(() => {
     async function init() {
+      if (!FEATURE_ENABLED) {
+        setLoading(false);
+        return;
+      }
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/auth/signin');
@@ -336,6 +341,22 @@ export default function CaptainKeywordsPage() {
       alert('❌ Failed to queue articles');
     }
   };
+
+  if (!FEATURE_ENABLED) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-lexa-cream px-6 py-12">
+        <AdminNav />
+        <div className="mx-auto max-w-3xl pt-16">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <h1 className="text-3xl font-bold text-lexa-navy mb-2">🔔 Keyword Monitor</h1>
+            <p className="text-zinc-700">
+              This feature is currently <strong>disabled</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

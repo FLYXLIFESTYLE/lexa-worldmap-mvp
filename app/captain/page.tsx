@@ -2,20 +2,16 @@
 
 /**
  * Captain's Knowledge Portal - Main Dashboard
- * 5 Pages: Upload & Manual Entry, Browse & Verify, Upload History, Scraped URLs, Keyword Monitor
+ * Core pages: Upload & Manual Entry, Browse & Verify, Upload History, Scraped URLs
  */
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
-import { statsAPI } from '@/lib/api/captain-portal';
 
 interface Captain {
   name: string;
-  role: string;
-  totalUploads: number;
-  lastActive: string;
 }
 
 export default function CaptainPortalPage() {
@@ -33,12 +29,19 @@ export default function CaptainPortalPage() {
         return;
       }
 
-      // TODO: Fetch captain stats from database
+      // Prefer the captain's display_name (e.g. "Christian") over email prefix (e.g. "chh")
+      let displayName = '';
+      try {
+        const { data: profile } = await supabase
+          .from('captain_profiles')
+          .select('display_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        displayName = (profile?.display_name || '').trim();
+      } catch {}
+
       setCaptain({
-        name: user.email?.split('@')[0] || 'Captain',
-        role: 'Captain',
-        totalUploads: 0,
-        lastActive: new Date().toISOString()
+        name: displayName || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Captain',
       });
       
       setLoading(false);
@@ -77,14 +80,6 @@ export default function CaptainPortalPage() {
       description: 'View all scraped URLs from the system (visible to all captains)',
       href: '/captain/urls',
       color: 'from-indigo-500 to-indigo-600',
-    },
-    {
-      icon: '🔔',
-      title: 'Keyword Monitor',
-      description: 'Set keywords for daily alerts (like Google Alerts), review articles, and queue for scraping',
-      href: '/captain/keywords',
-      color: 'from-orange-500 to-orange-600',
-      badge: 'New',
     },
   ];
 
@@ -143,21 +138,6 @@ export default function CaptainPortalPage() {
             <AdminNav />
           </div>
 
-          {/* Captain Stats */}
-          <div className="grid grid-cols-3 gap-4 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-lexa-gold">{captain?.totalUploads}</div>
-              <div className="text-sm opacity-80">Your Uploads</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-green-400">80%</div>
-              <div className="text-sm opacity-80">Default Score</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-400">5</div>
-              <div className="text-sm opacity-80">Active Pages</div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -223,10 +203,6 @@ export default function CaptainPortalPage() {
             <li className="flex items-start gap-2">
               <span className="text-blue-600 font-bold">•</span>
               <span><strong>Confidence Score</strong> defaults to 80% for new data. Only approved captains can increase it</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-blue-600 font-bold">•</span>
-              <span><strong>Keyword Monitor</strong> runs daily at 11pm - review articles next morning</span>
             </li>
           </ul>
         </div>

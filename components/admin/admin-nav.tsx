@@ -76,7 +76,7 @@ export default function AdminNav() {
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="fixed top-6 right-6 z-50 flex items-center gap-3">
       {/* Online Users Indicator */}
       <OnlineUsersIndicator />
       
