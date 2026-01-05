@@ -144,6 +144,10 @@ async def scrape_url(
         content_text = (scrape_result.get("content") or "").strip()
         if request.extract_intelligence and len(content_text) >= 80:
             content_redacted, pii_stats = redact_pii(scrape_result["content"])
+            # Store a safe snapshot of the source text (redacted) for Brain v2 Step 1
+            source_text_limit = 60000
+            source_text_truncated = len(content_redacted or "") > source_text_limit
+            source_text_redacted = (content_redacted or "")[:source_text_limit]
 
             contract = await run_fast_extraction(content_redacted, {
                 "upload_id": scrape_id,
@@ -228,6 +232,9 @@ async def scrape_url(
                     "metadata": {
                         **(scrape_result.get("metadata", {}) or {}),
                         "pii_redaction": pii_stats,
+                        "source_text_redacted": source_text_redacted,
+                        "source_text_length": len(content_redacted or ""),
+                        "source_text_truncated": source_text_truncated,
                         "counts_real": real_counts,
                         "counts_estimated": est_counts,
                         "captain_summary": (final_package.get("metadata", {}) or {}).get("captain_summary"),
@@ -370,6 +377,7 @@ async def update_scrape(
     """
     user = await get_current_user(http_request)
     user_id = user.get("id")
+    user_email = (user.get("email") or "").lower()
 
     # Admin check via captain_profiles (this is what the Next.js middleware uses)
     try:
@@ -395,7 +403,17 @@ async def update_scrape(
         current_meta = existing.data[0].get("metadata") or {}
         if not isinstance(current_meta, dict):
             current_meta = {}
-        updates["metadata"] = {**current_meta, **body.metadata}
+        next_meta = {**current_meta, **body.metadata}
+        # Simple edit versioning (auditability)
+        try:
+            current_v = int(current_meta.get("edit_version") or 0)
+        except Exception:
+            current_v = 0
+        next_meta["edit_version"] = current_v + 1
+        next_meta["last_edited_at"] = datetime.utcnow().isoformat()
+        next_meta["last_edited_by"] = user_id
+        next_meta["last_edited_by_email"] = user_email
+        updates["metadata"] = next_meta
     if not updates:
         return {"success": True, "scrape_id": scrape_id}
 

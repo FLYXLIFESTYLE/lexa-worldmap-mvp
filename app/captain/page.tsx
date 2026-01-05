@@ -14,6 +14,16 @@ interface Captain {
   name: string;
 }
 
+type FeatureCard = {
+  icon: string;
+  title: string;
+  description: string;
+  href: string;
+  color: string;
+  badge?: 'Primary' | 'New' | 'Disabled';
+  disabled?: boolean;
+};
+
 export default function CaptainPortalPage() {
   const router = useRouter();
   const [captain, setCaptain] = useState<Captain | null>(null);
@@ -50,7 +60,7 @@ export default function CaptainPortalPage() {
     checkAuth();
   }, [router, supabase.auth]);
 
-  const features = [
+  const features: FeatureCard[] = [
     {
       icon: '📤',
       title: 'Upload & Manual Entry',
@@ -80,6 +90,15 @@ export default function CaptainPortalPage() {
       description: 'View all scraped URLs from the system (visible to all captains)',
       href: '/captain/urls',
       color: 'from-indigo-500 to-indigo-600',
+    },
+    {
+      icon: '🔔',
+      title: 'Keyword Monitor',
+      description: 'Currently disabled (will return later)',
+      href: '/captain/keywords',
+      color: 'from-orange-500 to-orange-600',
+      badge: 'Disabled',
+      disabled: true,
     },
   ];
 
@@ -149,8 +168,13 @@ export default function CaptainPortalPage() {
           {features.map((feature) => (
             <button
               key={feature.title}
-              onClick={() => router.push(feature.href)}
-              className="relative bg-white rounded-xl shadow-sm hover:shadow-lg transition-all overflow-hidden text-left group"
+              onClick={() => {
+                if (feature.disabled) return;
+                router.push(feature.href);
+              }}
+              className={`relative bg-white rounded-xl shadow-sm transition-all overflow-hidden text-left group ${
+                feature.disabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-lg'
+              }`}
             >
               {/* Gradient Top Bar */}
               <div className={`h-2 bg-gradient-to-r ${feature.color}`}></div>
@@ -162,6 +186,8 @@ export default function CaptainPortalPage() {
                     <span className={`px-2 py-1 text-xs font-semibold rounded ${
                       feature.badge === 'Primary' 
                         ? 'bg-blue-100 text-blue-700' 
+                        : feature.badge === 'Disabled'
+                        ? 'bg-zinc-200 text-zinc-700'
                         : 'bg-green-100 text-green-700'
                     }`}>
                       {feature.badge}
@@ -169,7 +195,9 @@ export default function CaptainPortalPage() {
                   )}
                 </div>
                 
-                <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                <h3 className={`text-lg font-semibold text-gray-900 mb-2 transition-colors ${
+                  feature.disabled ? '' : 'group-hover:text-blue-600'
+                }`}>
                   {feature.title}
                 </h3>
                 
@@ -177,12 +205,14 @@ export default function CaptainPortalPage() {
                   {feature.description}
                 </p>
 
-                <div className="mt-4 flex items-center text-sm text-blue-600 font-medium">
-                  <span>Open</span>
-                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
+                {!feature.disabled && (
+                  <div className="mt-4 flex items-center text-sm text-blue-600 font-medium">
+                    <span>Open</span>
+                    <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                )}
               </div>
             </button>
           ))}

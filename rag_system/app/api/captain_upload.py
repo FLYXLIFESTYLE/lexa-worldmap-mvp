@@ -219,6 +219,11 @@ async def upload_file(
 
         # Redact common personal data BEFORE sending to LLM
         extracted_text, pii_stats = redact_pii(extracted_text)
+        # Store a safe snapshot of the source text (redacted) for Brain v2 Step 1
+        source_text_limit = 60000
+        source_text_redacted = (extracted_text or "")
+        source_text_truncated = len(source_text_redacted) > source_text_limit
+        source_text_redacted = source_text_redacted[:source_text_limit]
         
         # Clean up temp file
         if os.path.exists(temp_path):
@@ -255,6 +260,9 @@ async def upload_file(
                     "file_size": file_size,
                     "file_type": metadata.get("file_type"),
                     "pii_redaction": pii_stats,
+                    "source_text_redacted": source_text_redacted,
+                    "source_text_length": len(extracted_text or ""),
+                    "source_text_truncated": source_text_truncated,
                     **metadata
                 }
             }
@@ -396,6 +404,9 @@ async def upload_file(
                 "metadata": {
                     **(upload_record.get("metadata", {}) if isinstance(upload_record, dict) else {}),
                     "pii_redaction": pii_stats,
+                    "source_text_redacted": source_text_redacted,
+                    "source_text_length": len(extracted_text or ""),
+                    "source_text_truncated": source_text_truncated,
                     # Persist for history + open-from-history
                     "extraction_contract": extraction_contract,
                     "extracted_data": intelligence,
@@ -471,6 +482,9 @@ async def upload_text(
 
         upload_id = str(uuid.uuid4())
         text_redacted, pii_stats = redact_pii(request.text)
+        source_text_limit = 60000
+        source_text_truncated = len(text_redacted or "") > source_text_limit
+        source_text_redacted = (text_redacted or "")[:source_text_limit]
 
         # Create upload record (paste)
         try:
@@ -489,6 +503,9 @@ async def upload_text(
                     "description": request.source_description,
                     "text_length": len(text_redacted),
                     "pii_redaction": pii_stats,
+                    "source_text_redacted": source_text_redacted,
+                    "source_text_length": len(text_redacted or ""),
+                    "source_text_truncated": source_text_truncated,
                 },
             }).execute()
         except Exception:
@@ -592,6 +609,9 @@ async def upload_text(
                     "description": request.source_description,
                     "text_length": len(text_redacted),
                     "pii_redaction": pii_stats,
+                    "source_text_redacted": source_text_redacted,
+                    "source_text_length": len(text_redacted or ""),
+                    "source_text_truncated": source_text_truncated,
                     "extraction_contract": extraction_contract,
                     "extracted_data": intelligence,
                     "captain_summary": pkg_meta.get("captain_summary"),
@@ -784,7 +804,17 @@ async def update_upload(
         current_meta = existing.data[0].get("metadata") or {}
         if not isinstance(current_meta, dict):
             current_meta = {}
-        updates["metadata"] = {**current_meta, **body.metadata}
+        next_meta = {**current_meta, **body.metadata}
+        # Simple edit versioning for Brain v2 Step 1 (auditability)
+        try:
+            current_v = int(current_meta.get("edit_version") or 0)
+        except Exception:
+            current_v = 0
+        next_meta["edit_version"] = current_v + 1
+        next_meta["last_edited_at"] = datetime.utcnow().isoformat()
+        next_meta["last_edited_by"] = user_id
+        next_meta["last_edited_by_email"] = user_email
+        updates["metadata"] = next_meta
 
     if not updates:
         return {"success": True, "upload_id": str(upload_id)}
