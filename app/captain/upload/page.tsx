@@ -2370,6 +2370,7 @@ function CaptainUploadPageInner() {
                 {editingFile.type !== 'url' ? (
                   <button
                     onClick={() => {
+                      // Save extracted data first, THEN mark as dump (so we don't lose the intelligence)
                       const updated = { ...editingFile, keepDecision: 'dump' as const };
                       setFiles(prev => prev.map(f => f.name === editingFile.name ? updated : f));
                       setLoading(true);
@@ -2377,17 +2378,20 @@ function CaptainUploadPageInner() {
                         try {
                           if (editingFile.uploadId) {
                             await uploadAPI.updateUpload(editingFile.uploadId, {
-                              keep_file: false,
+                              keep_file: false,  // Mark as dump (removes original file)
                               metadata: {
+                                // Save the extracted intelligence even though we're dumping the file
                                 extracted_data: updated.extractedData,
                                 extraction_contract: updated.extractionContract,
+                                captain_summary: updated.extractionContract?.final_package?.metadata?.captain_summary,
+                                report_markdown: updated.extractionContract?.final_package?.metadata?.report_markdown,
                               },
                             });
                           }
-                          alert(`🗑️ Marked "${editingFile.name}" as DUMP (remove original file).`);
+                          alert(`✅ Extracted data saved. Original file marked as DUMP.`);
                           setEditingFile(null);
                         } catch (error: any) {
-                          alert(`❌ Failed to update dump status: ${error.message || 'Unknown error'}`);
+                          alert(`❌ Failed to save and dump: ${error.message || 'Unknown error'}`);
                         } finally {
                           setLoading(false);
                         }
@@ -2395,7 +2399,7 @@ function CaptainUploadPageInner() {
                     }}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700"
                   >
-                    🗑️ Dump File
+                    💾🗑️ Save & Dump File
                   </button>
                 ) : (
                   <div className="text-sm text-gray-600">

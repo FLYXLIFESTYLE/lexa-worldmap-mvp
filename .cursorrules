@@ -1,18 +1,33 @@
 # LEXA Project Intelligence & Memory Bank
 
-## Memory Bank System
-This project uses a Memory Bank system to maintain context across sessions. ALL memory bank files MUST be read at the start of EVERY task.
+## 🚨 START EVERY CONVERSATION HERE
 
-### Memory Bank Location
-`memory-bank/` - Contains all project context files
+### STEP 1: READ THIS FIRST (Mandatory)
+**File:** `START_HERE.md` - Critical context, existing agent architecture, deployment process
 
-### Core Files (MUST READ ALL)
-1. `projectbrief.md` - Foundation and core requirements
-2. `productContext.md` - Why LEXA exists, problems it solves
-3. `activeContext.md` - Current work focus and recent changes
-4. `systemPatterns.md` - Architecture and technical decisions
+### STEP 2: READ MEMORY BANK (Mandatory)
+**Location:** `memory-bank/` - Contains all project context
+
+### Core Files (MUST READ ALL):
+1. `productContext.md` - Why LEXA exists, Experience DNA framework, AIlessia + AIbert
+2. `systemPatterns.md` - Architecture, agent integration patterns
+3. `activeContext.md` - Current MVP completion plan, recent changes
+4. `progress.md` - What's complete, what's next
 5. `techContext.md` - Technologies and setup
-6. `progress.md` - Status, what works, what's next
+6. `projectbrief.md` - Foundation and core requirements
+
+### STEP 3: CHECK EXISTING CODE
+Before creating new files/agents, search for existing implementations:
+- Agents: AIlessia (`rag_system/core/ailessia/`), AIbert (`rag_system/core/aibert/`)
+- Services: `rag_system/app/services/`
+- APIs: `rag_system/app/api/`
+
+### Why This Matters:
+Cursor has limited memory (200k tokens) and forgets previous sessions. Reading these files FIRST prevents:
+- Recreating existing functionality
+- Asking about deployment (it's automated via GitHub!)
+- Ignoring existing agent architecture (AIlessia/AIbert)
+- Creating inconsistent solutions
 
 ## Project-Specific Patterns
 

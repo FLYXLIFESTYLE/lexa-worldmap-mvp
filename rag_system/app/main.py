@@ -144,6 +144,12 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import stats router: {e}")
 
+try:
+    from app.api.market_intelligence import router as market_intel_router
+    app.include_router(market_intel_router)
+except ImportError as e:
+    print(f"Warning: Could not import market intelligence router: {e}")
+
 
 @app.get("/")
 async def root():
