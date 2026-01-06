@@ -40,6 +40,15 @@ const activeTools: ToolCard[] = [
 // Section 2: Documentation
 const documentationTools: ToolCard[] = [
   {
+    id: 'company-brain',
+    name: 'Company Brain',
+    description: 'Analyze 5 years of ChatGPT conversations to extract company DNA and script training data',
+    icon: '🧠',
+    href: '/admin/company-brain',
+    accentClass: 'bg-purple-600',
+    features: ['Extract script examples', 'Identify feature ideas', 'Capture philosophy', 'Train AIlessia'],
+  },
+  {
     id: 'release-notes',
     name: 'Release Notes',
     description: 'Daily changelog of features and improvements',
