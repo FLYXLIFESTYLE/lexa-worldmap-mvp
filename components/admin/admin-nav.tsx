@@ -30,6 +30,12 @@ const adminPages = [
     href: '/captain/upload',
     icon: '⬆️',
     description: 'Upload files, scrape URLs, manual POIs'
+  },
+  {
+    name: 'Market Insights',
+    href: '/captain/market-insights',
+    icon: '📈',
+    description: 'Strategic Q&A and cruise recommendations'
   }
 ];
 

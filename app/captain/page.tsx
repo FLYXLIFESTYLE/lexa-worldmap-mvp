@@ -78,6 +78,14 @@ export default function CaptainPortalPage() {
       badge: 'Primary',
     },
     {
+      icon: '📈',
+      title: 'Market Insights',
+      description: 'Strategic intelligence: Ask questions, get cruise recommendations, analyze demand patterns',
+      href: '/captain/market-insights',
+      color: 'from-emerald-500 to-emerald-600',
+      badge: 'New',
+    },
+    {
       icon: '📊',
       title: 'Upload History',
       description: 'View your upload history, track extraction stats, and manage your documents',
