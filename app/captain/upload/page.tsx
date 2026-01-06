@@ -276,7 +276,7 @@ function CaptainUploadPageInner() {
       const isInInput = activeElement && (
         activeElement.tagName === 'INPUT' ||
         activeElement.tagName === 'TEXTAREA' ||
-        activeElement.isContentEditable
+        (activeElement instanceof HTMLElement && activeElement.isContentEditable)
       );
       
       // If user is typing in an input field, don't intercept
