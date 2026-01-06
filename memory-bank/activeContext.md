@@ -2,18 +2,27 @@
 
 **Last Updated**: January 5, 2026
 
-## Current Focus: Testing + Learning Sprint (with captains) + Pitch Deck
+## Current Focus: MVP Completion for Investor Demo
 
-### What we're working on (now):
-1. **Captain testing loop** (daily)
-   - Captains + Chris actively chat with LEXA, push edge cases, and rate what works/doesn't.
-2. **Learning via real examples**
-   - Upload proven scripts/itineraries/transcripts/PDFs and ingest URLs.
-   - Add POIs manually when needed to raise the bar fast.
-3. **Expand POI coverage in the background**
-   - Continue ingestion/projection for all 14 destinations without disrupting testing.
-4. **Pitch deck prep**
-   - A functional, non-technical story for investors and strategic partners.
+### New MVP Completion Plan (User-Requested Sequence):
+1. **Phase 0: Tier Definitions** (1 day) - User provides tier features, document them
+2. **Phase 1: Script Design Engine** (5 days) - POI injection, day-by-day, booking links, refinement
+3. **Phase 2: Finalize LEXA Chat** (4 days) - Script display, library, refinement flow
+4. **Phase 3: Tiers & Upsells + Marketplace** (8 days) - Payment, enforcement, marketplace, GoHighLevel
+5. **Phase 4: Emotional Profile Display** (2 days) - Show users their profile in account
+6. **Phase 5: Landing Page Enhancements** (2 days) - Popular scripts, theme categories (14 themes)
+7. **Phase 6: Data Ingestion** (Ongoing) - Upload, scrape, generate POIs continuously
+
+### The 3 Perfect Things for MVP:
+1. **Data Pipeline** (85% complete) - Upload, scrape, generate + extraction, approval, storage, relation, retrieval
+2. **LEXA Chat Customer Journey** (80% complete) - Complete end-to-end flow
+3. **Emotional Profiles + Script Engine for Upsells** (60% complete) - Profile display + upsell triggers
+
+### New Requirements Added:
+- **Emotional Profile Display**: Show users their emotional profile in account dashboard
+- **Script Marketplace**: Browse, reuse, and edit scripts from other users
+- **Landing Page Enhancements**: Popular scripts section + all 14 theme categories (add Nightlife & Sports)
+- **GoHighLevel Integration**: Affiliate program for brokers, influencers, and affiliates
 
 ### Key requirement:
 **Functional summary** of what the system does and why it's powerful.

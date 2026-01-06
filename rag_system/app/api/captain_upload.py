@@ -18,8 +18,8 @@ from app.services.supabase_auth import get_current_user
 
 router = APIRouter(prefix="/api/captain/upload", tags=["Upload"])
 
-# Max file size (10MB for free tier)
-MAX_FILE_SIZE = 10 * 1024 * 1024
+# Max file size (50MB - increased to support larger documents)
+MAX_FILE_SIZE = 50 * 1024 * 1024
 
 
 def _safe_err_msg(e: Exception) -> str:
@@ -261,7 +261,7 @@ async def upload_file(
         if file_size > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=413,
-                detail=f"File too large ({file_size / 1024 / 1024:.1f}MB). Max 10MB."
+                detail=f"File too large ({file_size / 1024 / 1024:.1f}MB). Max 50MB."
             )
         
         # Save to temp file

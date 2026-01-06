@@ -5,7 +5,7 @@
  * Merges: File Upload, URL Scraping, Manual POI Entry, Yacht Destinations Upload
  */
 
-import { useState, useEffect, Suspense, useRef } from 'react';
+import { useState, useEffect, Suspense, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
@@ -78,6 +78,15 @@ function CaptainUploadPageInner() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [editingFile, setEditingFile] = useState<UploadedFile | null>(null); // File being edited
+  
+  // Ref to store latest functions for paste handler (avoids dependency issues)
+  const pasteHandlerRef = useRef<{
+    handleFileUpload: (files: FileList | null) => Promise<void>;
+    setLoading: (loading: boolean) => void;
+    setFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
+    setEditingFile: React.Dispatch<React.SetStateAction<UploadedFile | null>>;
+    normalizeExtractedData: (data: any) => any;
+  } | null>(null);
   const [selectedPois, setSelectedPois] = useState<Set<number>>(new Set());
   const [selectedExperiences, setSelectedExperiences] = useState<Set<number>>(new Set());
   const [selectedProviders, setSelectedProviders] = useState<Set<number>>(new Set());
@@ -247,6 +256,122 @@ function CaptainUploadPageInner() {
     })();
   }, [searchParams]);
 
+  // Global paste listener for file upload area (when in file mode and upload area is visible)
+  useEffect(() => {
+    if (mode !== 'file') return;
+    
+    const handleWindowPaste = async (e: ClipboardEvent) => {
+      // Only handle if the upload area is visible
+      const uploadArea = document.querySelector('[data-upload-area]') as HTMLElement;
+      if (!uploadArea) return;
+      
+      const hasFiles = e.clipboardData?.files && e.clipboardData.files.length > 0;
+      const hasText = e.clipboardData?.getData('text/plain')?.trim();
+      
+      // If no text or files, ignore
+      if (!hasText && !hasFiles) return;
+      
+      // Check if user is focused on an input/textarea (don't interfere with normal text input)
+      const activeElement = document.activeElement;
+      const isInInput = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.isContentEditable
+      );
+      
+      // If user is typing in an input field, don't intercept
+      if (isInInput && hasText) {
+        return;
+      }
+      
+      // Check if upload area is focused
+      const isUploadAreaFocused = document.activeElement === uploadArea || 
+                                  uploadArea.contains(document.activeElement);
+      
+      // For text pastes: handle if upload area is focused OR if no input is focused
+      // For file pastes: only handle if upload area is focused
+      if (hasText && !isUploadAreaFocused && isInInput) {
+        return;
+      }
+      
+      if (hasFiles && !isUploadAreaFocused) {
+        return;
+      }
+      
+      // If it's text and upload area is not focused, focus it first
+      if (hasText && !isUploadAreaFocused) {
+        uploadArea.focus();
+      }
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Get latest functions from ref
+      const handlers = pasteHandlerRef.current;
+      if (!handlers) return;
+      
+      // Check for files first (images, etc.)
+      if (hasFiles) {
+        const fileList = e.clipboardData.files;
+        handlers.handleFileUpload(fileList);
+        return;
+      }
+      
+      // Check for text
+      if (hasText) {
+        console.log('📋 Handling text paste in upload area');
+        // Upload pasted text
+        handlers.setLoading(true);
+        try {
+          const title = `Pasted Text - ${new Date().toLocaleString()}`;
+          const result = await uploadAPI.uploadText(title, hasText);
+          const extractedDataNormalized = handlers.normalizeExtractedData(result.extracted_data);
+          
+          // Create a virtual file entry for the pasted text
+          const virtualFile: UploadedFile = {
+            name: title,
+            size: hasText.length,
+            type: 'text/plain',
+            status: 'done',
+            confidenceScore: result.confidence_score || 80,
+            uploadId: result.upload_id,
+            extractedData: extractedDataNormalized,
+            countsReal: result.counts_real,
+            countsEstimated: result.counts_estimated,
+            extractionContract: result.extraction_contract,
+            keepDecision: 'keep',
+          };
+          
+          handlers.setFiles((prev) => [...prev, virtualFile]);
+          
+          // Auto-open editor if data extracted
+          const hasData = result.pois_extracted > 0 || result.intelligence_extracted.experiences > 0;
+          if (hasData) {
+            handlers.setEditingFile(virtualFile);
+          } else {
+            alert(
+              `✅ Text pasted and uploaded!\n` +
+                `POIs found: ${result.pois_extracted}\n` +
+                `Experiences: ${result.intelligence_extracted.experiences}\n\n` +
+                `No data extracted. Please review or try manual entry.`
+            );
+          }
+        } catch (error: any) {
+          console.error('Text upload failed:', error);
+          alert(`❌ Failed to upload pasted text: ${error.message}`);
+        } finally {
+          handlers.setLoading(false);
+        }
+      }
+    };
+    
+    // Use capture phase to catch paste events early
+    window.addEventListener('paste', handleWindowPaste, true);
+    return () => {
+      window.removeEventListener('paste', handleWindowPaste, true);
+    };
+  }, [mode]);
+
   // FILE UPLOAD HANDLERS
   const handleFileUpload = async (uploadedFiles: FileList | null) => {
     if (!uploadedFiles || uploadedFiles.length === 0) return;
@@ -331,6 +456,17 @@ function CaptainUploadPageInner() {
       setIsDragging(false);
     }
   };
+  
+  // Update ref whenever functions change
+  useEffect(() => {
+    pasteHandlerRef.current = {
+      handleFileUpload,
+      setLoading,
+      setFiles,
+      setEditingFile,
+      normalizeExtractedData,
+    };
+  }, [handleFileUpload, setLoading, setFiles, setEditingFile, normalizeExtractedData]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -350,6 +486,78 @@ function CaptainUploadPageInner() {
     setIsDragging(false);
     handleFileUpload(e.dataTransfer.files);
   };
+
+  // Handle paste (text or files) - used by onPaste handler on div
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const clipboardData = e.clipboardData;
+    
+    // Check for files first (images, etc.)
+    if (clipboardData.files && clipboardData.files.length > 0) {
+      handleFileUpload(clipboardData.files);
+      return;
+    }
+    
+    // Check for text
+    const pastedText = clipboardData.getData('text/plain');
+    if (pastedText && pastedText.trim().length > 0) {
+      // Upload pasted text
+      setLoading(true);
+      try {
+        const title = `Pasted Text - ${new Date().toLocaleString()}`;
+        const result = await uploadAPI.uploadText(title, pastedText);
+        const extractedDataNormalized = normalizeExtractedData(result.extracted_data);
+        
+        // Create a virtual file entry for the pasted text
+        const virtualFile: UploadedFile = {
+          name: title,
+          size: pastedText.length,
+          type: 'text/plain',
+          status: 'done',
+          confidenceScore: result.confidence_score || 80,
+          uploadId: result.upload_id,
+          extractedData: extractedDataNormalized,
+          countsReal: result.counts_real,
+          countsEstimated: result.counts_estimated,
+          extractionContract: result.extraction_contract,
+          keepDecision: 'keep',
+        };
+        
+        setFiles((prev) => [...prev, virtualFile]);
+        
+        // Auto-open editor if data extracted
+        const hasData = result.pois_extracted > 0 || result.intelligence_extracted.experiences > 0;
+        if (hasData) {
+          setEditingFile(virtualFile);
+        } else {
+          alert(
+            `✅ Text pasted and uploaded!\n` +
+              `POIs found: ${result.pois_extracted}\n` +
+              `Experiences: ${result.intelligence_extracted.experiences}\n\n` +
+              `No data extracted. Please review or try manual entry.`
+          );
+        }
+      } catch (error: any) {
+        console.error('Text upload failed:', error);
+        alert(`❌ Failed to upload pasted text: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [handleFileUpload]);
+  
+  // Update ref whenever functions change (after they're defined)
+  useEffect(() => {
+    pasteHandlerRef.current = {
+      handleFileUpload,
+      setLoading,
+      setFiles,
+      setEditingFile,
+      normalizeExtractedData,
+    };
+  }, [handleFileUpload, normalizeExtractedData]);
 
   // URL SCRAPING HANDLERS
   const handleAddUrl = () => {
@@ -897,10 +1105,23 @@ function CaptainUploadPageInner() {
             </p>
 
             <div
+              data-upload-area
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-xl p-12 text-center transition-all ${
+              onPaste={handlePaste}
+              onMouseDown={(e) => {
+                // Focus the div when clicking anywhere inside it
+                e.currentTarget.focus();
+              }}
+              onFocus={(e) => {
+                // Visual feedback when focused
+                console.log('Upload area focused - ready for paste');
+              }}
+              tabIndex={0}
+              role="textbox"
+              aria-label="Upload area - click to focus, then paste text or drag files here"
+              className={`border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                 isDragging
                   ? 'border-blue-500 bg-blue-50 scale-105'
                   : 'border-gray-300 hover:border-blue-400'
@@ -909,20 +1130,37 @@ function CaptainUploadPageInner() {
               <input
                 type="file"
                 id="file-upload"
+                ref={(input) => {
+                  // Store ref for programmatic access
+                  if (input) (window as any).__fileUploadInput = input;
+                }}
                 multiple
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg"
                 onChange={(e) => handleFileUpload(e.target.files)}
                 className="hidden"
               />
-              <label htmlFor="file-upload" className="cursor-pointer block">
+              <div>
                 <div className="text-6xl mb-4">📤</div>
                 <p className="text-xl font-semibold text-gray-900 mb-2">
-                  Click, Drag & Drop, or Paste
+                  Drag & Drop, or Paste Text
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 mb-3">
                   PDF, Word, Excel, TXT, PNG, JPG, JPEG
                 </p>
-              </label>
+                <p className="text-xs text-gray-400 mb-4">
+                  Click here first, then press Ctrl+V to paste text, or drag files here
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    document.getElementById('file-upload')?.click();
+                  }}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Or Click to Select Files
+                </button>
+              </div>
             </div>
 
             {isProcessing && (
