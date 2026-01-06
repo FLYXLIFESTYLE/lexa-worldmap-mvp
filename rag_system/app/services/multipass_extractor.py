@@ -24,6 +24,7 @@ from app.services.multipass_contract import (
     PassResult,
     Package,
 )
+from app.services.lexa_extraction_context import get_lexa_extraction_context
 
 
 class MultipassExtractor:
@@ -120,19 +121,27 @@ class MultipassExtractor:
             text=text,
             previous_package=None,
             extra_rules=[
-                # Goal: match Claude-quality extraction richness in a single call (production-safe).
-                "Extract with Claude-level richness when the source supports it (target 50+ sub_experiences for multi-day itineraries).",
+                # Goal: match direct Claude chat quality - investor-pitch level intelligence
+                "Extract with INVESTOR-PITCH quality. Map every hotel/experience to LEXA's 9 emotions with intensities (1-10) and evidence.",
+                "Match to LEXA's 5 client archetypes with match scores (0-100) and explain why each archetype would love it.",
+                "Identify luxury travel trends and explain why they matter for LEXA's competitive positioning.",
+                "Include conversation trigger examples for each major experience/hotel.",
+                "Extract pricing intelligence and map to LEXA's tier/upsell system (Spark/Inspired/Connoisseur + Discovery/Blueprint/Concierge/White Glove).",
+                "For articles about hotels/resorts: Extract room counts, opening dates, historical context, unique selling points, pricing if mentioned.",
+                "Target 50+ sub_experiences for multi-day itineraries, each with emotional mapping.",
                 "Prefer source-backed specificity over generic filler. If something is inferred, mark it `generic`: true and lower confidence.",
-                "Do NOT extract or output personal data (names of individuals, emails, phone numbers, passport/ID numbers, booking references). If present in the source, ignore it.",
-                "Populate script_seed (no venue names in signature_highlights).",
+                "Do NOT extract or output personal data (names of individuals, emails, phone numbers, passport/ID numbers, booking references).",
+                "Populate script_seed with emotional description and signature highlights (no venue names).",
                 "Add per-item confidence 0–1 and include citations (snippets) for concrete claims.",
-                "Fill counts.real_extracted for citation-backed items; counts.estimated_potential for likely but not explicit items.",
-                # Claude-style outputs for the Captain UI (stored inside package.metadata)
-                "In package.metadata, include `captain_summary` (a Claude-style 'Perfect! I've extracted...' summary with counts + top emotions) and `report_markdown` (a full markdown document that mirrors the Captain-facing extraction report: Overview, Offerings / Core Experience Categories, Customer Pain Points, Emotional Mapping, Experience Breakdown (50+), Destinations & Venues, Service Providers, Client Archetypes, Neo4j relationship examples, Next steps).",
-                # Additional structured meta to help rendering & downstream DB
-                "In package.metadata, include: experience_type, duration_days, duration_nights, route (array of locations in order), primary_theme, secondary_emotions (array), anti_emotions (array), and price_indicators (array) when present in source.",
-                # Provider/brand pages (like AliveXperiences): extract the same business-level insights Claude would surface
-                "In package.metadata, include provider-level insights when present: `core_offerings` (array of 5–12 core offering categories, each with name, description, emotional_drivers, pain_points, example_experiences), `customer_pain_points` (deduped list), `value_propositions` (deduped list), and `emotional_drivers` (deduped list).",
+                "Fill counts.real_extracted for citation-backed items; counts.estimated_potential for inferred items.",
+                # Claude-style outputs for Captain UI
+                "In package.metadata, include `captain_summary` (Claude-style 'Perfect! I've extracted [X] hotels with [Y] emotional mappings...' with key insights and top emotions).",
+                "In package.metadata, include `report_markdown` (full markdown: Overview → Emotional Mapping → Client Archetypes → Trends → Investor Insights → Neo4j Examples → Next Steps).",
+                "In package.metadata, include `investor_insights` object with: market_validation, competitive_positioning, monetization_angle, demo_opportunities.",
+                # Structured metadata
+                "In package.metadata, include: experience_type, duration_days, route (array), primary_theme, luxury_tier, price_tier, and emotional_intensities_summary (top 3 emotions with scores).",
+                # Provider insights
+                "In package.metadata for provider pages, include: core_offerings (with emotional_drivers per offering), customer_pain_points (deduped), value_propositions, competitive_gaps_for_lexa.",
                 "Return strict JSON with package + findings + warnings + status.",
             ],
         )
@@ -186,7 +195,15 @@ class MultipassExtractor:
         # This is critical for itinerary-style documents where details are spread across many pages.
         text_limit = 60000 if (pass_name == "expand" and not previous_package) else 18000
 
-        return f"""You are LEXA's extraction engine. Return STRICT JSON only.
+        # Inject LEXA's rich domain context for intelligence-level extraction
+        lexa_context = get_lexa_extraction_context()
+
+        return f"""You are LEXA's senior intelligence analyst. Extract with investor-pitch quality.
+
+{lexa_context if pass_name == "expand" else ""}
+
+---
+
 Pass: {pass_name}
 
 Contract (abbreviated):
@@ -197,8 +214,9 @@ Previous package (if any):
 
 Rules:
 - Follow the contract keys exactly.
+- For "expand" pass: Map emotions with intensities (1-10), match client archetypes, identify trends.
+- For "validate" pass: Verify emotion intensities are evidence-backed, archetype matches are logical.
 - Do not wrap JSON in markdown.
-- Keep/dump decision is NOT part of this payload.
 - Concrete claims need citations with confidence; otherwise mark as generic.
 - Separate counts.real_extracted vs estimated_potential.
 - {rules}

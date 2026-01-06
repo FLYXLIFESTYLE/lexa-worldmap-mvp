@@ -44,9 +44,17 @@ class SubExperience(TypedDict, total=False):
 
 class Venue(TypedDict, total=False):
     name: str
-    kind: str                  # restaurant|hotel|spa|beach|venue|provider
+    kind: str                  # restaurant|hotel|spa|beach|venue|provider|palace|private_island
     location: str
     description: str
+    emotional_map: List[EmotionSignal]  # NEW: Map to LEXA's 9 emotions with intensities
+    client_archetypes: List[Dict]       # NEW: Which archetypes would love this
+    room_count: Optional[int]           # NEW: For hotels/resorts
+    opening_date: Optional[str]         # NEW: For new properties
+    pricing: Optional[Dict]             # NEW: Pricing intelligence
+    unique_selling_points: List[str]    # NEW: What makes it one-of-a-kind
+    conversation_triggers: List[str]    # NEW: When to recommend
+    luxury_tier: Optional[str]          # NEW: ultra_luxury|high_luxury|entry_luxury
     coordinates: Optional[Dict[str, float]]
     tags: List[str]
     citations: List[Citation]
@@ -97,6 +105,8 @@ class Package(TypedDict, total=False):
     citations: List[Citation]
     confidence: Dict[str, float]  # per-section confidence
     counts: Counts
+    trends: List[Dict]             # NEW: Market trends and shifts
+    investor_insights: Dict        # NEW: Why this data matters for business
     metadata: Dict[str, object]
 
 
@@ -138,6 +148,8 @@ def empty_package() -> Package:
             "real_extracted": {},
             "estimated_potential": {},
         },
+        trends=[],
+        investor_insights={},
         metadata={"created_at": datetime.utcnow().isoformat()},
     )
 
@@ -166,17 +178,19 @@ def describe_contract() -> Dict[str, object]:
         "passes": ["outline", "expand", "validate", "report"],
         "package_fields": {
             "experience_overview": "Short narrative of what this experience/product is.",
-            "emotional_map": "List of emotions with intensity 1–10, evidence, citations, confidence.",
-            "sub_experiences": "50+ possible moments/activities with descriptions, locations, highlights.",
-            "destinations": "Cities/regions mentioned with context.",
-            "venues": "Hotels/restaurants/spas/places mentioned.",
-            "service_providers": "Vendors/operators/brands mentioned.",
-            "client_archetypes": "Who this is for; drivers, pain points.",
+            "emotional_map": "List of emotions with intensity 1–10, evidence, citations, confidence. Use LEXA's 9 core emotions.",
+            "sub_experiences": "50+ possible moments/activities with emotional mapping for each.",
+            "destinations": "Cities/regions with emotional mapping.",
+            "venues": "Hotels/restaurants/spas with MANDATORY emotional_map (intensities 1-10) and client_archetypes (match scores 0-100).",
+            "service_providers": "Vendors/operators/brands with competitive insights.",
+            "client_archetypes": "LEXA's 5 archetypes with emotional drivers and pain points.",
             "script_seed": "Theme, hook, emotional description, signature highlights (no venue names).",
-            "relationships": "Edges for Neo4j with properties and citations.",
+            "relationships": "Neo4j edges with emotional weights and properties.",
             "citations": "Source-backed evidence snippets.",
             "counts": "real_extracted vs estimated_potential per section.",
             "confidence": "Per-section confidence 0–1.",
+            "trends": "Luxury travel market shifts, timing, why they matter for LEXA.",
+            "investor_insights": "Market validation, competitive positioning, monetization angle, demo opportunities.",
         },
         "rules": [
             "Return strict JSON, no markdown.",

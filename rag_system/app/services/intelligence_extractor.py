@@ -9,6 +9,7 @@ from typing import List, Dict, Optional
 import anthropic
 import re
 from datetime import datetime
+from app.services.lexa_extraction_context import get_lexa_extraction_context
 
 
 class IntelligenceExtractor:
@@ -138,126 +139,272 @@ class IntelligenceExtractor:
     def _build_comprehensive_prompt(self, text: str, source_file: Optional[str]) -> str:
         """Build prompt for comprehensive intelligence extraction"""
         
-        prompt = f"""Extract all valuable information from this travel/luxury experience document and return it as JSON.
+        # Inject LEXA's rich domain context
+        lexa_context = get_lexa_extraction_context()
+        
+        prompt = f"""
+{lexa_context}
 
-Document: {source_file or "Unknown"}
+---
 
-Extract:
-1. All locations/places (POIs) - restaurants, hotels, spas, beaches, villages, landmarks, ports, marinas
-2. All experiences/activities - what people do, treatments, excursions, moments, rituals, protocols
-3. All companies/services mentioned - competitors, partners, vendors, service providers
-4. Emotional mapping - what emotions are evoked, with intensities if mentioned
-5. Client archetypes and profiles - who this experience is for, their emotional drivers
-6. Any trends, insights, or learnings
+## YOUR EXTRACTION TASK
 
-Be EXTREMELY thorough - extract EVERYTHING mentioned, even if it seems minor. 
-Extract sub-experiences, variations, optional activities, and all details.
+Extract intelligence from this document with the lens of a luxury travel advisor preparing 
+an investor pitch. Think like the Claude chat that analyzed Bloomberg's "11 Most Exciting 
+Luxury Hotels 2026" - provide rich insights, not just raw data.
+
+**Document:** {source_file or "Unknown"}
+
+### WHAT TO EXTRACT (In Priority Order):
+
+1. **Hotels/Experiences with Emotional Mapping** (MANDATORY)
+   - For EACH hotel/venue/experience: Map to LEXA's 9 emotions with intensity scores (1-10)
+   - Provide evidence for each emotion score from the source text
+   - Be specific: "Prestige (10/10) - Former royal palace, King's residence" not just "Prestige: high"
+
+2. **Client Archetype Matching** (MANDATORY)
+   - For EACH experience: Which of LEXA's 5 archetypes would love this? (match score 0-100)
+   - Why would they love it? (address specific pain points)
+   - What conversation triggers should prompt LEXA to recommend this?
+
+3. **Luxury Travel Trends** (If Applicable)
+   - What market shift does this exemplify? (e.g., "Historic conversions over new builds")
+   - How does this validate LEXA's emotional AI approach?
+   - What competitive insights does this reveal?
+
+4. **All POIs/Venues** (restaurants, hotels, spas, villages, landmarks, ports)
+5. **All Sub-Experiences** (activities, treatments, moments, rituals)
+6. **Service Providers** (companies, brands, operators mentioned)
+7. **Pricing Intelligence** (when mentioned - critical for tier/upsell positioning)
+8. **Investor Insights** (why this data matters for LEXA's business case)
+
+### EXTRACTION STANDARDS:
+
+**MINIMUM Quality:**
+- At least 3 emotions per experience (with intensities 1-10)
+- At least 1 client archetype match (with match score and reasoning)
+- Clear evidence citations from source
+
+**GOLD Standard (aim for this):**
+- 5-7 emotions per experience with intensities + evidence
+- 2-3 client archetype matches with match scores
+- Trend analysis (what shift it exemplifies)
+- Conversation trigger examples
+- Sample LEXA recommendation dialogue
+- Investor insight paragraph
+- Neo4j relationship suggestions
+
+Be EXTREMELY thorough - extract EVERYTHING mentioned, even if it seems minor.
 
 Return ONLY valid JSON with this structure:
 {{
-  "pois": [{{"name": "...", "type": "...", "location": "...", "description": "..."}}],
-  "experiences": [{{"experience_title": "...", "experience_type": "...", "description": "...", "location": "..."}}],
-  "competitor_analysis": [{{"competitor_name": "...", "service_type": "..."}}],
-  "trends": [],
-  "client_insights": [],
+  "extraction_summary": "Perfect! I've extracted [X hotels/experiences] with [Y emotions mapped], [Z client archetypes]...",
+  "pois": [
+    {{
+      "name": "Full name (e.g., 'Diriyah Palace', 'Zannier Bendor')",
+      "type": "hotel|restaurant|spa|resort|villa|palace|historic_property",
+      "location": "City/region (e.g., 'Riyadh, Saudi Arabia', 'Provence, France')",
+      "description": "What makes it special, historical context, unique features",
+      "emotional_map": [
+        {{"emotion": "Prestige", "intensity": 10, "evidence": "Former royal residence, King's home"}},
+        {{"emotion": "Exclusivity", "intensity": 10, "evidence": "70 rooms, palace hosts, private spa suites"}},
+        {{"emotion": "Discovery", "intensity": 9, "evidence": "First public access to royal palace"}}
+      ],
+      "client_archetypes": [
+        {{
+          "archetype": "Ultra-HNW Exclusivity Seeker",
+          "match_score": 98,
+          "why": "Royal residence offers ultimate prestige + exclusivity for milestone celebrations",
+          "pain_points_solved": ["Cookie-cutter luxury", "Lack of true exclusivity", "Forgettable venues"]
+        }}
+      ],
+      "room_count": 70,
+      "opening_date": "2026" or null,
+      "pricing": {{"amount": 5199, "currency": "EUR", "unit": "per_night"}} or null,
+      "unique_selling_points": ["Only royal palace-to-hotel", "Art Deco architecture", "Taif rose scented"],
+      "conversation_triggers": ["Once-in-a-lifetime", "Feel like royalty", "Ultimate exclusivity"],
+      "category": "accommodation",
+      "luxury_tier": "ultra_luxury|high_luxury|entry_luxury",
+      "coordinates": {{"lat": null, "lng": null}}
+    }}
+  ],
+  "experiences": [...],
+  "competitor_analysis": [...],
+  "trends": [
+    {{
+      "trend_name": "Historic Conversions Over New Builds",
+      "shift_from": "Cookie-cutter designer hotels",
+      "shift_to": "Authentic properties with stories and independent spirit",
+      "evidence": "7 of 11 hotels are historic conversions (palaces, theaters, Georgian homes)",
+      "why_matters_for_lexa": "Validates LEXA's emotional AI approach - clients seek meaning, not just luxury amenities",
+      "market_timing": "2024-2026 shift",
+      "business_opportunity": "Traditional booking sites can't convey emotional significance; LEXA can"
+    }}
+  ],
+  "client_insights": [...],
   "price_intelligence": {{}},
-  "operational_learnings": []
+  "operational_learnings": [],
+  "investor_insights": {{
+    "market_validation": "What this data proves about luxury travel market",
+    "competitive_positioning": "How LEXA is differentiated",
+    "monetization_angle": "Which tier/upsell features this data supports",
+    "demo_opportunities": "How to showcase this data in investor demo"
+  }}
 }}
 
 Document content:
 
 ## EXTRACTION RULES:
 
-### 1. POIS (Points of Interest) - Extract EVERY location mentioned
-For EACH place, venue, restaurant, hotel, spa, beach, port, village, landmark, or location:
+### 1. HOTELS/POIS - Extract with Emotional Intelligence
+For EACH hotel, resort, venue, or significant location:
 {{
-  "name": "Full name (e.g., 'Hotel du Cap-Eden-Roc', 'Èze', 'Elsa')",
-  "type": "restaurant|hotel|spa|beach|port|village|landmark|activity_venue|wellness_center",
-  "location": "City/region (e.g., 'Monaco', 'Saint-Tropez', 'Cap d'Antibes', 'French Riviera')",
-  "description": "What makes it special, what happens there, notable features",
-  "category": "wellness|dining|accommodation|activity|spa|beach|cultural",
-  "address": "If mentioned",
-  "coordinates": {{"lat": null, "lng": null}}  // Only if you can infer
+  "name": "Full name",
+  "type": "hotel|restaurant|spa|resort|villa|palace|historic_property|private_island",
+  "location": "City, Country or Region",
+  "description": "What makes it special - include historical context, unique features, cultural significance",
+  "emotional_map": [
+    {{"emotion": "Prestige|Exclusivity|Discovery|etc.", "intensity": 1-10, "evidence": "Quote from source"}}
+  ],
+  "client_archetypes": [
+    {{
+      "archetype": "Name from LEXA's 5 archetypes",
+      "match_score": 0-100,
+      "why": "Specific reasons with pain points solved"
+    }}
+  ],
+  "pricing": {{"amount": number, "currency": "EUR|USD", "unit": "per_night|per_experience|per_day"}} or null,
+  "opening_date": "YYYY" or "YYYY-MM" or null,
+  "room_count": number or null,
+  "unique_selling_points": ["What makes it one-of-a-kind"],
+  "conversation_triggers": ["Phrases that should prompt LEXA to recommend this"],
+  "luxury_tier": "ultra_luxury|high_luxury|entry_luxury",
+  "category": "accommodation|dining|wellness|activity"
 }}
 
-EXAMPLES:
-- "Èze" → {{"name": "Èze", "type": "village", "location": "French Riviera", "description": "Medieval hilltop village", "category": "cultural"}}
-- "Hotel du Cap-Eden-Roc Spa" → {{"name": "Hotel du Cap-Eden-Roc", "type": "hotel", "location": "Cap d'Antibes", "description": "Luxury hotel with spa, hydrotherapy pools, private gardens", "category": "wellness"}}
-- "Elsa (Monaco) 1 * Michelin" → {{"name": "Elsa", "type": "restaurant", "location": "Monaco", "description": "1 Michelin star restaurant", "category": "dining"}}
-- "Cheval Blanc St-Tropez Spa by Guerlain" → {{"name": "Cheval Blanc St-Tropez", "type": "hotel", "location": "Saint-Tropez", "description": "Ultra-luxury hotel with Guerlain spa, hammam, sea-view suites", "category": "wellness"}}
+EXAMPLES OF GOLD STANDARD EXTRACTION:
 
-### 2. EXPERIENCES - Extract EVERY activity, moment, or experience described
+Input: "Diriyah Palace - 70-room hotel in former royal residence of King Abdulaziz, opening 2026"
+
+Output:
+{{
+  "name": "Diriyah Palace",
+  "type": "palace",
+  "location": "Riyadh, Saudi Arabia",
+  "description": "Former royal residence of King Abdulaziz Al Saud (founding father of Saudi Arabia), converted to 70-room luxury hotel. Art Deco architecture, scented with Taif rose, private spa suites.",
+  "emotional_map": [
+    {{"emotion": "Prestige", "intensity": 10, "evidence": "Literal royal palace, founding father's home"}},
+    {{"emotion": "Exclusivity", "intensity": 10, "evidence": "Only 70 rooms, palace hosts, private spa suites"}},
+    {{"emotion": "Legacy", "intensity": 9, "evidence": "National historic significance, royal celebrations"}},
+    {{"emotion": "Discovery", "intensity": 9, "evidence": "First public access to royal residence"}},
+    {{"emotion": "Indulgence", "intensity": 9, "evidence": "Palace hosts cater to every request, Taif rose scenting"}}
+  ],
+  "client_archetypes": [
+    {{
+      "archetype": "Ultra-HNW Exclusivity Seeker",
+      "match_score": 98,
+      "why": "Royal palace offers ultimate prestige and exclusivity for milestone celebrations",
+      "pain_points_solved": ["Cookie-cutter luxury", "Lack of significance", "Forgettable venues"]
+    }},
+    {{
+      "archetype": "Legacy Builder / Milestone Celebrator",
+      "match_score": 95,
+      "why": "Historic royal residence perfect for significant anniversaries/birthdays",
+      "pain_points_solved": ["Forgettable milestone venues", "Lack of emotional significance"]
+    }}
+  ],
+  "room_count": 70,
+  "opening_date": "2026",
+  "unique_selling_points": ["Only royal palace-to-hotel opening in 2026", "King Abdulaziz's actual residence", "Art Deco architecture", "Taif rose signature scent"],
+  "conversation_triggers": ["Once-in-a-lifetime anniversary", "Want to feel like royalty", "Ultimate exclusivity", "Milestone celebration"],
+  "luxury_tier": "ultra_luxury",
+  "category": "accommodation"
+}}
+
+### 2. EXPERIENCES - Extract with Emotional Mapping
 For EACH experience, activity, treatment, or moment:
 {{
-  "experience_title": "Descriptive name (e.g., 'Sunrise Yoga on Deck', 'Private Thermal Circuit')",
-  "experience_type": "wellness|spa_treatment|dining|activity|excursion|meditation|fitness|cultural",
-  "description": "Detailed description of what happens, what's included",
-  "location": "Where it takes place (e.g., 'onboard', 'Monaco', 'Èze village')",
-  "duration": "If mentioned (e.g., 'morning', '2 hours', 'full day')",
-  "unique_elements": "What makes it special or unique",
-  "emotional_goal": "relaxation|energy|recovery|adventure|luxury|transformation|connection",
-  "target_audience": "If mentioned",
-  "estimated_budget": "If mentioned"
+  "experience_title": "Descriptive name",
+  "experience_type": "wellness|spa_treatment|dining|activity|excursion|meditation|fitness|cultural|luxury_service",
+  "description": "Detailed description including sensory details, emotions evoked, transformational aspects",
+  "location": "Where it takes place",
+  "duration": "If mentioned",
+  "emotional_map": [
+    {{"emotion": "Indulgence|Serenity|Discovery|etc.", "intensity": 1-10, "evidence": "Why this emotion is evoked"}}
+  ],
+  "client_archetypes": [
+    {{"archetype": "Who would love this", "match_score": 0-100, "why": "Specific appeal"}}
+  ],
+  "unique_elements": "What makes it special or one-of-a-kind",
+  "pricing": {{"amount": number, "currency": "EUR|USD"}} or null,
+  "conversation_triggers": ["Phrases that should prompt this"],
+  "luxury_tier": "ultra_luxury|high_luxury|entry_luxury"
 }}
 
-EXAMPLES:
-- "Sunrise yoga on deck" → {{"experience_title": "Sunrise Yoga on Deck", "experience_type": "wellness", "description": "Yoga session on yacht deck at sunrise with Cap-Ferrat backdrop", "location": "onboard", "duration": "morning", "emotional_goal": "relaxation"}}
-- "Private thermal circuit at Thermes Marins Monte-Carlo" → {{"experience_title": "Thermal Circuit at Thermes Marins", "experience_type": "wellness", "description": "Private thermal circuit with hydrotherapy and marine detox", "location": "Monaco", "emotional_goal": "recovery"}}
-- "Mindful walk through Èze village" → {{"experience_title": "Mindful Village Walk in Èze", "experience_type": "activity", "description": "Guided mindful walk through medieval village and nature paths", "location": "Èze", "emotional_goal": "connection"}}
-
-### 3. COMPETITORS - Extract companies, services, brands mentioned
+### 3. MARKET TRENDS - Identify luxury travel shifts
 {{
-  "competitor_name": "Company/service name",
+  "trend_name": "Name of trend (e.g., 'Historic Conversions Over New Builds')",
+  "shift_from": "Old paradigm being replaced",
+  "shift_to": "New paradigm emerging",
+  "evidence": "Specific examples from source",
+  "why_matters_for_lexa": "How this validates LEXA's approach or creates opportunity",
+  "market_timing": "When this shift is happening",
+  "business_opportunity": "How LEXA can capitalize"
+}}
+
+EXAMPLE:
+{{
+  "trend_name": "Intimate Scale Over Mega-Resorts",
+  "shift_from": "200+ room luxury hotels with cookie-cutter amenities",
+  "shift_to": "6-90 room properties with unique stories and independent spirit",
+  "evidence": "7 of 11 Bloomberg hotels have under 100 rooms (La Réserve Florence: only 6 apartments)",
+  "why_matters_for_lexa": "Validates LEXA's focus on exclusive, emotionally significant properties that can't be found on generic booking sites",
+  "market_timing": "2024-2026 accelerating",
+  "business_opportunity": "LEXA can curate access to properties too small/exclusive for OTAs; justifies Connoisseur tier pricing"
+}}
+
+### 4. SERVICE PROVIDERS / COMPETITORS
+{{
+  "competitor_name": "Company/brand name",
   "service_type": "What they offer",
+  "luxury_positioning": "ultra_luxury|high_luxury|mass_luxury",
+  "emotional_approach": "How they appeal emotionally (if discernible)",
   "strengths": "What they do well",
-  "weaknesses": "Limitations or gaps",
-  "lessons_for_lexa": "What LEXA can learn"
+  "gaps_for_lexa": "What LEXA can do better",
+  "lessons_for_lexa": "What LEXA can learn or adopt"
 }}
 
-EXAMPLES:
-- "Drip Hydration (UK based but operates internationally)" → {{"competitor_name": "Drip Hydration", "service_type": "IV Drip therapy", "strengths": "International operations", "lessons_for_lexa": "IV therapy is in demand for wellness cruises"}}
-- "Epulsive (Tailored workouts using EMS suits)" → {{"competitor_name": "Epulsive", "service_type": "EMS fitness training", "strengths": "20-minute full body workouts", "lessons_for_lexa": "Efficient workout options appeal to time-conscious luxury travelers"}}
-
-### 4. MARKET TRENDS - Only if clearly identifiable patterns
+### 5. INVESTOR INSIGHTS (Always Include)
 {{
-  "trend_name": "Name of trend",
-  "trend_category": "wellness|technology|luxury|sustainability",
-  "description": "What the trend is",
-  "target_demographic": "Who it appeals to",
-  "business_opportunity": "How LEXA can leverage this"
-}}
-
-### 5. CLIENT INSIGHTS - Understanding luxury traveler behavior
-Extract emotional profiles, client archetypes, and psychological insights:
-{{
-  "insight_category": "desires|pain_points|buying_behavior|decision_factors|emotional_profile|client_archetype",
-  "client_segment": "Who this applies to (e.g., 'Burnt-Out Executive', 'Longevity Optimizer', 'Wellness Enthusiast')",
-  "insight_description": "The insight",
-  "emotional_drivers": ["List of primary emotions sought, e.g., ['Rejuvenation', 'Serenity', 'Transformation']"],
-  "emotional_intensities": {{"emotion_name": intensity_1_to_10}},  // If mentioned
-  "pain_points": ["What frustrates them or what they're escaping from"],
-  "transformation_journey": "If described, the before/after transformation (e.g., 'Depleted → Restored → Vitalized')"
-}}
-
-### 6. OPERATIONAL LEARNINGS - Practical logistics, requirements, tips
-{{
-  "learning_type": "logistics|booking|seasonality|requirements|best_practices",
-  "description": "The learning",
-  "applicability": "When/where this applies"
-}}
-
-### 7. PRICE INTELLIGENCE - Only if pricing mentioned
-{{
-  "experience_type": "Type of experience",
-  "price_range": "If mentioned",
-  "value_drivers": "What justifies the price"
+  "market_validation": "What this source proves about the luxury travel market (e.g., 'Demand for ultra-exclusive properties higher than ever')",
+  "competitive_positioning": "How LEXA is differentiated from competitors (e.g., 'Traditional booking sites show star ratings; LEXA maps emotional intensities')",
+  "monetization_angle": "Which LEXA tier/upsell this data supports (e.g., 'Royal palace data justifies Connoisseur tier + White Glove upsell positioning')",
+  "demo_opportunities": "How to showcase this in investor pitch (e.g., 'Show how LEXA recommends Diriyah Palace to Legacy Builder celebrating 60th birthday')"
 }}
 
 ---
 
-{text[:15000]}
+## DOCUMENT TO ANALYZE:
 
-IMPORTANT: Return ONLY the JSON object, no markdown, no explanations, no code blocks. Start with {{ and end with }}."""
+{text[:60000]}
+
+---
+
+## CRITICAL INSTRUCTIONS:
+
+1. **Extract like you're preparing an investor pitch** - Show market intelligence, not just data
+2. **Map EVERY hotel/experience to emotions with intensities** - This is LEXA's core differentiation
+3. **Match to client archetypes with scores** - Show who would pay premium for this
+4. **Identify trends and market shifts** - Prove LEXA understands the luxury market
+5. **Include investor insights** - Explain why this data is valuable for LEXA's business case
+6. **Provide conversation examples** - Show how LEXA would recommend this to clients
+7. **Think about Neo4j relationships** - How does this data connect in the knowledge graph?
+
+**Output Format:** Start with a Claude-style summary ("Perfect! I've extracted..."), then provide 
+the complete JSON with all required fields. Be thorough - this extraction quality determines 
+whether LEXA is investor-ready or amateur.
+
+Return ONLY valid JSON. No markdown code blocks, no explanations outside the JSON. Start with {{ and end with }}."""
         
         return prompt
     
