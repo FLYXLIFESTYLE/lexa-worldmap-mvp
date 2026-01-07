@@ -77,16 +77,16 @@ class CompanyBrainAgent:
         
         # 1. Extract text from Word document
         try:
-            # process_file_auto expects a file-like object, not path + bytes
+            # process_file_auto returns a tuple (text, metadata), not a dict
             # Save to temp file first
             import tempfile
             with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_file:
                 temp_file.write(file_content)
                 temp_path = temp_file.name
             
-            # Process file
-            extracted = await process_file_auto(temp_path)
-            text_content = extracted.get('text', '')
+            # Process file - returns (text, metadata) tuple
+            extracted_text, metadata = await process_file_auto(temp_path)
+            text_content = extracted_text
             
             # Clean up temp file
             import os
@@ -100,6 +100,8 @@ class CompanyBrainAgent:
         
         except Exception as e:
             print(f"File processing error: {str(e)}")
+            import traceback
+            traceback.print_exc()
             raise Exception(f"Could not extract text from document: {str(e)}")
         
         # 2. Build company brain analysis prompt
