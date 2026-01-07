@@ -8,6 +8,12 @@ import OnlineUsersIndicator from './online-users-indicator';
 
 const adminPages = [
   {
+    name: 'CEO Dashboard',
+    href: '/ceo-dashboard',
+    icon: '👔',
+    description: 'Strategic overview - Mission, Architecture, KPIs'
+  },
+  {
     name: 'Admin Dashboard',
     href: '/admin/dashboard',
     icon: '📊',
