@@ -13,11 +13,22 @@ import PortalShell from '@/components/portal/portal-shell';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://lexa-worldmap-mvp-rlss.onrender.com';
 
+interface ProcessedFile {
+  name: string;
+  size: number;
+  status: 'pending' | 'processing' | 'done' | 'error';
+  scriptExamplesCount?: number;
+  ideasCount?: number;
+  category?: string;
+  error?: string;
+}
+
 export default function CompanyBrainPage() {
   const router = useRouter();
   const supabase = createClient();
 
   const [uploading, setUploading] = useState(false);
+  const [processedFiles, setProcessedFiles] = useState<ProcessedFile[]>([]);
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [selectedAnalysis, setSelectedAnalysis] = useState<any>(null);
   const [synthesizing, setSynthesizing] = useState(false);
@@ -52,7 +63,20 @@ export default function CompanyBrainPage() {
 
     setUploading(true);
 
+    // Initialize processed files list
+    const initialFiles: ProcessedFile[] = Array.from(files).map(f => ({
+      name: f.name,
+      size: f.size,
+      status: 'pending'
+    }));
+    setProcessedFiles(initialFiles);
+
     for (const file of Array.from(files)) {
+      // Update status to processing
+      setProcessedFiles(prev => prev.map(f => 
+        f.name === file.name ? { ...f, status: 'processing' } : f
+      ));
+
       try {
         const formData = new FormData();
         formData.append('file', file);
@@ -74,13 +98,27 @@ export default function CompanyBrainPage() {
         }
 
         const result = await response.json();
-        alert(`✅ ${file.name} analyzed!\n` +
-              `Script examples: ${result.script_examples_count}\n` +
-              `Ideas worth discussing: ${result.features_worth_discussing_count}\n` +
-              `Category: ${result.knowledge_category}`);
+        
+        // Update status to done with results
+        setProcessedFiles(prev => prev.map(f => 
+          f.name === file.name ? {
+            ...f,
+            status: 'done',
+            scriptExamplesCount: result.script_examples_count,
+            ideasCount: result.features_worth_discussing_count,
+            category: result.knowledge_category
+          } : f
+        ));
 
       } catch (error: any) {
-        alert(`❌ Failed to analyze ${file.name}: ${error.message}`);
+        // Update status to error
+        setProcessedFiles(prev => prev.map(f => 
+          f.name === file.name ? {
+            ...f,
+            status: 'error',
+            error: error.message
+          } : f
+        ));
       }
     }
 
@@ -153,7 +191,7 @@ export default function CompanyBrainPage() {
           Upload exported ChatGPT conversations (Word documents). The agent will extract company DNA, experience scripts, and valuable ideas.
         </p>
 
-        <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-blue-400 transition-all">
+        <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-purple-400 transition-all">
           <input
             type="file"
             id="company-brain-upload"
@@ -165,20 +203,66 @@ export default function CompanyBrainPage() {
           <label htmlFor="company-brain-upload" className="cursor-pointer block">
             <div className="text-6xl mb-4">🧠</div>
             <p className="text-xl font-semibold text-gray-900 mb-2">
-              Click to Upload ChatGPT Conversations
+              Click, Drag & Drop ChatGPT Conversations
             </p>
             <p className="text-sm text-gray-500">
-              Word documents (.doc, .docx)
+              Word documents (.doc, .docx) from ChatGPT export
             </p>
           </label>
         </div>
 
-        {uploading && (
+        {/* Processing Status */}
+        {processedFiles.length > 0 && (
+          <div className="mt-6 space-y-3">
+            <h3 className="font-semibold text-gray-900 mb-3">
+              Processing Conversations ({processedFiles.filter(f => f.status === 'done').length}/{processedFiles.length})
+            </h3>
+            {processedFiles.map((file, index) => (
+              <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{file.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {(file.size / 1024).toFixed(2)} KB
+                  </p>
+                  {file.status === 'done' && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      📝 {file.scriptExamplesCount} scripts • 💡 {file.ideasCount} ideas • 🎯 {file.category}
+                    </p>
+                  )}
+                  {file.status === 'error' && (
+                    <p className="text-xs text-red-600 mt-1">
+                      ❌ {file.error}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    file.status === 'pending' ? 'bg-gray-200 text-gray-700' :
+                    file.status === 'processing' ? 'bg-blue-100 text-blue-700 animate-pulse' :
+                    file.status === 'done' ? 'bg-green-100 text-green-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {file.status === 'pending' ? '⏳ Pending' :
+                     file.status === 'processing' ? '🔄 Analyzing...' :
+                     file.status === 'done' ? '✅ Complete' :
+                     '❌ Error'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {uploading && processedFiles.some(f => f.status === 'processing') && (
           <div className="mt-4">
             <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-2 w-1/2 bg-blue-500 animate-pulse" />
+              <div className="h-2 bg-purple-500 animate-pulse" style={{
+                width: `${(processedFiles.filter(f => f.status === 'done').length / processedFiles.length) * 100}%`
+              }} />
             </div>
-            <p className="text-sm text-gray-600 mt-2">Analyzing conversation...</p>
+            <p className="text-sm text-gray-600 mt-2 text-center">
+              Extracting company DNA from historical conversations...
+            </p>
           </div>
         )}
       </div>
