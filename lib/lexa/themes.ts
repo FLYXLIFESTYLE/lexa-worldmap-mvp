@@ -1,9 +1,11 @@
 /**
- * LEXA canonical 12 themes (experience-first).
+ * LEXA canonical 14 themes (experience-first).
  * Keep this list stable: it drives onboarding, preference learning, and Neo4j theme nodes.
+ * 
+ * Updated Jan 2026: Added Nightlife & Entertainment, Sports & Active
  */
 
-export const LEXA_THEMES_12 = [
+export const LEXA_THEMES_14 = [
   'Romance & Intimacy',
   'Adventure & Exploration',
   'Wellness & Transformation',
@@ -16,12 +18,17 @@ export const LEXA_THEMES_12 = [
   'Family Luxury',
   'Celebration & Milestones',
   'Solitude & Reflection',
+  'Nightlife & Entertainment',
+  'Sports & Active',
 ] as const;
 
-export type LexaTheme = (typeof LEXA_THEMES_12)[number];
+// Backward compatibility alias
+export const LEXA_THEMES_12 = LEXA_THEMES_14;
+
+export type LexaTheme = (typeof LEXA_THEMES_14)[number];
 
 export function formatThemeMenu(): string {
-  return LEXA_THEMES_12.map((t, i) => `${i + 1}. ${t}`).join('\n');
+  return LEXA_THEMES_14.map((t, i) => `${i + 1}. ${t}`).join('\n');
 }
 
 // UI metadata for theme quick-reply cards (license-free icons via lucide on frontend)
@@ -38,6 +45,8 @@ export const LEXA_THEME_UI: Record<LexaTheme, { id: string; icon: string; accent
   'Family Luxury': { id: 'family', icon: 'Users', accent: 'navy' },
   'Celebration & Milestones': { id: 'celebration', icon: 'PartyPopper', accent: 'amber' },
   'Solitude & Reflection': { id: 'solitude', icon: 'Moon', accent: 'navy' },
+  'Nightlife & Entertainment': { id: 'nightlife', icon: 'Music', accent: 'violet' },
+  'Sports & Active': { id: 'sports', icon: 'Trophy', accent: 'amber' },
 };
 
 export const LEXA_THEME_COPY: Record<LexaTheme, { hook: string; description: string }> = {
@@ -101,6 +110,16 @@ export const LEXA_THEME_COPY: Record<LexaTheme, { hook: string; description: str
     description:
       'This script protects your quiet: minimal obligations, soft structure, and places chosen for their stillness. Gentle prompts, private rituals, and simple beauty help you process, reset, and return with clarity.',
   },
+  'Nightlife & Entertainment': {
+    hook: 'When the sun sets, your evening begins.',
+    description:
+      'This script opens doors to exclusive after-hours experiences: VIP club access, private performances, and late-night discoveries that most travelers never see. From rooftop lounges to underground venues, your nights become as memorable as your days.',
+  },
+  'Sports & Active': {
+    hook: 'Luxury isn\'t passive – it\'s powerful.',
+    description:
+      'This script keeps you moving with purpose: championship golf courses, private tennis coaching, elite fitness sessions, and active wellness experiences. Whether mastering a skill or testing your limits, you return energized and accomplished.',
+  },
 };
 
 function normalize(s: string) {
@@ -134,7 +153,7 @@ export function parseThemeSelection(input: string): LexaTheme[] {
 
   // 2) Name selection (keywords / partial match)
   if (out.length < 3) {
-    for (const t of LEXA_THEMES_12) {
+    for (const t of LEXA_THEMES_14) {
       const tn = normalize(t);
       // allow matching on any significant word
       const words = tn.split(' ').filter((w) => w.length >= 4 && w !== 'and');
