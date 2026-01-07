@@ -77,8 +77,23 @@ class CompanyBrainAgent:
         
         # 1. Extract text from Word document
         try:
-            extracted = await process_file_auto(file_path, file_content)
+            # process_file_auto expects a file-like object, not path + bytes
+            # Save to temp file first
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_file:
+                temp_file.write(file_content)
+                temp_path = temp_file.name
+            
+            # Process file
+            extracted = await process_file_auto(temp_path)
             text_content = extracted.get('text', '')
+            
+            # Clean up temp file
+            import os
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
             
             if len(text_content) < 100:
                 raise ValueError("Document appears empty or unreadable")
