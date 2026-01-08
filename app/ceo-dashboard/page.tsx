@@ -1,560 +1,620 @@
 'use client';
 
 /**
- * CEO Dashboard - Strategic Overview for Chris, Paul, Bakary
- * High-level view of LEXA: Mission, Architecture, KPIs, and Definitions
+ * CEO Dashboard - Pitch Deck Style
+ * 8 slides: Mission, Problem/Solution, DNA, Agents, Coverage, Emotions, KPIs, Financials
  */
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
-import PortalShell from '@/components/portal/portal-shell';
 
 export default function CEODashboardPage() {
-  const router = useRouter();
   const supabase = createClient();
-
+  const [currentSlide, setCurrentSlide] = useState(0);
   const [kpiData, setKpiData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
 
-  // Refresh KPIs (on-demand or could be cron)
-  const refreshKPIs = async () => {
-    setLoading(true);
-    try {
-      // TODO: Call API to get live KPI data
-      // For now, using placeholder
-      setKpiData({
-        pois_total: 340000,
-        pois_luxury_scored: 85000,
-        chats_total: 1247,
-        users_by_tier: {
-          spark: 890,
-          inspired: 45,
-          connoisseur: 12
-        },
-        arr: 3564 * 45 + 11964 * 12,
-        upsell_revenue: 47500
-      });
-    } catch (error) {
-      console.error('Error loading KPIs:', error);
-    } finally {
-      setLoading(false);
-    }
+  // Editable content state
+  const [editableContent, setEditableContent] = useState({
+    mission: "Transform luxury travel from logistics into emotional transformation",
+    why: "Humans don't remember destinations—they remember feelings. Every booking site shows hotels. We design moments you'll taste, smell, and feel years later.",
+    what: "AI that uses emotional intelligence (not just keywords) to design personalized €3k-€100k+ experiences. Powered by 340k+ luxury POIs, 8 specialized AI agents, and a knowledge graph competitors can't replicate.",
+    how: "3-tier subscription (€0-€12k/year) + 4 upsell packages (€497-€8k/day). AIlessia + AIbert design scripts. Grounded in real, verified POIs—no hallucinations.",
+    problem: "Luxury Fatigue: UHNW travelers are tired of cookie-cutter experiences. Traditional travel agents can't scale. Booking sites lack emotional intelligence. Generic AI hallucinates.",
+    solution: "Experience-First, Not Logistics: We start with 'What do you want to feel?' not 'Where do you want to go?' Emotional profiling → Grounded POIs → Cinematic scripts worth €3k-€100k+.",
+    future: "Phase 1: 14 emotional themes. Phase 2: Luxury assets AS themes (your yacht, your villa). Phase 3: Individuals AS themes (ultimate gift: 'Design an experience for my father's 70th'). No competitor can follow us here.",
+    dna_story: "Every experience needs a narrative arc: Beginning (arrival, transition), Peak (the 'foodgasm' moment), Resolution (transformation, not souvenir).",
+    dna_emotion: "The feeling IS the destination. 9 core emotions with intensity scoring (1-10). Most powerful experiences blend 2-3 emotions.",
+    dna_trigger: "Sensory anchors create lasting memories. 5 senses: Smell (most powerful), taste, sound, sight, touch. Like a meal you can taste years later.",
+    profiles: "AIlessia listens to every conversation, extracting emotional keywords, detecting preferences, mapping to 9 emotions with intensities. By message 10, we know their archetype with 85%+ confidence. This profile feeds script design, making upsells inevitable.",
+    market_opportunity: "€47B luxury travel market. 12M UHNW individuals globally. Current penetration: <0.01%. Target: 10,000 clients by Year 3 = €50M ARR.",
+    financial_projection: "Year 1: €500k ARR (140 Inspired + 40 Connoisseur). Year 2: €5M ARR (1,000 Inspired + 200 Connoisseur + upsells). Year 3: €50M ARR (scale + SYCC cruises + White Glove). Gross margin: 47%. Break-even: Month 18."
+  });
+
+  const updateContent = (key: string, value: string) => {
+    setEditableContent(prev => ({ ...prev, [key]: value }));
+    // TODO: Auto-save to localStorage or database
   };
 
-  useEffect(() => {
-    refreshKPIs();
-  }, []);
+  const slides = [
+    { title: "Mission & Vision", icon: "🚀" },
+    { title: "Problem & Solution", icon: "💡" },
+    { title: "Experience DNA", icon: "🧬" },
+    { title: "LEXA Architecture", icon: "🏗️" },
+    { title: "Coverage & Scale", icon: "🌍" },
+    { title: "Emotional Intelligence", icon: "❤️" },
+    { title: "Live KPIs", icon: "📊" },
+    { title: "Market & Financials", icon: "💰" }
+  ];
+
+  const nextSlide = () => {
+    if (currentSlide < slides.length - 1) setCurrentSlide(currentSlide + 1);
+  };
+
+  const prevSlide = () => {
+    if (currentSlide > 0) setCurrentSlide(currentSlide - 1);
+  };
 
   return (
-    <PortalShell
-      icon="👔"
-      title="CEO Dashboard"
-      subtitle="Strategic overview of LEXA - Mission, Architecture, KPIs"
-      backLink={{ href: '/admin/dashboard', label: 'Back to Admin' }}
-      topRight={<AdminNav />}
-      mission={[
-        { label: 'PURPOSE', text: 'High-level strategic view for Chris, Paul, and Bakary.' },
-        { label: 'WHAT YOU SEE', text: 'Elevator pitch, architecture, definitions, and live KPIs.' },
-        { label: 'FOR INVESTORS', text: 'This page tells the LEXA story in one view.' },
-      ]}
-      quickTips={[
-        'Use this page for investor presentations and strategic reviews.',
-        'KPIs update on-demand (click Refresh) or can be automated nightly.',
-        'Elevator pitch section is designed to create FOMO in investors.',
-      ]}
-    >
-      {/* SECTION 1: ELEVATOR PITCH */}
-      <div className="bg-gradient-to-r from-blue-900 to-purple-900 rounded-xl shadow-2xl p-10 mb-8 text-white">
-        <h2 className="text-4xl font-bold mb-8 text-center">🚀 The LEXA Elevator Pitch</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          {/* Mission */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
-            <h3 className="text-2xl font-bold mb-3 text-yellow-300">🎯 Mission</h3>
-            <p className="text-lg leading-relaxed">
-              Transform luxury travel from logistics into <span className="font-bold text-yellow-300">emotional transformation</span>. 
-              We design €3k-€100k+ experiences that clients remember for life, not just Instagram.
-            </p>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white">
+      {/* Top Nav */}
+      <div className="fixed top-6 right-6 z-50">
+        <AdminNav />
+      </div>
 
-          {/* Why */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
-            <h3 className="text-2xl font-bold mb-3 text-yellow-300">💡 Why LEXA Exists</h3>
-            <p className="text-lg leading-relaxed">
-              Humans don't remember destinations—they remember <span className="font-bold text-yellow-300">feelings</span>. 
-              Every booking site shows hotels. We design moments you'll taste, smell, and feel years later.
-            </p>
-          </div>
-
-          {/* What */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
-            <h3 className="text-2xl font-bold mb-3 text-yellow-300">🤖 What We Built</h3>
-            <p className="text-lg leading-relaxed">
-              AI that uses <span className="font-bold text-yellow-300">emotional intelligence</span> (not just keywords) to design personalized 
-              experience scripts. Powered by 340k+ luxury POIs, 8 specialized AI agents, and a knowledge graph 
-              competitors can't replicate.
-            </p>
-          </div>
-
-          {/* How */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
-            <h3 className="text-2xl font-bold mb-3 text-yellow-300">⚙️ How It Works</h3>
-            <p className="text-lg leading-relaxed">
-              3-tier subscription (€0-€12k/year) + 4 upsell packages (€497-€8k/day). 
-              AIlessia (conversational artist) + AIbert (analytical psychologist) design scripts. 
-              Grounded in real, verified POIs—<span className="font-bold text-yellow-300">no hallucinations</span>.
-            </p>
-          </div>
-        </div>
-
-        {/* Differentiation */}
-        <div className="bg-yellow-400/20 backdrop-blur-sm rounded-lg p-8 mb-8 border-2 border-yellow-300">
-          <h3 className="text-3xl font-bold mb-6 text-center">🥊 Why We Win</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <h4 className="font-bold text-xl mb-2 text-yellow-300">vs. Google Maps</h4>
-              <p className="text-sm opacity-90">
-                <span className="text-red-300">They show:</span> "4.8★ Restaurant"<br/>
-                <span className="text-green-300">We show:</span> "Evokes Discovery (9/10) + Prestige (8/10), perfect for Cultural Connoisseur archetype"
-              </p>
-            </div>
-
-            <div>
-              <h4 className="font-bold text-xl mb-2 text-yellow-300">vs. Generic ChatGPT/Claude</h4>
-              <p className="text-sm opacity-90">
-                <span className="text-red-300">They:</span> Hallucinate venues, generic suggestions<br/>
-                <span className="text-green-300">We:</span> Grounded in 340k verified POIs, emotional profiling, zero hallucinations
-              </p>
-            </div>
-
-            <div>
-              <h4 className="font-bold text-xl mb-2 text-yellow-300">vs. Travel Agents/Brokers</h4>
-              <p className="text-sm opacity-90">
-                <span className="text-red-300">They:</span> Can't scale, limited by personal experience<br/>
-                <span className="text-green-300">We:</span> AI scales infinitely, learns from every conversation, €12k/year ARR per client
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Future Potential */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg p-8 border-2 border-white/30">
-          <h3 className="text-3xl font-bold mb-4 text-center">🔮 The Future (This Is Where Investors FOMO)</h3>
-          <p className="text-xl leading-relaxed text-center mb-6">
-            Today: 14 emotional themes. Tomorrow: <span className="font-bold text-yellow-300">Luxury assets AS themes.</span>
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div className="bg-white/20 rounded p-4">
-              <div className="font-bold mb-2">🛥️ Asset Themes</div>
-              <div className="opacity-90">"Design my experience around this specific yacht/villa/jet"</div>
-            </div>
-            <div className="bg-white/20 rounded p-4">
-              <div className="font-bold mb-2">👤 Individual Themes</div>
-              <div className="opacity-90">"Design an experience for my father's 70th birthday" (ultimate gift service)</div>
-            </div>
-            <div className="bg-white/20 rounded p-4">
-              <div className="font-bold mb-2">💰 Market Expansion</div>
-              <div className="opacity-90">Corporate retreats, wellness programs, multi-modal journeys (yacht→jet→train)</div>
-            </div>
-          </div>
-          <p className="text-center mt-6 text-xl font-bold text-yellow-300">
-            No competitor can follow us here. We're building the luxury experience OS.
-          </p>
+      {/* Slide Counter */}
+      <div className="fixed top-6 left-6 z-50 bg-white/10 backdrop-blur-md rounded-lg px-4 py-2">
+        <div className="text-sm font-medium">
+          Slide {currentSlide + 1} of {slides.length}
         </div>
       </div>
 
-      {/* SECTION 2: ARCHITECTURE & DEFINITIONS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        
-        {/* LEXA Architecture */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">🏗️ LEXA Architecture</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-bold text-purple-900 mb-2">🤖 8 AI Agents</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-start p-2 bg-purple-50 rounded">
-                  <div className="flex-1">
-                    <span className="font-semibold">AIlessia</span>
-                    <div className="text-gray-600 text-xs">Conversational artist, script composer</div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-start p-2 bg-blue-50 rounded">
-                  <div className="flex-1">
-                    <span className="font-semibold">AIbert</span>
-                    <div className="text-gray-600 text-xs">Analytical psychologist, desire anticipation</div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-start p-2 bg-green-50 rounded">
-                  <div className="flex-1">
-                    <span className="font-semibold">Intelligence Extractor</span>
-                    <div className="text-gray-600 text-xs">Documents → investor-quality insights</div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-start p-2 bg-yellow-50 rounded">
-                  <div className="flex-1">
-                    <span className="font-semibold">Multipass Enrichment</span>
-                    <div className="text-gray-600 text-xs">4-pass validation for complex docs</div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-start p-2 bg-indigo-50 rounded">
-                  <div className="flex-1">
-                    <span className="font-semibold">Brain v2 Retrieval</span>
-                    <div className="text-gray-600 text-xs">Grounded POI context (no hallucinations)</div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-start p-2 bg-pink-50 rounded">
-                  <div className="flex-1">
-                    <span className="font-semibold">Scraping Agent</span>
-                    <div className="text-gray-600 text-xs">URLs → clean text → extraction</div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-start p-2 bg-emerald-50 rounded">
-                  <div className="flex-1">
-                    <span className="font-semibold">Market Intelligence</span>
-                    <div className="text-gray-600 text-xs">Strategic insights, cruise recommendations</div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-start p-2 bg-purple-50 rounded">
-                  <div className="flex-1">
-                    <span className="font-semibold">Company Brain</span>
-                    <div className="text-gray-600 text-xs">Mines 5 years of ChatGPT for company DNA</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t">
-              <h3 className="font-bold text-blue-900 mb-2">💾 Database Landscape</h3>
-              <div className="space-y-2 text-sm">
-                <div className="p-3 bg-blue-50 rounded">
-                  <div className="font-semibold mb-1">PostgreSQL (Supabase)</div>
-                  <div className="text-gray-600 text-xs">
-                    User accounts, conversations, emotional profiles, memberships, scripts, uploads, scraped URLs, extracted POIs (drafts)
-                  </div>
-                </div>
-                <div className="p-3 bg-green-50 rounded">
-                  <div className="font-semibold mb-1">Vector Database (pgvector)</div>
-                  <div className="text-gray-600 text-xs">
-                    Conversation embeddings, semantic search, narrative similarity
-                  </div>
-                </div>
-                <div className="p-3 bg-purple-50 rounded">
-                  <div className="font-semibold mb-1">Graph Database (Neo4j)</div>
-                  <div className="text-gray-600 text-xs">
-                    340k+ luxury POIs, emotional relationships, theme connections, destination hierarchies, verified knowledge (approved POIs)
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Experience DNA */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">🧬 DNA of an Experience</h2>
-          <p className="text-gray-600 mb-6 text-sm">
-            LEXA's proprietary methodology - what makes experiences unforgettable
-          </p>
-
-          <div className="space-y-4">
-            <div className="bg-amber-50 rounded-lg p-4 border-l-4 border-amber-500">
-              <h3 className="font-bold text-amber-900 mb-2">📖 1. STORY</h3>
-              <p className="text-sm text-gray-700">
-                Every experience needs a narrative arc: <span className="font-semibold">Beginning</span> (arrival, transition), 
-                <span className="font-semibold"> Peak</span> (the "foodgasm" moment), 
-                <span className="font-semibold"> Resolution</span> (transformation, not souvenir).
-              </p>
-              <p className="text-xs text-gray-600 mt-2 italic">
-                Examples: "Reconnection after distance," "Celebrating freedom," "The adventure that changed everything"
-              </p>
-            </div>
-
-            <div className="bg-rose-50 rounded-lg p-4 border-l-4 border-rose-500">
-              <h3 className="font-bold text-rose-900 mb-2">❤️ 2. EMOTION</h3>
-              <p className="text-sm text-gray-700">
-                The <span className="font-semibold">feeling IS the destination</span>. Core emotions: Freedom, Connection, Awe, Peace, Thrill, Belonging.
-                Most powerful experiences blend 2-3 emotions.
-              </p>
-              <p className="text-xs text-gray-600 mt-2 italic">
-                Examples: "Thrilling freedom," "Peaceful awe," "Intimate adventure"
-              </p>
-            </div>
-
-            <div className="bg-emerald-50 rounded-lg p-4 border-l-4 border-emerald-500">
-              <h3 className="font-bold text-emerald-900 mb-2">🎯 3. TRIGGER</h3>
-              <p className="text-sm text-gray-700">
-                The <span className="font-semibold">sensory anchor</span> that brings it all back. 
-                Five senses as memory triggers: smell (most powerful), taste, sound, sight, touch.
-              </p>
-              <p className="text-xs text-gray-600 mt-2 italic">
-                Examples: Lavender in Provence, that truffle pasta, ocean waves, golden hour view, cool marble
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg border border-purple-300">
-            <p className="text-sm text-purple-900 font-semibold text-center">
-              💎 This is our competitive moat—no booking site or generic AI can design with this depth.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* SECTION 2: DEFINITIONS & LISTS */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-8">📚 Core Definitions & Lists</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* 14 Theme Categories */}
-          <div>
-            <h3 className="text-xl font-bold text-gray-900 mb-4">🎨 14 Theme Categories</h3>
-            <div className="space-y-2 text-sm max-h-96 overflow-y-auto pr-2">
-              {[
-                { name: 'Romance & Intimacy', hook: 'Fall in love with each other all over again' },
-                { name: 'Adventure & Exploration', hook: 'For when comfort isn\'t enough – you want a story' },
-                { name: 'Wellness & Transformation', hook: 'Leave as yourself. Return as your next chapter' },
-                { name: 'Culinary Excellence', hook: 'Travel through taste, one unforgettable course at a time' },
-                { name: 'Cultural Immersion', hook: 'Not just another destination – a deeper connection' },
-                { name: 'Pure Luxury & Indulgence', hook: 'Give yourself permission to want exactly what you want' },
-                { name: 'Nature & Wildlife', hook: 'Get close to the world that usually stays out of reach' },
-                { name: 'Water Sports & Marine', hook: 'Live your days at sea, not just look at the water' },
-                { name: 'Art & Architecture', hook: 'Walk inside the world\'s most beautiful ideas' },
-                { name: 'Family Luxury', hook: 'Time together that everyone will remember' },
-                { name: 'Celebration & Milestones', hook: 'Mark the moment so it never blurs' },
-                { name: 'Solitude & Reflection', hook: 'Finally, the space to hear yourself again' },
-                { name: 'Nightlife & Entertainment', hook: 'When the sun sets, your evening begins' },
-                { name: 'Sports & Active', hook: 'Luxury isn\'t passive – it\'s powerful' },
-              ].map((theme, i) => (
-                <div key={i} className="p-3 bg-gray-50 rounded border-l-4 border-purple-500">
-                  <div className="font-semibold text-gray-900">{i + 1}. {theme.name}</div>
-                  <div className="text-xs text-gray-600 italic">{theme.hook}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 12 Destinations (MVP) */}
-          <div>
-            <h3 className="text-xl font-bold text-gray-900 mb-4">🗺️ 12 Destinations (MVP)</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {[
-                'French Riviera',
-                'Amalfi Coast',
-                'Balearics',
-                'Cyclades',
-                'BVI',
-                'USVI',
-                'Bahamas',
-                'Dutch Antilles',
-                'French Antilles',
-                'Arabian Gulf (UAE)',
-                'Adriatic (North/Central/South)',
-                'Ionian Sea',
-              ].map((dest, i) => (
-                <div key={i} className="p-2 bg-blue-50 rounded text-gray-900">
-                  {i + 1}. {dest}
-                </div>
-              ))}
-            </div>
-
-            <h3 className="text-xl font-bold text-gray-900 mt-6 mb-4">🌍 8 Languages</h3>
-            <div className="grid grid-cols-4 gap-2 text-sm">
-              {[
-                'English 🇬🇧',
-                'French 🇫🇷',
-                'Spanish 🇪🇸',
-                'German 🇩🇪',
-                'Italian 🇮🇹',
-                'Portuguese 🇵🇹',
-                'Russian 🇷🇺',
-                'Arabic 🇦🇪',
-              ].map((lang, i) => (
-                <div key={i} className="p-2 bg-green-50 rounded text-gray-900 text-center text-xs">
-                  {lang}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6 p-4 bg-yellow-50 rounded border border-yellow-300">
-              <h3 className="font-bold text-yellow-900 mb-2">🎯 Scoring Systems</h3>
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="font-semibold">Luxury Score (0-10):</span>
-                  <div className="text-gray-700">Based on: Google rating × 2, price level ($$$$), Michelin stars, luxury keywords, review count</div>
-                </div>
-                <div>
-                  <span className="font-semibold">Confidence Score (0-100%):</span>
-                  <div className="text-gray-700">Uploads default 80%. Captain verification required for &gt;80%. Approved POIs: 95%+</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Emotions & Activities */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">🎭 Emotions & Activities</h2>
-          
-          <div className="mb-6">
-            <h3 className="font-bold text-rose-900 mb-3">9 Core Emotions</h3>
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              {[
-                'Exclusivity',
-                'Prestige',
-                'Discovery',
-                'Indulgence',
-                'Romance',
-                'Adventure',
-                'Legacy',
-                'Freedom',
-                'Transformation',
-              ].map((emotion, i) => (
-                <div key={i} className="p-2 bg-rose-50 rounded text-gray-900 text-center font-medium">
-                  {emotion}
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-gray-600 mt-2 italic">
-              Each POI mapped with intensity scores (1-10) and evidence
-            </p>
-          </div>
-
-          <div>
-            <h3 className="font-bold text-blue-900 mb-3">Neo4j Relationship Types</h3>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {[
-                'LOCATED_IN',
-                'HAS_THEME',
-                'SUPPORTS_ACTIVITY',
-                'EVOKES',
-                'PERFECT_FOR',
-                'INCLUDES_PORT',
-                'EXEMPLIFIES',
-                'SOLVES',
-              ].map((rel, i) => (
-                <div key={i} className="p-2 bg-blue-50 rounded text-gray-900 font-mono">
-                  {rel}
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-gray-600 mt-2 italic">
-              8 unique relationship types connecting POIs, emotions, themes, destinations
-            </p>
-          </div>
-
-          <div className="mt-6 p-4 bg-purple-50 rounded">
-            <h3 className="font-bold text-purple-900 mb-2 text-sm">Activities in Database</h3>
-            <div className="text-2xl font-bold text-purple-600">TBD</div>
-            <p className="text-xs text-gray-600">Will populate from live Neo4j query</p>
-          </div>
-        </div>
-      </div>
-
-      {/* SECTION 3: LIVE KPIs */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-3xl font-bold text-gray-900">📊 Live KPIs</h2>
+      {/* Slide Navigation Dots */}
+      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex gap-2">
+        {slides.map((slide, i) => (
           <button
-            onClick={refreshKPIs}
-            disabled={loading}
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg disabled:opacity-50"
-          >
-            {loading ? '⏳ Refreshing...' : '🔄 Refresh KPIs'}
-          </button>
-        </div>
+            key={i}
+            onClick={() => setCurrentSlide(i)}
+            className={`w-3 h-3 rounded-full transition-all ${
+              i === currentSlide ? 'bg-yellow-400 w-8' : 'bg-white/30 hover:bg-white/50'
+            }`}
+            title={slide.title}
+          />
+        ))}
+      </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {/* POI Stats */}
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 border border-blue-200">
-            <div className="text-sm text-blue-900 font-semibold mb-1">Total POIs</div>
-            <div className="text-4xl font-bold text-blue-600">
-              {kpiData?.pois_total?.toLocaleString() || '—'}
+      {/* Arrow Navigation */}
+      <button
+        onClick={prevSlide}
+        disabled={currentSlide === 0}
+        className="fixed left-6 top-1/2 transform -translate-y-1/2 z-50 bg-white/10 backdrop-blur-md rounded-full p-4 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+      >
+        ←
+      </button>
+      <button
+        onClick={nextSlide}
+        disabled={currentSlide === slides.length - 1}
+        className="fixed right-6 top-1/2 transform -translate-y-1/2 z-50 bg-white/10 backdrop-blur-md rounded-full p-4 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+      >
+        →
+      </button>
+
+      {/* Slides Container */}
+      <div className="w-full h-screen overflow-hidden">
+        <div 
+          className="flex transition-transform duration-500 ease-in-out h-full"
+          style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+        >
+          {/* SLIDE 1: MISSION & VISION */}
+          <div className="min-w-full h-full flex flex-col items-center justify-center p-16">
+            <div className="max-w-6xl w-full">
+              <h1 className="text-6xl font-bold mb-4 text-center bg-gradient-to-r from-yellow-300 to-pink-300 bg-clip-text text-transparent">
+                LEXA
+              </h1>
+              <p className="text-2xl text-center mb-16 text-gray-300">
+                Emotional Intelligence for Luxury Travel
+              </p>
+
+              <div className="grid grid-cols-2 gap-6">
+                {/* Mission */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 hover:border-yellow-300/50 transition-all">
+                  <div className="text-yellow-300 text-sm font-bold mb-3">🎯 MISSION</div>
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => updateContent('mission', e.currentTarget.textContent || '')}
+                    className="text-lg leading-relaxed outline-none focus:ring-2 focus:ring-yellow-300 rounded p-2"
+                  >
+                    {editableContent.mission}
+                  </div>
+                </div>
+
+                {/* Why */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 hover:border-yellow-300/50 transition-all">
+                  <div className="text-yellow-300 text-sm font-bold mb-3">💡 WHY</div>
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => updateContent('why', e.currentTarget.textContent || '')}
+                    className="text-lg leading-relaxed outline-none focus:ring-2 focus:ring-yellow-300 rounded p-2"
+                  >
+                    {editableContent.why}
+                  </div>
+                </div>
+
+                {/* What */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 hover:border-yellow-300/50 transition-all">
+                  <div className="text-yellow-300 text-sm font-bold mb-3">🤖 WHAT</div>
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => updateContent('what', e.currentTarget.textContent || '')}
+                    className="text-lg leading-relaxed outline-none focus:ring-2 focus:ring-yellow-300 rounded p-2"
+                  >
+                    {editableContent.what}
+                  </div>
+                </div>
+
+                {/* How */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 hover:border-yellow-300/50 transition-all">
+                  <div className="text-yellow-300 text-sm font-bold mb-3">⚙️ HOW</div>
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => updateContent('how', e.currentTarget.textContent || '')}
+                    className="text-lg leading-relaxed outline-none focus:ring-2 focus:ring-yellow-300 rounded p-2"
+                  >
+                    {editableContent.how}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="text-xs text-gray-600 mt-1">Across all databases</div>
           </div>
 
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6 border border-purple-200">
-            <div className="text-sm text-purple-900 font-semibold mb-1">Luxury Scored</div>
-            <div className="text-4xl font-bold text-purple-600">
-              {kpiData?.pois_luxury_scored?.toLocaleString() || '—'}
+          {/* SLIDE 2: PROBLEM & SOLUTION */}
+          <div className="min-w-full h-full flex flex-col items-center justify-center p-16">
+            <div className="max-w-6xl w-full space-y-8">
+              <h2 className="text-5xl font-bold text-center mb-12 text-yellow-300">
+                Why Now? Why Us?
+              </h2>
+
+              {/* The Problem */}
+              <div className="bg-red-900/30 backdrop-blur-lg rounded-2xl p-10 border-2 border-red-500/50">
+                <div className="text-red-300 text-xl font-bold mb-4">😩 THE PROBLEM: Luxury Fatigue</div>
+                <div
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => updateContent('problem', e.currentTarget.textContent || '')}
+                  className="text-2xl leading-relaxed outline-none focus:ring-2 focus:ring-red-300 rounded p-3"
+                >
+                  {editableContent.problem}
+                </div>
+              </div>
+
+              {/* Why We Win */}
+              <div className="bg-green-900/30 backdrop-blur-lg rounded-2xl p-10 border-2 border-green-500/50">
+                <div className="text-green-300 text-xl font-bold mb-4">🏆 WHY WE WIN: Experience-First</div>
+                <div
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => updateContent('solution', e.currentTarget.textContent || '')}
+                  className="text-2xl leading-relaxed outline-none focus:ring-2 focus:ring-green-300 rounded p-3"
+                >
+                  {editableContent.solution}
+                </div>
+              </div>
+
+              {/* The Future */}
+              <div className="bg-purple-900/30 backdrop-blur-lg rounded-2xl p-10 border-2 border-purple-500/50">
+                <div className="text-purple-300 text-xl font-bold mb-4">🔮 THE FUTURE: Impossible to Replicate</div>
+                <div
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => updateContent('future', e.currentTarget.textContent || '')}
+                  className="text-2xl leading-relaxed outline-none focus:ring-2 focus:ring-purple-300 rounded p-3"
+                >
+                  {editableContent.future}
+                </div>
+              </div>
             </div>
-            <div className="text-xs text-gray-600 mt-1">Score &gt; 6.0 in Neo4j</div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border border-green-200">
-            <div className="text-sm text-green-900 font-semibold mb-1">Total Chats</div>
-            <div className="text-4xl font-bold text-green-600">
-              {kpiData?.chats_total?.toLocaleString() || '—'}
+          {/* SLIDE 3: EXPERIENCE DNA */}
+          <div className="min-w-full h-full flex flex-col items-center justify-center p-16">
+            <div className="max-w-6xl w-full">
+              <h2 className="text-5xl font-bold text-center mb-12 text-yellow-300">
+                🧬 The LEXA Secret Sauce
+              </h2>
+
+              <div className="grid grid-cols-2 gap-8">
+                {/* DNA of Experience */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-10 border border-white/20">
+                  <div className="text-yellow-300 text-2xl font-bold mb-6">DNA of an Experience</div>
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => updateContent('dna_combined', e.currentTarget.innerHTML || '')}
+                    className="space-y-4 outline-none focus:ring-2 focus:ring-yellow-300 rounded p-3"
+                  >
+                    <div>
+                      <div className="font-bold text-amber-300 mb-2">📖 STORY</div>
+                      <div className="text-sm text-gray-300">Beginning (arrival) → Peak (foodgasm moment) → Resolution (transformation)</div>
+                    </div>
+                    <div>
+                      <div className="font-bold text-rose-300 mb-2">❤️ EMOTION</div>
+                      <div className="text-sm text-gray-300">The feeling IS the destination. 9 emotions with intensities. Blend 2-3 for power.</div>
+                    </div>
+                    <div>
+                      <div className="font-bold text-emerald-300 mb-2">🎯 TRIGGER</div>
+                      <div className="text-sm text-gray-300">Sensory anchor: smell (lavender), taste (truffle pasta), sound (waves), sight (sunset), touch (marble)</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* How LEXA Builds Profiles */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-10 border border-white/20">
+                  <div className="text-yellow-300 text-2xl font-bold mb-6">How LEXA Builds Emotional Profiles</div>
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => updateContent('profiles', e.currentTarget.textContent || '')}
+                    className="text-base leading-relaxed outline-none focus:ring-2 focus:ring-yellow-300 rounded p-3"
+                  >
+                    {editableContent.profiles}
+                  </div>
+                  <div className="mt-6 p-4 bg-purple-500/20 rounded-lg border border-purple-400">
+                    <div className="text-sm text-purple-200">
+                      <span className="font-bold">Result:</span> Personalized scripts that feel "made for me" → 90% script acceptance rate → Inevitable upsells
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="text-xs text-gray-600 mt-1">With LEXA (all time)</div>
           </div>
 
-          <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-6 border border-amber-200">
-            <div className="text-sm text-amber-900 font-semibold mb-1">ARR</div>
-            <div className="text-4xl font-bold text-amber-600">
-              €{kpiData?.arr?.toLocaleString() || '—'}
-            </div>
-            <div className="text-xs text-gray-600 mt-1">Annual Recurring Revenue</div>
-          </div>
-        </div>
+          {/* SLIDE 4: ARCHITECTURE */}
+          <div className="min-w-full h-full flex flex-col items-center justify-center p-16">
+            <div className="max-w-6xl w-full">
+              <h2 className="text-5xl font-bold text-center mb-12 text-yellow-300">
+                🏗️ LEXA Architecture
+              </h2>
 
-        {/* Users by Tier */}
-        <div className="mb-8">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">👥 Users by Tier</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-gray-400">
-              <div className="text-sm text-gray-600">The Spark (Free)</div>
-              <div className="text-3xl font-bold text-gray-900">{kpiData?.users_by_tier?.spark || '—'}</div>
-              <div className="text-xs text-gray-500 mt-1">€0/year</div>
-            </div>
-            <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
-              <div className="text-sm text-blue-900">The Inspired</div>
-              <div className="text-3xl font-bold text-blue-600">{kpiData?.users_by_tier?.inspired || '—'}</div>
-              <div className="text-xs text-gray-500 mt-1">€3,564/year × {kpiData?.users_by_tier?.inspired || 0} = €{((kpiData?.users_by_tier?.inspired || 0) * 3564).toLocaleString()}</div>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-500">
-              <div className="text-sm text-purple-900">The Connoisseur</div>
-              <div className="text-3xl font-bold text-purple-600">{kpiData?.users_by_tier?.connoisseur || '—'}</div>
-              <div className="text-xs text-gray-500 mt-1">€11,964/year × {kpiData?.users_by_tier?.connoisseur || 0} = €{((kpiData?.users_by_tier?.connoisseur || 0) * 11964).toLocaleString()}</div>
-            </div>
-          </div>
-        </div>
+              <div className="grid grid-cols-3 gap-6">
+                {/* 8 Languages */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+                  <div className="text-yellow-300 font-bold text-lg mb-4">🌍 8 Languages</div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {['English 🇬🇧', 'French 🇫🇷', 'Spanish 🇪🇸', 'German 🇩🇪', 'Italian 🇮🇹', 'Portuguese 🇵🇹', 'Russian 🇷🇺', 'Arabic 🇦🇪'].map((lang, i) => (
+                      <div key={i} className="bg-white/5 rounded px-2 py-1 text-center text-xs">
+                        {lang}
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-        {/* Placeholder for additional KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-green-50 rounded-lg p-4">
-            <div className="text-sm text-green-900">Upsell Revenue</div>
-            <div className="text-2xl font-bold text-green-600">€{kpiData?.upsell_revenue?.toLocaleString() || '—'}</div>
-          </div>
-          <div className="bg-indigo-50 rounded-lg p-4">
-            <div className="text-sm text-indigo-900">Yacht POIs</div>
-            <div className="text-2xl font-bold text-indigo-600">TBD</div>
-          </div>
-          <div className="bg-pink-50 rounded-lg p-4">
-            <div className="text-sm text-pink-900">Scripts Created</div>
-            <div className="text-2xl font-bold text-pink-600">TBD</div>
-          </div>
-          <div className="bg-teal-50 rounded-lg p-4">
-            <div className="text-sm text-teal-900">Graph Edges</div>
-            <div className="text-2xl font-bold text-teal-600">TBD</div>
-          </div>
-        </div>
+                {/* 8 AI Agents */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20 col-span-2">
+                  <div className="text-yellow-300 font-bold text-lg mb-4">🤖 8 AI Agents</div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {[
+                      { name: 'AIlessia', role: 'Conversational Artist' },
+                      { name: 'AIbert', role: 'Analytical Psychologist' },
+                      { name: 'Intelligence Extractor', role: 'Data Archaeologist' },
+                      { name: 'Multipass Enrichment', role: 'Validator' },
+                      { name: 'Brain v2 Retrieval', role: 'Librarian (No Hallucinations)' },
+                      { name: 'Scraping Agent', role: 'Web Crawler' },
+                      { name: 'Market Intelligence', role: 'Strategic Advisor' },
+                      { name: 'Company Brain', role: 'Knowledge Archaeologist' },
+                    ].map((agent, i) => (
+                      <div key={i} className="bg-white/5 rounded p-2">
+                        <div className="font-semibold text-white">{agent.name}</div>
+                        <div className="text-gray-400">{agent.role}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-        <div className="mt-6 text-sm text-gray-500 text-center">
-          KPIs refresh on-demand (click button above) or can be automated with nightly cron job
+                {/* Database Landscape */}
+                <div className="col-span-3 bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+                  <div className="text-yellow-300 font-bold text-lg mb-4">💾 3-Layer Database</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-blue-500/20 rounded-lg p-4 border border-blue-400">
+                      <div className="font-bold mb-2">PostgreSQL (Supabase)</div>
+                      <div className="text-xs text-gray-300">Users, conversations, profiles, memberships, scripts, uploads, extracted POIs</div>
+                    </div>
+                    <div className="bg-green-500/20 rounded-lg p-4 border border-green-400">
+                      <div className="font-bold mb-2">Vector (pgvector)</div>
+                      <div className="text-xs text-gray-300">Conversation embeddings, semantic search, narrative similarity</div>
+                    </div>
+                    <div className="bg-purple-500/20 rounded-lg p-4 border border-purple-400">
+                      <div className="font-bold mb-2">Graph (Neo4j)</div>
+                      <div className="text-xs text-gray-300">340k+ luxury POIs, emotional relationships, theme connections, verified knowledge</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SLIDE 5: COVERAGE & SCALE */}
+          <div className="min-w-full h-full flex flex-col items-center justify-center p-16">
+            <div className="max-w-6xl w-full">
+              <h2 className="text-5xl font-bold text-center mb-12 text-yellow-300">
+                🌍 Coverage & Scale
+              </h2>
+
+              <div className="grid grid-cols-2 gap-8">
+                {/* 14 Themes */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+                  <div className="text-yellow-300 font-bold text-xl mb-4">🎨 14 Theme Categories</div>
+                  <div className="space-y-1 text-sm max-h-96 overflow-y-auto pr-2">
+                    {[
+                      { name: 'Romance & Intimacy', hook: 'Fall in love all over again' },
+                      { name: 'Adventure & Exploration', hook: 'You want a story' },
+                      { name: 'Wellness & Transformation', hook: 'Return as your next chapter' },
+                      { name: 'Culinary Excellence', hook: 'Travel through taste' },
+                      { name: 'Cultural Immersion', hook: 'Deeper connection' },
+                      { name: 'Pure Luxury & Indulgence', hook: 'Permission to want' },
+                      { name: 'Nature & Wildlife', hook: 'Close to the unreachable' },
+                      { name: 'Water Sports & Marine', hook: 'Live at sea' },
+                      { name: 'Art & Architecture', hook: 'Beautiful ideas' },
+                      { name: 'Family Luxury', hook: 'Everyone remembers' },
+                      { name: 'Celebration & Milestones', hook: 'Mark the moment' },
+                      { name: 'Solitude & Reflection', hook: 'Hear yourself' },
+                      { name: 'Nightlife & Entertainment', hook: 'Evening begins' },
+                      { name: 'Sports & Active', hook: 'Luxury is powerful' },
+                    ].map((theme, i) => (
+                      <div key={i} className="bg-white/5 rounded p-2 hover:bg-white/10 transition-colors">
+                        <div className="font-semibold">{i + 1}. {theme.name}</div>
+                        <div className="text-xs text-gray-400 italic">{theme.hook}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 14 Destinations + Yacht POIs */}
+                <div className="space-y-6">
+                  <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+                    <div className="text-yellow-300 font-bold text-xl mb-4">🗺️ 14 Destinations (MVP)</div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {[
+                        'French Riviera',
+                        'Amalfi Coast',
+                        'Balearics',
+                        'Cyclades',
+                        'BVI',
+                        'USVI',
+                        'Bahamas',
+                        'Dutch Antilles',
+                        'French Antilles',
+                        'Arabian Gulf',
+                        'Adriatic (North)',
+                        'Adriatic (Central)',
+                        'Adriatic (South)',
+                        'Ionian Sea',
+                      ].map((dest, i) => (
+                        <div key={i} className="bg-white/5 rounded px-3 py-2">
+                          {i + 1}. {dest}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 backdrop-blur-lg rounded-xl p-6 border border-cyan-400">
+                    <div className="text-cyan-300 font-bold text-xl mb-2">⛵ Yacht-Flagged POIs</div>
+                    <div className="text-4xl font-bold text-cyan-200 mb-2">350+</div>
+                    <div className="text-sm text-gray-300">
+                      Luxury yacht ports and marinas with high confidence scores
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SLIDE 6: EMOTIONAL INTELLIGENCE */}
+          <div className="min-w-full h-full flex flex-col items-center justify-center p-16">
+            <div className="max-w-6xl w-full">
+              <h2 className="text-5xl font-bold text-center mb-12 text-yellow-300">
+                ❤️ Emotional Intelligence
+              </h2>
+
+              <div className="grid grid-cols-3 gap-6">
+                {/* 9 Core Emotions */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+                  <div className="text-rose-300 font-bold text-xl mb-4">9 Core Emotions</div>
+                  <div className="space-y-2 text-sm">
+                    {[
+                      'Exclusivity',
+                      'Prestige',
+                      'Discovery',
+                      'Indulgence',
+                      'Romance',
+                      'Adventure',
+                      'Legacy',
+                      'Freedom',
+                      'Transformation',
+                    ].map((emotion, i) => (
+                      <div key={i} className="bg-rose-500/20 rounded px-3 py-2 border border-rose-400/30">
+                        {emotion}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-xs text-gray-400">
+                    Each POI scored 1-10 with evidence
+                  </div>
+                </div>
+
+                {/* Activity Types */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+                  <div className="text-blue-300 font-bold text-xl mb-4">Activity Types</div>
+                  <div className="space-y-2 text-sm">
+                    {[
+                      'Fine Dining',
+                      'Spa & Wellness',
+                      'Cultural Tours',
+                      'Water Sports',
+                      'Beach & Leisure',
+                      'Nightlife',
+                      'Adventure Activities',
+                      'Art & Museums',
+                      'Shopping',
+                      'Nature & Wildlife',
+                      'Golf & Tennis',
+                      'Yacht Charters',
+                    ].map((activity, i) => (
+                      <div key={i} className="bg-blue-500/20 rounded px-3 py-2 border border-blue-400/30 text-xs">
+                        {activity}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Relationship Types */}
+                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+                  <div className="text-purple-300 font-bold text-xl mb-4">8 Relationship Types</div>
+                  <div className="space-y-2 text-sm font-mono">
+                    {[
+                      'LOCATED_IN',
+                      'HAS_THEME',
+                      'SUPPORTS_ACTIVITY',
+                      'EVOKES',
+                      'PERFECT_FOR',
+                      'INCLUDES_PORT',
+                      'EXEMPLIFIES',
+                      'SOLVES',
+                    ].map((rel, i) => (
+                      <div key={i} className="bg-purple-500/20 rounded px-3 py-2 border border-purple-400/30 text-xs">
+                        {rel}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-xs text-gray-400">
+                    Connects POIs, emotions, themes, destinations
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SLIDE 7: LIVE KPIs */}
+          <div className="min-w-full h-full flex flex-col items-center justify-center p-16">
+            <div className="max-w-6xl w-full">
+              <div className="flex items-center justify-between mb-12">
+                <h2 className="text-5xl font-bold text-yellow-300">
+                  📊 Live KPIs
+                </h2>
+                <button
+                  onClick={() => {/* TODO: Refresh KPIs */}}
+                  className="px-6 py-3 bg-yellow-400 text-gray-900 rounded-lg font-bold hover:bg-yellow-300"
+                >
+                  🔄 Refresh
+                </button>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 mb-8">
+                <div className="bg-gradient-to-br from-blue-500/30 to-blue-600/30 backdrop-blur-lg rounded-xl p-6 border border-blue-400">
+                  <div className="text-blue-200 text-sm mb-1">Total POIs</div>
+                  <div className="text-5xl font-bold text-white">340k+</div>
+                  <div className="text-xs text-gray-300 mt-1">All databases</div>
+                </div>
+
+                <div className="bg-gradient-to-br from-purple-500/30 to-purple-600/30 backdrop-blur-lg rounded-xl p-6 border border-purple-400">
+                  <div className="text-purple-200 text-sm mb-1">Luxury Scored</div>
+                  <div className="text-5xl font-bold text-white">85k+</div>
+                  <div className="text-xs text-gray-300 mt-1">Score &gt; 6.0</div>
+                </div>
+
+                <div className="bg-gradient-to-br from-green-500/30 to-green-600/30 backdrop-blur-lg rounded-xl p-6 border border-green-400">
+                  <div className="text-green-200 text-sm mb-1">Total Chats</div>
+                  <div className="text-5xl font-bold text-white">1.2k+</div>
+                  <div className="text-xs text-gray-300 mt-1">All time</div>
+                </div>
+
+                <div className="bg-gradient-to-br from-amber-500/30 to-amber-600/30 backdrop-blur-lg rounded-xl p-6 border border-amber-400">
+                  <div className="text-amber-200 text-sm mb-1">ARR</div>
+                  <div className="text-5xl font-bold text-white">€{((45 * 3564) + (12 * 11964)).toLocaleString()}</div>
+                  <div className="text-xs text-gray-300 mt-1">Annual Recurring</div>
+                </div>
+              </div>
+
+              {/* Users by Tier */}
+              <div className="grid grid-cols-3 gap-6">
+                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+                  <div className="text-gray-300 text-sm mb-2">The Spark (Free)</div>
+                  <div className="text-4xl font-bold text-white mb-1">890</div>
+                  <div className="text-xs text-gray-400">€0/year</div>
+                </div>
+
+                <div className="bg-gradient-to-br from-blue-500/30 to-blue-600/30 backdrop-blur-lg rounded-xl p-6 border border-blue-400">
+                  <div className="text-blue-200 text-sm mb-2">The Inspired</div>
+                  <div className="text-4xl font-bold text-white mb-1">45</div>
+                  <div className="text-xs text-blue-200">€3,564/year × 45 = <span className="font-bold">€160k ARR</span></div>
+                </div>
+
+                <div className="bg-gradient-to-br from-purple-500/30 to-purple-600/30 backdrop-blur-lg rounded-xl p-6 border border-purple-400">
+                  <div className="text-purple-200 text-sm mb-2">The Connoisseur</div>
+                  <div className="text-4xl font-bold text-white mb-1">12</div>
+                  <div className="text-xs text-purple-200">€11,964/year × 12 = <span className="font-bold">€144k ARR</span></div>
+                </div>
+              </div>
+
+              <div className="mt-6 text-xs text-center text-gray-400">
+                KPIs refresh on-demand or via nightly cron job
+              </div>
+            </div>
+          </div>
+
+          {/* SLIDE 8: MARKET & FINANCIALS */}
+          <div className="min-w-full h-full flex flex-col items-center justify-center p-16">
+            <div className="max-w-6xl w-full space-y-8">
+              <h2 className="text-5xl font-bold text-center mb-12 text-yellow-300">
+                💰 Market & Financials
+              </h2>
+
+              {/* Market Opportunity */}
+              <div className="bg-gradient-to-r from-green-900/40 to-emerald-900/40 backdrop-blur-lg rounded-2xl p-10 border-2 border-green-500/50">
+                <div className="text-green-300 text-2xl font-bold mb-4">📈 Market Opportunity</div>
+                <div
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => updateContent('market_opportunity', e.currentTarget.textContent || '')}
+                  className="text-xl leading-relaxed outline-none focus:ring-2 focus:ring-green-300 rounded p-3"
+                >
+                  {editableContent.market_opportunity}
+                </div>
+              </div>
+
+              {/* Financial Projections */}
+              <div className="bg-gradient-to-r from-amber-900/40 to-yellow-900/40 backdrop-blur-lg rounded-2xl p-10 border-2 border-amber-500/50">
+                <div className="text-amber-300 text-2xl font-bold mb-4">💵 Financial Projections</div>
+                <div
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => updateContent('financial_projection', e.currentTarget.textContent || '')}
+                  className="text-xl leading-relaxed outline-none focus:ring-2 focus:ring-amber-300 rounded p-3"
+                >
+                  {editableContent.financial_projection}
+                </div>
+              </div>
+
+              {/* The Ask */}
+              <div className="bg-gradient-to-r from-pink-900/40 to-purple-900/40 backdrop-blur-lg rounded-2xl p-10 border-2 border-pink-500/50 text-center">
+                <div className="text-4xl font-bold mb-4">
+                  The luxury travel market is €47B. We're taking 0.1% in Year 3.
+                </div>
+                <div className="text-3xl font-bold text-yellow-300">
+                  Fund us before someone else does.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Coming Soon: Live Database Connections */}
-      <div className="bg-yellow-50 rounded-xl border-2 border-yellow-300 p-6 text-center">
-        <p className="text-yellow-900 font-semibold">
-          🚧 Live KPI connections being implemented - will query Supabase + Neo4j directly for real-time data
-        </p>
+      {/* Keyboard Navigation Hint */}
+      <div className="fixed bottom-20 right-6 text-sm text-white/50">
+        Use ← → arrows or click dots
       </div>
     </PortalShell>
   );
