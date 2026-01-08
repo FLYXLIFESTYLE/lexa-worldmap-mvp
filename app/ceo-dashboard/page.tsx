@@ -627,6 +627,6 @@ export default function CEODashboardPage() {
       <div className="fixed bottom-20 right-6 text-sm text-white/50">
         Use ← → arrows or click dots
       </div>
-    </PortalShell>
+    </div>
   );
 }
