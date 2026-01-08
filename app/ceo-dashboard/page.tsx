@@ -3,14 +3,12 @@
 /**
  * CEO Dashboard - Pitch Deck Style
  * 8 slides: Mission, Problem/Solution, DNA, Agents, Coverage, Emotions, KPIs, Financials
+ * Works standalone (no Supabase required for local testing)
  */
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client-browser';
-import AdminNav from '@/components/admin/admin-nav';
 
 export default function CEODashboardPage() {
-  const supabase = createClient();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [kpiData, setKpiData] = useState<any>(null);
 
@@ -57,9 +55,22 @@ export default function CEODashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white">
-      {/* Top Nav */}
+      {/* Back Button */}
       <div className="fixed top-6 right-6 z-50">
-        <AdminNav />
+        <a
+          href="/admin/dashboard"
+          className="bg-white/10 backdrop-blur-md rounded-lg px-4 py-2 hover:bg-white/20 transition-all text-sm font-medium"
+        >
+          ← Back to Admin
+        </a>
+      </div>
+
+      {/* Title */}
+      <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 text-center">
+        <div className="text-2xl font-bold bg-gradient-to-r from-yellow-300 to-pink-300 bg-clip-text text-transparent">
+          CEO DASHBOARD
+        </div>
+        <div className="text-xs text-gray-400">Investor Pitch Deck</div>
       </div>
 
       {/* Slide Counter */}
