@@ -4,15 +4,14 @@
  * It orchestrates existing ingestion scripts so you can run:
  * - Wikidata (online, uses destination bbox from Supabase)
  * - Overture (requires a local GeoJSON file path)
- * - Foursquare OS (requires a local NDJSON file path)
+ * - (Future) Foursquare Enterprise (only after an enterprise contract permits the use-case)
  * - Optional projection to Neo4j
  *
  * Usage examples:
  *   npm run ingest:destination -- "French Riviera" --wikidata
  *   npm run ingest:destination -- "French Riviera" --wikidata --projectNeo4j
  *   npm run ingest:destination -- "French Riviera" --overture "C:\\data\\overture_fr.geojson"
- *   npm run ingest:destination -- "French Riviera" --fsq "C:\\data\\fsq_fr.ndjson"
- *   npm run ingest:destination -- "French Riviera" --wikidata --overture "..." --fsq "..." --projectNeo4j
+ *   npm run ingest:destination -- "French Riviera" --wikidata --overture "..." --projectNeo4j
  */
 
 import { spawnSync } from 'node:child_process';
@@ -21,7 +20,6 @@ type Args = {
   destination: string;
   wikidata: boolean;
   overturePath: string | null;
-  fsqPath: string | null;
   projectNeo4j: boolean;
 };
 
@@ -31,7 +29,6 @@ function parseArgs(argv: string[]): Args {
 
   let wikidata = false;
   let overturePath: string | null = null;
-  let fsqPath: string | null = null;
   let projectNeo4j = false;
 
   for (let i = 1; i < argv.length; i++) {
@@ -39,10 +36,9 @@ function parseArgs(argv: string[]): Args {
     if (a === '--wikidata') wikidata = true;
     else if (a === '--projectNeo4j') projectNeo4j = true;
     else if (a === '--overture') overturePath = argv[++i] ?? null;
-    else if (a === '--fsq') fsqPath = argv[++i] ?? null;
   }
 
-  return { destination, wikidata, overturePath, fsqPath, projectNeo4j };
+  return { destination, wikidata, overturePath, projectNeo4j };
 }
 
 function q(s: string) {
@@ -71,11 +67,6 @@ async function main() {
   if (args.overturePath) {
     console.log('--- Step: Overture (GeoJSON file) ---');
     runOrThrow(`npm run ingest:overture -- ${q(args.destination)} ${q(args.overturePath)}`);
-  }
-
-  if (args.fsqPath) {
-    console.log('--- Step: Foursquare OS Places (NDJSON file) ---');
-    runOrThrow(`npm run ingest:fsq -- ${q(args.destination)} ${q(args.fsqPath)}`);
   }
 
   if (args.projectNeo4j) {

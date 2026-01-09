@@ -17,7 +17,6 @@ import { getNeo4jDriver } from './client';
 import { logQualityCheck } from '../services/logger';
 import { addSeasonalAvailability } from './relationship-inference';
 import { scoreAllUnscored } from './scoring-engine';
-import { enrichUnnamedPOIs } from './enrich-unnamed-pois';
 import type { Driver, Session } from 'neo4j-driver';
 
 // ============================================================================
@@ -180,15 +179,10 @@ export async function runFullCheck(): Promise<QualityCheckResults> {
     console.log('[Data Quality Agent] Step 1/5: Finding and merging duplicates...');
     results.duplicates = await findAndMergeDuplicates();
 
-    // Step 2: Enrich unnamed POIs (try to find names instead of deleting)
-    console.log('[Data Quality Agent] Step 2/5: Enriching unnamed POIs...');
-    const enrichmentResult = await enrichUnnamedPOIs();
-    results.unnamedPOIs = {
-      checked: enrichmentResult.found,
-      deleted: enrichmentResult.deleted,
-      enriched: enrichmentResult.enriched,
-      failed: enrichmentResult.failed,
-    };
+    // Step 2: Remove unnamed POIs
+    // MVP policy: avoid unnamed POIs because they cannot be reviewed/approved reliably.
+    console.log('[Data Quality Agent] Step 2/5: Removing unnamed POIs...');
+    results.unnamedPOIs = await removeUnnamedPOIs();
 
     // Step 3: Ensure relations exist
     console.log('[Data Quality Agent] Step 3/5: Checking and creating relations...');
