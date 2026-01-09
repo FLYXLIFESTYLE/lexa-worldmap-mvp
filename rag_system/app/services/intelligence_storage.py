@@ -117,6 +117,18 @@ def _normalize_poi_for_extracted_pois(poi: Dict, *, source_file: Optional[str], 
         "yacht_accessible": bool(poi.get("yacht_accessible")) if poi.get("yacht_accessible") is not None else None,
         "marina_distance": poi.get("marina_distance"),
         "source_file": source_file,
+        # Investor-grade brain fields (stored first-class in DB)
+        # These keys are now columns (020_extracted_pois_brain_fields.sql).
+        "emotional_map": _as_list(poi.get("emotional_map")),
+        "sensory_triggers": _as_list(poi.get("sensory_triggers")),
+        "client_archetypes": _as_list(poi.get("client_archetypes")),
+        "conversation_triggers": _as_list(poi.get("conversation_triggers")),
+        "pricing": poi.get("pricing") if isinstance(poi.get("pricing"), dict) else None,
+        "source_refs": _as_list(poi.get("source_refs")),
+        "citations": _as_list(poi.get("citations")),
+        "enrichment": poi.get("enrichment") if isinstance(poi.get("enrichment"), dict) else None,
+        "emotion_confidence": _clamp_int(poi.get("emotion_confidence"), 0, 100, 0) if poi.get("emotion_confidence") is not None else None,
+        "luxury_score_confidence": _clamp_int(poi.get("luxury_score_confidence"), 0, 100, 0) if poi.get("luxury_score_confidence") is not None else None,
         "metadata": {
             "source_type": source_type,
             "raw": poi,
