@@ -47,11 +47,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
-    const parsedBody = BodySchema?.safeParse(body);
-    if (parsedBody && !parsedBody.success) {
+    const parsedBody = BodySchema.safeParse(body);
+    if (!parsedBody.success) {
       return NextResponse.json({ error: 'Invalid payload', details: parsedBody.error.flatten() }, { status: 400 });
     }
-    const input = parsedBody?.success ? parsedBody.data : {};
+    const input = parsedBody.data;
 
     const tavilyKey = process.env.TAVILY_API_KEY || '';
     const anthropicKey = process.env.ANTHROPIC_API_KEY || '';

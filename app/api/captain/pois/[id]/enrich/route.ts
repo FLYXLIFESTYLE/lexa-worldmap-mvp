@@ -33,7 +33,7 @@ const EnrichmentPatchSchema = z.object({
   sensory_triggers: z.array(z.string().min(1)).optional(),
   conversation_triggers: z.array(z.string().min(1)).optional(),
   client_archetypes: z.array(z.any()).optional(),
-  pricing: z.record(z.any()).optional(),
+  pricing: z.record(z.string(), z.any()).optional(),
   confidence_score: z.number().int().min(0).max(100).optional(),
   emotion_confidence: z.number().int().min(0).max(100).optional(),
   luxury_score_confidence: z.number().int().min(0).max(100).optional(),
@@ -52,12 +52,12 @@ function isEmptyText(v: unknown): boolean {
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const body = BodySchema ? await req.json().catch(() => ({})) : {};
-    const parsedBody = BodySchema?.safeParse(body);
-    if (parsedBody && !parsedBody.success) {
+    const body = await req.json().catch(() => ({}));
+    const parsedBody = BodySchema.safeParse(body);
+    if (!parsedBody.success) {
       return NextResponse.json({ error: 'Invalid payload', details: parsedBody.error.flatten() }, { status: 400 });
     }
-    const input = parsedBody?.success ? parsedBody.data : {};
+    const input = parsedBody.data;
 
     // Optional feature flag (keep safe; default ON if key present)
     const tavilyKey = process.env.TAVILY_API_KEY || '';

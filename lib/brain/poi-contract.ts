@@ -127,7 +127,7 @@ export const CanonicalPoiDraftSchema = z.object({
   citations: z.array(CitationSchema).optional().default([]),
 
   // Extra structured facets (MVP-safe)
-  enrichment: z.record(z.any()).optional().default({}),
+  enrichment: z.record(z.string(), z.any()).optional().default({}),
 });
 
 export type CanonicalPoiDraft = z.infer<typeof CanonicalPoiDraftSchema>;
