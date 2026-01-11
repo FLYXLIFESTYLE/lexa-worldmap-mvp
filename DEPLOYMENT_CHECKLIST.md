@@ -52,6 +52,7 @@ Quick checklist for deploying to production.
 - [ ] Migration `create_captain_profiles.sql` run
 - [ ] Migration `021_knowledge_nuggets.sql` run (Knowledge Nuggets inbox)
 - [ ] Migration `023_experience_entity_destination_links.sql` run (Destination membership + per-destination source counts)
+- [ ] Migration `024_extracted_pois_generated_source.sql` run (Idempotent import of generated POIs into extracted_pois)
 - [ ] Storage bucket `public` created
 - [ ] Storage bucket is **public**
 - [ ] Email templates configured

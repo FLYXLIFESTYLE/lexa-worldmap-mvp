@@ -252,6 +252,7 @@ create_upload_tracking.sql       → Upload history tracking
 021_knowledge_nuggets.sql        → Knowledge Nuggets inbox
 022_experience_entities_geo_indexes.sql → Geo indexes for faster bbox queries
 023_experience_entity_destination_links.sql → Destination membership + per-destination source pointers
+024_extracted_pois_generated_source.sql → Idempotent import of generated POIs into extracted_pois
 ```
 
 ---

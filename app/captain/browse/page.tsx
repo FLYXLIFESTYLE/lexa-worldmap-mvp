@@ -192,6 +192,30 @@ export default function CaptainBrowsePage() {
     }
   };
 
+  const handleImportGenerated = async () => {
+    const destination = prompt('Destination name (must match destinations list):', 'French Riviera') || '';
+    if (!destination.trim()) return;
+    const source = (prompt('Source (osm / wikidata / overture / any):', 'osm') || 'osm').trim().toLowerCase();
+    const limitRaw = (prompt('How many to import (max 5000):', '500') || '500').trim();
+    const limit = Math.max(1, Math.min(5000, Number(limitRaw) || 500));
+
+    try {
+      const res = await fetch('/api/captain/pois/import-generated', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destination, source, limit }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(String(data.details || data.error || 'Import failed'));
+      }
+      await fetchPOIs();
+      alert(`✅ Imported ${data.created || 0} generated POIs into the review list for ${destination}.`);
+    } catch (e: any) {
+      alert(`❌ Import generated POIs failed: ${e?.message || 'Unknown error'}`);
+    }
+  };
+
   const handleBulkVerifyVisible = async () => {
     const ids = filteredPois.filter((p) => !p.verified).map((p) => p.id);
     if (!ids.length) {
@@ -692,6 +716,17 @@ export default function CaptainBrowsePage() {
                       title="Verifies (approves) all visible, unverified POIs."
                     >
                       Verify all visible
+                    </button>
+                  )}
+
+                  {section === 'pois' && (
+                    <button
+                      type="button"
+                      onClick={handleImportGenerated}
+                      className="px-4 py-2 rounded-lg bg-lexa-navy text-white text-sm font-semibold hover:bg-lexa-navy/90"
+                      title="Import open-source POIs (OSM/Wikidata/Overture) into this review list."
+                    >
+                      Import Generated POIs
                     </button>
                   )}
 

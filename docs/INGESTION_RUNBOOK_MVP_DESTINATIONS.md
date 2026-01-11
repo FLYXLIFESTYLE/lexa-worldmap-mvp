@@ -78,5 +78,22 @@ Overture ingestion expects a local GeoJSON file path per destination:
 npm run ingest:destination -- "French Riviera" --overture "C:\\path\\to\\overture_fr.geojson"
 ```
 
+### Easiest way on Windows (recommended)
+1) Download per-destination GeoJSON files:
+
+```powershell
+# installs the official CLI (one-time)
+pip install overturemaps
+
+# downloads one GeoJSON per destination into data_overture/
+powershell -ExecutionPolicy Bypass -File scripts\\download-overture-mvp12.ps1
+```
+
+2) Ingest one destination file:
+
+```bash
+npm run ingest:destination -- "French Riviera" --overture "data_overture\\french_riviera.geojson"
+```
+
 This is optional until we decide the exact download/extract workflow for Overture datasets.
 
