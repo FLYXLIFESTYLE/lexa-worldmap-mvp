@@ -38,6 +38,12 @@ const adminPages = [
     description: 'Upload files, scrape URLs, manual POIs'
   },
   {
+    name: 'Knowledge Nuggets',
+    href: '/captain/nuggets',
+    icon: '🧠',
+    description: 'Unstructured snippets inbox (events/openings/signals)'
+  },
+  {
     name: 'Market Insights',
     href: '/captain/market-insights',
     icon: '📈',

@@ -11,9 +11,13 @@ emotional intelligence to design personalized €3k–€100k+ experiences for U
 
 ---
 
-## LEXA's Emotional Framework (9 Core Emotions)
+## LEXA's EmotionalTag Framework (9 Core Dimensions)
 
-Every hotel, experience, or destination should be mapped to these emotions with intensity scores (1-10):
+Every hotel, experience, or destination should be mapped to these **EmotionalTags** with intensity scores (1-10).
+
+Important:
+- These are **NOT** the same as Neo4j `:Emotion` taxonomy nodes (AWE, PEACE, etc.).
+- These are LEXA’s investor-demo-friendly “experience dimensions” and should be stored as `EmotionalTag`.
 
 ### 1. **Exclusivity** (1-10)
 Private access, limited availability, VIP treatment, intimate scale, invitation-only
@@ -203,8 +207,8 @@ LEXA's emotional AI approach aligns perfectly with the new luxury paradigm:
 When extracting, always think about graph relationships:
 
 ```cypher
-// Hotels evoke emotions
-(hotel)-[:EVOKES {intensity: 10, evidence: "..."}]->(emotion:Emotion {name: "Prestige"})
+// Hotels evoke LEXA EmotionalTags (dimensions)
+(hotel)-[:EVOKES {intensity_1_10: 10, evidence: "..."}]->(tag:EmotionalTag {name: "Prestige"})
 
 // Hotels match archetypes
 (hotel)-[:PERFECT_FOR {match_score: 98}]->(archetype:ClientArchetype {name: "Ultra-HNW Exclusivity Seeker"})

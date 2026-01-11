@@ -46,13 +46,15 @@ export async function GET() {
     // Get top luxury POIs
     const topPOIs = await session.run(`
       MATCH (p:poi)
+      OPTIONAL MATCH (p)-[:LOCATED_IN]->(d:destination)
+      OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
       WITH p, coalesce(p.luxury_score_verified, p.luxury_score_base, p.luxury_score, p.luxuryScore) as rawScore
       WHERE rawScore IS NOT NULL
       WITH p, CASE WHEN rawScore > 10 THEN rawScore ELSE rawScore * 10 END as score
       RETURN p.name as name, 
              score as score, 
              p.type as type,
-             p.destination_name as destination
+             coalesce(mvp.name, d.name, p.destination_name) as destination
       ORDER BY score DESC
       LIMIT 10
     `);

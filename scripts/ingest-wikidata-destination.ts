@@ -139,6 +139,8 @@ async function main() {
 
   let createdEntities = 0;
   let createdSources = 0;
+  let createdDestinationLinks = 0;
+  let createdDestinationSourceLinks = 0;
   let skippedExisting = 0;
 
   for (const row of bindings) {
@@ -167,6 +169,34 @@ async function main() {
     }
 
     if (existingSource?.id) {
+      // Even if the Wikidata source is globally deduped, we still want destination coverage.
+      // These tables may not exist yet (migration not applied), so treat as best-effort.
+      try {
+        if (existingSource.entity_id) {
+          await supabaseAdmin
+            .from('experience_entity_destinations')
+            .upsert(
+              { entity_id: existingSource.entity_id, destination_id: dest.id },
+              { onConflict: 'entity_id,destination_id', ignoreDuplicates: true }
+            );
+          createdDestinationLinks++;
+
+          await supabaseAdmin
+            .from('experience_entity_destination_sources')
+            .upsert(
+              {
+                destination_id: dest.id,
+                entity_id: existingSource.entity_id,
+                source: 'wikidata',
+                source_id: wikidataId,
+              },
+              { onConflict: 'destination_id,source,source_id', ignoreDuplicates: true }
+            );
+          createdDestinationSourceLinks++;
+        }
+      } catch {
+        // Ignore if tables don't exist yet.
+      }
       skippedExisting++;
       continue;
     }
@@ -198,6 +228,24 @@ async function main() {
 
     createdEntities++;
 
+    // Destination membership + destination-specific source pointer (best-effort)
+    try {
+      await supabaseAdmin
+        .from('experience_entity_destinations')
+        .upsert({ entity_id: entity.id, destination_id: dest.id }, { onConflict: 'entity_id,destination_id', ignoreDuplicates: true });
+      createdDestinationLinks++;
+
+      await supabaseAdmin
+        .from('experience_entity_destination_sources')
+        .upsert(
+          { destination_id: dest.id, entity_id: entity.id, source: 'wikidata', source_id: wikidataId },
+          { onConflict: 'destination_id,source,source_id', ignoreDuplicates: true }
+        );
+      createdDestinationSourceLinks++;
+    } catch {
+      // ignore
+    }
+
     // 2) Record the source payload (auditing)
     const { error: srcErr } = await supabaseAdmin.from('experience_entity_sources').insert({
       source: 'wikidata',
@@ -219,7 +267,9 @@ async function main() {
   }
 
   console.log(
-    `Done. Inserted entities=${createdEntities}, sources=${createdSources}, skipped_existing_sources=${skippedExisting}`
+    `Done. Inserted entities=${createdEntities}, sources=${createdSources}, ` +
+      `dest_links=${createdDestinationLinks}, dest_source_links=${createdDestinationSourceLinks}, ` +
+      `skipped_existing_sources=${skippedExisting}`
   );
 }
 

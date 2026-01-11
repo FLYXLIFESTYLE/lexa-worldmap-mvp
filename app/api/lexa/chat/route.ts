@@ -360,7 +360,10 @@ async function buildGroundedPoiContext(state: SessionState): Promise<string | nu
 
     const header = [
       '## Grounded Knowledge (Neo4j first, drafts as fallback)',
-      `Destination: ${res.destination}`,
+      `Destination: ${res.canonicalDestination || res.destination}`,
+      res.canonicalDestination && res.canonicalDestination !== res.destination
+        ? `Matched from: ${res.destination}`
+        : '',
       res.usedThemes.length ? `Themes: ${res.usedThemes.join(', ')}` : '',
       '',
       'Rules:',

@@ -57,15 +57,20 @@ export async function GET(req: NextRequest) {
       // Get destination statistics
       const result = await session.run(
         `
-        MATCH (p:poi)
-        WHERE p.destination_name IS NOT NULL
-        WITH p.destination_name as destination,
-             count(p) as total_pois,
-             sum(CASE WHEN p.luxury_score >= 7 THEN 1 ELSE 0 END) as luxury_pois,
-             avg(p.luxury_score) as avg_luxury_score,
-             collect(DISTINCT p.type) as poi_types,
-             sum(CASE WHEN p.captain_comments IS NOT NULL AND p.captain_comments <> '' THEN 1 ELSE 0 END) as has_captain_comments,
-             collect({type: p.type, count: 1}) as type_list
+        MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
+        OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
+        WITH
+          coalesce(mvp.name, d.name) AS destination,
+          coalesce(p.luxury_score_base, p.luxury_score, 0.0) AS luxury_score,
+          coalesce(p.type, p.category, 'poi') AS poi_type,
+          p.captain_comments AS captain_comments
+        WITH destination,
+             count(*) as total_pois,
+             sum(CASE WHEN luxury_score >= 7 THEN 1 ELSE 0 END) as luxury_pois,
+             avg(luxury_score) as avg_luxury_score,
+             collect(DISTINCT poi_type) as poi_types,
+             sum(CASE WHEN captain_comments IS NOT NULL AND captain_comments <> '' THEN 1 ELSE 0 END) as has_captain_comments,
+             collect({type: poi_type, count: 1}) as type_list
         WITH destination, total_pois, luxury_pois, avg_luxury_score, poi_types, has_captain_comments, type_list
         UNWIND type_list as type_entry
         WITH destination, total_pois, luxury_pois, avg_luxury_score, poi_types, has_captain_comments, 
@@ -95,12 +100,16 @@ export async function GET(req: NextRequest) {
       // Get overall statistics
       const statsResult = await session.run(
         `
-        MATCH (p:poi)
-        RETURN count(p) as total_pois,
-               count(DISTINCT p.destination_name) as total_destinations,
-               sum(CASE WHEN p.luxury_score >= 7 THEN 1 ELSE 0 END) as luxury_pois,
-               avg(p.luxury_score) as avg_luxury_score,
-               sum(CASE WHEN p.luxury_score IS NULL THEN 1 ELSE 0 END) as unscored_pois
+        MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
+        OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
+        WITH
+          coalesce(mvp.name, d.name) AS destination,
+          coalesce(p.luxury_score_base, p.luxury_score, null) AS luxury_score
+        RETURN count(*) as total_pois,
+               count(DISTINCT destination) as total_destinations,
+               sum(CASE WHEN luxury_score >= 7 THEN 1 ELSE 0 END) as luxury_pois,
+               avg(luxury_score) as avg_luxury_score,
+               sum(CASE WHEN luxury_score IS NULL THEN 1 ELSE 0 END) as unscored_pois
         `
       );
 

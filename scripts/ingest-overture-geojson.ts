@@ -212,6 +212,21 @@ async function ingestOvertureBatch(params: {
     if (typeof oid === 'string' && row?.id) idByOvertureId.set(oid, row.id);
   }
 
+  // Destination membership (best-effort; migration may not be applied yet)
+  try {
+    const membershipRows = Array.from(idByOvertureId.values()).map((entity_id) => ({
+      entity_id,
+      destination_id: destId,
+    }));
+    if (membershipRows.length) {
+      await supabaseAdmin
+        .from('experience_entity_destinations')
+        .upsert(membershipRows, { onConflict: 'entity_id,destination_id', ignoreDuplicates: true });
+    }
+  } catch {
+    // ignore
+  }
+
   // 2) Upsert source payloads (batch)
   const sourceRows = candidates.map((c) => {
     const entityId = idByOvertureId.get(c.overtureId) ?? null;
@@ -230,6 +245,26 @@ async function ingestOvertureBatch(params: {
   );
 
   if (srcErr) throw new Error(`Failed to upsert experience_entity_sources batch: ${formatSupabaseError(srcErr)}`);
+
+  // Destination-specific source pointers (best-effort)
+  try {
+    const destSourceRows = candidates
+      .map((c) => ({
+        destination_id: destId,
+        entity_id: idByOvertureId.get(c.overtureId) ?? null,
+        source: 'overture',
+        source_id: c.overtureId,
+      }))
+      .filter((r) => !!r.entity_id);
+
+    if (destSourceRows.length) {
+      await supabaseAdmin
+        .from('experience_entity_destination_sources')
+        .upsert(destSourceRows as any, { onConflict: 'destination_id,source,source_id', ignoreDuplicates: true });
+    }
+  } catch {
+    // ignore
+  }
 
   return { insertedEntities: candidates.length, insertedSources: candidates.length };
 }

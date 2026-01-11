@@ -92,11 +92,9 @@
 - Providers handled separately from competitors; competitor data mapped into providers when present.
 - Removed top-level confidence/emotion/count boxes to reduce noise.
 
-**Google Places API**
-- Nearby Search: $32 per 1,000 requests
-- Place Details: $17 per 1,000 requests
-- Place Photos: $7 per 1,000 requests
-- Budget: €242 credits + $200/month free (90 days)
+**Paid enrichment APIs (optional, later)**
+- For MVP brain hardening we rely on **open/free sources + scraping + manual enrichment**.
+- Paid APIs (Google Places, etc.) can be re-enabled later behind a feature flag / paid tier when desired.
 
 **Google Vision API**
 - Text Detection (OCR): $1.50 per 1,000 images
@@ -212,13 +210,13 @@ npm run dev
 
 ### API Rate Limits:
 - **Anthropic Claude**: 50 req/min (tier 1), 1000 req/min (tier 2+)
-- **Google Places**: $850 budget ($50 for French Riviera, $500 for yacht cities)
-- **Neo4j Aura Free**: 50,000 nodes, 175,000 relationships (currently OK)
+- **Paid enrichers (optional later)**: budget depends on provider; not required for MVP brain hardening
+- **Neo4j Aura**: must be on a tier that supports the current dataset (free tier is below 300K+ POIs scale)
 - **Supabase Free**: 500MB database, 1GB file storage, 2GB bandwidth
 
 ### Data Constraints:
 - **POI Luxury Filter**: rating ≥ 4.0, price level ≥ $$
-- **Theme Categories**: Fixed at 12 (extensible but requires UI changes)
+- **Theme Categories**: 14 core themes (UI + chat + script engine must stay in sync)
 - **Session Storage**: Limited to 5MB in browser (use Supabase for persistence)
 - **Neo4j Query Timeout**: 30 seconds max
 

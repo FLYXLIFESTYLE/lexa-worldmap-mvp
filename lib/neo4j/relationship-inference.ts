@@ -12,8 +12,12 @@
  */
 
 import { getNeo4jDriver } from './client';
-import { calculateRelationshipConfidence } from './scoring-engine';
 import Anthropic from '@anthropic-ai/sdk';
+import {
+  normalizeLexaDimensionName,
+  resolveCanonicalTaxonomy,
+  slugify,
+} from './taxonomy-resolver';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -59,38 +63,42 @@ Entity Types:
 - theme_category
 - activity_type
 - experience_category
-- Emotion (Joy, Excitement, Peace, Adventure, Romance, etc.)
-- Desire (Connection, Discovery, Transformation, Indulgence, etc.)
-- Fear (Crowds, Heights, Water, Isolation, etc.)
+- EmotionalTag (LEXA's experience dimensions: Exclusivity, Prestige, Discovery, Indulgence, Romance, Adventure, Legacy, Freedom, Transformation)
+- Emotion (canonical, code-based: AWE, PEACE, FREEDOM, INTIMACY, MEANING, etc.)
+- Desire (canonical, code-based when possible)
+- Fear (canonical, code-based when possible)
 - Need (Relaxation, Challenge, Culture, Nature, etc.)
 
 Relationship Types to Infer:
 
-1. EVOKES: POI → Emotion
-   Example: "The sunset at Santorini made me feel peaceful" → (Santorini)-[:EVOKES {confidence: 0.9}]->(Peace)
+1. EVOKES: POI → EmotionalTag (LEXA dimensions)
+   Example: "We want something ultra exclusive and prestige" → (POI)-[:EVOKES]->(:EmotionalTag {name:'Exclusivity'})
 
-2. AMPLIFIES_DESIRE: POI → Desire
+2. EVOKES_EMOTION: POI → Emotion (canonical emotion)
+   Example: "The sunset made me feel awe" → (POI)-[:EVOKES_EMOTION]->(:Emotion {code:'AWE'})
+
+3. AMPLIFIES_DESIRE: POI → Desire
    Example: "I want to discover hidden gems" → (HiddenPOI)-[:AMPLIFIES_DESIRE {confidence: 0.8}]->(Discovery)
 
-3. MITIGATES_FEAR: POI → Fear
+4. MITIGATES_FEAR: POI → Fear
    Example: "I'm afraid of crowds, so prefer secluded beaches" → (SecludedBeach)-[:MITIGATES_FEAR {confidence: 0.85}]->(Crowds)
 
-4. RELATES_TO: POI → Need/Constraint
+5. RELATES_TO: POI → Need/Constraint
    Example: "I need relaxation and wellness" → (SpaResort)-[:RELATES_TO {confidence: 0.9}]->(Relaxation)
 
-5. SUPPORTS_ACTIVITY: POI → Activity Type
+6. SUPPORTS_ACTIVITY: POI → Activity Type
    Example: "I want to go sailing" → (Marina)-[:SUPPORTS_ACTIVITY {confidence: 0.8}]->(Sailing)
 
-6. HAS_THEME: POI → Theme Category
+7. HAS_THEME: POI → Theme Category
    Example: "I'm interested in wine tasting experiences" → (Vineyard)-[:HAS_THEME {confidence: 0.85}]->(Culinary)
 
-7. FEATURED_IN: POI → Theme/Experience
+8. FEATURED_IN: POI → Theme/Experience
    Example: "This villa is perfect for romantic getaways" → (Villa)-[:FEATURED_IN {confidence: 0.9}]->(Romance)
 
-8. AVAILABLE_IN: POI → Time Period
+9. AVAILABLE_IN: POI → Time Period
    Example: "Best visited in summer" → (BeachClub)-[:AVAILABLE_IN {season: 'summer', confidence: 0.8}]
 
-9. PROMINENT_IN: POI → Destination
+10. PROMINENT_IN: POI → Destination
    Example: "The Eiffel Tower defines Paris" → (EiffelTower)-[:PROMINENT_IN {confidence: 0.95}]->(Paris)
 
 Return JSON in this format:
@@ -112,7 +120,8 @@ Return JSON in this format:
 IMPORTANT:
 - Only infer relationships with confidence >= 0.6
 - Use exact entity names from the context if provided
-- For new entities, use clear, standardized names
+- For EmotionalTag, use one of the 9 LEXA dimensions when possible
+- For Emotion/Desire/Fear, prefer canonical CODE when known; otherwise use the closest canonical name
 - Include evidence for each relationship
 `;
 
@@ -179,31 +188,120 @@ export async function createInferredRelationships(
       }
 
       try {
-        // Dynamic Cypher query based on relationship type
-        const query = `
-          MATCH (from:${rel.fromType} {name: $fromId})
-          MERGE (to:${rel.toType} {name: $toId})
+        const fromMatch =
+          rel.fromType === 'poi'
+            ? 'MATCH (from:poi {name: $fromId})'
+            : `MATCH (from:${rel.fromType} {name: $fromId})`;
+
+        // Taxonomy guardrails:
+        // - Never create Emotion/Desire/Fear by name (it creates duplicates).
+        // - If we can’t resolve to a canonical code, we skip the relationship.
+        const toType = rel.toType;
+        const rawToId = (rel.toId || '').trim();
+        const now = new Date().toISOString();
+
+        // EVOKES + EmotionalTag (LEXA dimensions)
+        if (toType === 'EmotionalTag' || (rel.relationType === 'EVOKES' && toType === 'Emotion')) {
+          const tagName =
+            toType === 'EmotionalTag' ? normalizeLexaDimensionName(rawToId) : normalizeLexaDimensionName(rawToId);
+          if (!tagName) continue;
+          const tagSlug = slugify(tagName);
+
+          const relType = 'EVOKES';
+          await session.run(
+            `
+            ${fromMatch}
+            MERGE (to:EmotionalTag {slug: $slug})
+            SET to.name = coalesce(to.name, $name)
+            MERGE (from)-[r:${relType}]->(to)
+            ON CREATE SET
+              r.confidence = $confidence,
+              r.evidence = $evidence,
+              r.created_at = datetime($now),
+              r.inferred_by = 'ai'
+            ON MATCH SET
+              r.confidence = CASE WHEN $confidence > coalesce(r.confidence, 0) THEN $confidence ELSE r.confidence END,
+              r.updated_at = datetime($now)
+            RETURN r
+            `,
+            {
+              fromId: rel.fromId,
+              slug: tagSlug,
+              name: tagName,
+              confidence: rel.confidence,
+              evidence: rel.evidence,
+              now,
+            }
+          );
+          created++;
+          continue;
+        }
+
+        if (toType === 'Emotion' || toType === 'Desire' || toType === 'Fear') {
+          const resolved = await resolveCanonicalTaxonomy(session, toType, rawToId);
+          if (!resolved) {
+            // Skip instead of creating duplicates by name.
+            continue;
+          }
+
+          const relType = toType === 'Emotion' && rel.relationType === 'EVOKES' ? 'EVOKES_EMOTION' : rel.relationType;
+
+          await session.run(
+            `
+            ${fromMatch}
+            MERGE (to:${toType} {code: $code})
+            SET to.name = coalesce(to.name, $name)
+            MERGE (from)-[r:${relType}]->(to)
+            ON CREATE SET
+              r.confidence = $confidence,
+              r.evidence = $evidence,
+              r.created_at = datetime($now),
+              r.inferred_by = 'ai'
+            ON MATCH SET
+              r.confidence = CASE WHEN $confidence > coalesce(r.confidence, 0) THEN $confidence ELSE r.confidence END,
+              r.updated_at = datetime($now)
+            RETURN r
+            `,
+            {
+              fromId: rel.fromId,
+              code: resolved.code,
+              name: resolved.name || null,
+              confidence: rel.confidence,
+              evidence: rel.evidence,
+              now,
+            }
+          );
+          created++;
+          continue;
+        }
+
+        // Default behavior for non-taxonomy nodes: merge by name
+        await session.run(
+          `
+          ${fromMatch}
+          MERGE (to:${toType} {name: $toId})
           MERGE (from)-[r:${rel.relationType}]->(to)
           ON CREATE SET
             r.confidence = $confidence,
             r.evidence = $evidence,
-            r.created_at = datetime(),
+            r.created_at = datetime($now),
             r.inferred_by = 'ai'
           ON MATCH SET
             r.confidence = CASE
-              WHEN $confidence > r.confidence THEN $confidence
+              WHEN $confidence > coalesce(r.confidence, 0) THEN $confidence
               ELSE r.confidence
             END,
-            r.updated_at = datetime()
+            r.updated_at = datetime($now)
           RETURN r
-        `;
-
-        await session.run(query, {
-          fromId: rel.fromId,
-          toId: rel.toId,
-          confidence: rel.confidence,
-          evidence: rel.evidence,
-        });
+          `,
+          {
+            fromId: rel.fromId,
+            toId: rawToId,
+            confidence: rel.confidence,
+            evidence: rel.evidence,
+            now,
+          }
+        );
 
         created++;
       } catch (error) {

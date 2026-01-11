@@ -538,7 +538,15 @@ export async function ensureRelations(): Promise<RelationStats> {
       WHERE NOT (p)-[:LOCATED_IN]->()
         AND p.destination_name IS NOT NULL
       WITH p
-      MATCH (d:destination {name: p.destination_name})
+      MERGE (d:destination {name: p.destination_name})
+      SET
+        // If we don't know the kind (legacy data), treat it as city by default.
+        d.kind = coalesce(d.kind, 'city'),
+        d.canonical_id = coalesce(
+          d.canonical_id,
+          toLower(replace(replace(trim(toString(p.destination_name)), " ", "-"), ".", ""))
+        ),
+        d.updated_at = datetime()
       MERGE (p)-[:LOCATED_IN]->(d)
       RETURN count(p) as created
     `);

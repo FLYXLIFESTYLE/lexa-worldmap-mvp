@@ -11,6 +11,92 @@ from app.services.supabase_client import get_supabase
 def _as_list(v):
     return v if isinstance(v, list) else []
 
+def _looks_like_bad_poi_name(name: str) -> bool:
+    """
+    Hard gate to prevent junk POIs like sentence fragments:
+    e.g. "by the French family behind Pernod Ricard. It will open..."
+
+    Keep conservative: block only obvious garbage.
+    """
+    if not isinstance(name, str):
+        return True
+    n = name.strip()
+    if not n:
+        return True
+    if len(n) > 120:
+        return True
+    # Multiple sentences
+    if n.count(".") >= 2 or n.count("!") >= 2 or n.count("?") >= 2:
+        return True
+    # Too many commas often indicates a paragraph fragment
+    if n.count(",") >= 3:
+        return True
+    lower = n.lower()
+    if lower.startswith(("by ", "and ", "it ", "this ", "they ", "the ")):
+        return True
+    return False
+
+def _map_source_type_to_source_ref(source_type: str) -> str:
+    # Align backend source types to the canonical allowlist vocabulary.
+    if source_type == "file_upload":
+        return "upload"
+    if source_type == "text_paste":
+        return "paste"
+    if source_type == "url_scrape":
+        return "url_scrape"
+    return "manual"
+
+def _default_source_refs(*, source_type: str, source_id: str, source_url: str = None) -> list:
+    return [
+        {
+            "source_type": _map_source_type_to_source_ref(source_type),
+            "source_id": str(source_id),
+            "source_url": source_url,
+            "captured_at": datetime.utcnow().isoformat() + "Z",
+            "external_ids": {},
+            "license": None,
+        }
+    ]
+
+def _save_knowledge_nugget(
+    supabase,
+    *,
+    user_id: str,
+    upload_id: str,
+    scrape_id: str,
+    destination: str,
+    text: str,
+    source_type: str,
+    source_id: str,
+    source_url: str = None,
+    nugget_type: str = "poi_fragment",
+):
+    """
+    Save valuable unstructured snippets that are NOT POIs.
+    This keeps intelligence without polluting extracted_pois.
+    """
+    try:
+        t = (text or "").strip()
+        if not t:
+            return False
+        # Keep it short; we do not store full articles here.
+        if len(t) > 1500:
+            t = t[:1500]
+        payload = {
+            "upload_id": upload_id,
+            "scrape_id": scrape_id,
+            "created_by": user_id,
+            "nugget_type": nugget_type,
+            "destination": destination,
+            "text": t,
+            "source_refs": _default_source_refs(source_type=source_type, source_id=source_id, source_url=source_url),
+            "citations": [],
+            "enrichment": {"source_type": source_type},
+        }
+        supabase.table("knowledge_nuggets").insert(payload).execute()
+        return True
+    except Exception:
+        return False
 
 def _clamp_int(v, lo: int, hi: int, default: int):
     try:
@@ -66,6 +152,8 @@ def _normalize_poi_for_extracted_pois(poi: Dict, *, source_file: Optional[str], 
 
     name = (poi.get("name") or "").strip()
     if not name:
+        return {}
+    if _looks_like_bad_poi_name(name):
         return {}
 
     destination = poi.get("destination") or poi.get("location") or poi.get("city") or poi.get("where")
@@ -178,8 +266,10 @@ async def save_intelligence_to_db(
     try:
         # 1. Save POIs (normalize to match schema)
         source_file = None
+        source_url = None
         if isinstance(source_metadata, dict):
             source_file = source_metadata.get("filename") or source_metadata.get("title")
+            source_url = source_metadata.get("url")
 
         # If this source was re-processed, wipe previously materialized POIs first (best-effort)
         try:
@@ -192,9 +282,39 @@ async def save_intelligence_to_db(
 
         if intelligence.get('pois'):
             for poi in _as_list(intelligence.get("pois")):
+                # If the "name" is actually a sentence fragment, store it as a knowledge nugget instead.
+                raw_name = (poi.get("name") or "").strip() if isinstance(poi, dict) else ""
+                if raw_name and _looks_like_bad_poi_name(raw_name):
+                    dest = poi.get("destination") or poi.get("location") or poi.get("city") or poi.get("where")
+                    if not isinstance(dest, str):
+                        dest = None
+                    # Prefer the raw "name" fragment; fall back to description if needed.
+                    frag = raw_name
+                    if isinstance(poi.get("description"), str) and poi.get("description") and len(frag) < 40:
+                        frag = (poi.get("description") or "").strip() or frag
+                    _save_knowledge_nugget(
+                        supabase,
+                        user_id=user_id,
+                        upload_id=upload_id,
+                        scrape_id=scrape_id,
+                        destination=(dest.strip() if isinstance(dest, str) else None),
+                        text=frag,
+                        source_type=source_type,
+                        source_id=source_id,
+                        source_url=source_url,
+                        nugget_type="poi_fragment",
+                    )
+                    continue
+
                 normalized = _normalize_poi_for_extracted_pois(poi, source_file=source_file, source_type=source_type)
                 if not normalized:
                     continue
+
+                # Hardening: always attach provenance (source_refs) if missing.
+                if not isinstance(normalized.get("source_refs"), list) or len(normalized.get("source_refs")) == 0:
+                    normalized["source_refs"] = _default_source_refs(
+                        source_type=source_type, source_id=source_id, source_url=source_url
+                    )
 
                 poi_data = {
                     "upload_id": upload_id,

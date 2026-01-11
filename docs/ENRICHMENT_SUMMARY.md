@@ -2,6 +2,18 @@
 
 **Date:** December 17, 2025
 
+## ⚠️ Update (Jan 2026)
+This document reflects an older enrichment approach centered on Google Places.
+
+**Current MVP direction (Brain Hardening):**
+- Use **Tavily + Claude** for real-time enrichment with **content minimization** (facts + provenance + short snippets only).
+- Store sentence fragments as **Knowledge Nuggets** (not POIs) for Captain review.
+
+See:
+- `docs/LEXA_BRAIN_FIELD_ALLOWLIST_POLICY.md`
+- `docs/LEXA_CANONICAL_POI_CONTRACT.md`
+- `docs/KNOWLEDGE_NUGGETS.md`
+
 ---
 
 ## ❓ Your Questions:

@@ -11,6 +11,21 @@ import { useEffect, useMemo, useState } from 'react';
 
 import PortalShell from '@/components/portal/portal-shell';
 
+type PoiCountsRow = {
+  destination_id: string;
+  destination: string;
+  kind: string;
+  supabase_pois: number;
+  extracted_pois: number;
+  sources: { wikidata: number; osm: number; overture: number };
+  neo4j_pois: number;
+  neo4j_matched_destinations: string[];
+};
+
+type PoiCountsResponse =
+  | { success: true; rows: PoiCountsRow[]; generated_at: string }
+  | { success: false; error: string };
+
 type EditableKey =
   | 'mission'
   | 'why'
@@ -51,6 +66,10 @@ export default function CEODashboardPage() {
   );
 
   const [editableContent, setEditableContent] = useState<EditableContent>(defaultContent);
+  const [poiCountsLoading, setPoiCountsLoading] = useState(false);
+  const [poiCountsError, setPoiCountsError] = useState<string | null>(null);
+  const [poiCounts, setPoiCounts] = useState<PoiCountsRow[] | null>(null);
+  const [poiCountsUpdatedAt, setPoiCountsUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -62,6 +81,27 @@ export default function CEODashboardPage() {
       // ignore corrupted local storage
     }
   }, []);
+
+  const refreshPoiCounts = async () => {
+    setPoiCountsLoading(true);
+    setPoiCountsError(null);
+    try {
+      const res = await fetch('/api/admin/poi-counts', { method: 'GET' });
+      const json = (await res.json().catch(() => ({}))) as PoiCountsResponse;
+      if (!res.ok || !json || (json as any).success === false) {
+        const err = String((json as any)?.error || 'Failed to load POI counts');
+        throw new Error(err);
+      }
+      const ok = json as Extract<PoiCountsResponse, { success: true }>;
+      setPoiCounts(ok.rows);
+      setPoiCountsUpdatedAt(ok.generated_at);
+    } catch (e: any) {
+      setPoiCountsError(e?.message || 'Failed to load POI counts');
+      setPoiCounts(null);
+    } finally {
+      setPoiCountsLoading(false);
+    }
+  };
 
   const updateContent = (key: EditableKey, value: string) => {
     setEditableContent((prev) => {
@@ -104,6 +144,12 @@ export default function CEODashboardPage() {
     }
   };
 
+  useEffect(() => {
+    // Best-effort: only shows if you are logged in as admin.
+    refreshPoiCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <PortalShell
       icon="👔"
@@ -134,7 +180,7 @@ export default function CEODashboardPage() {
       quickTips={[
         'Click a section on the right to jump instantly.',
         'Text blocks marked editable can be refined live before an event (they auto-save in your browser).',
-        'KPIs are currently demo placeholders - we can connect them to Supabase + Neo4j next.',
+        'KPIs can be connected to live Supabase + Neo4j (admin-only).',
       ]}
     >
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8 items-start">
@@ -488,12 +534,11 @@ export default function CEODashboardPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      // placeholder: real KPIs will come from an API endpoint
-                      alert('KPI refresh will be wired to live data next.');
+                      refreshPoiCounts();
                     }}
                     className="shrink-0 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 transition-colors text-sm"
                   >
-                    Refresh
+                    {poiCountsLoading ? 'Refreshing…' : 'Refresh'}
                   </button>
                 </div>
 
@@ -510,6 +555,70 @@ export default function CEODashboardPage() {
                       <div className="text-xs text-zinc-700 mt-1">{k.note}</div>
                     </div>
                   ))}
+                </div>
+
+                <div className="mt-6 bg-white border border-zinc-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-lexa-navy">📍 POIs by destination (Supabase + Neo4j)</div>
+                      <div className="text-xs text-zinc-600 mt-1">
+                        Shows counts per destination. Supabase counts include canonical entities + draft POIs; Neo4j counts are graph POIs.
+                      </div>
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      {poiCountsUpdatedAt ? `Updated: ${new Date(poiCountsUpdatedAt).toLocaleString()}` : ''}
+                    </div>
+                  </div>
+
+                  {poiCountsError && (
+                    <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                      Live counts are admin-only. Sign in as admin to see them. ({poiCountsError})
+                    </div>
+                  )}
+
+                  {!poiCountsError && !poiCounts && (
+                    <div className="mt-3 text-sm text-zinc-600">Loading…</div>
+                  )}
+
+                  {!!poiCounts?.length && (
+                    <div className="mt-4 overflow-auto">
+                      <table className="min-w-[900px] w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs text-zinc-600">
+                            <th className="py-2 pr-4">Destination</th>
+                            <th className="py-2 pr-4">Supabase POIs</th>
+                            <th className="py-2 pr-4">Draft POIs</th>
+                            <th className="py-2 pr-4">Wikidata</th>
+                            <th className="py-2 pr-4">OSM</th>
+                            <th className="py-2 pr-4">Overture</th>
+                            <th className="py-2 pr-4">Neo4j POIs</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {poiCounts.map((r) => (
+                            <tr key={r.destination_id} className="border-t border-zinc-200">
+                              <td className="py-2 pr-4">
+                                <div className="font-semibold text-zinc-900">{r.destination}</div>
+                                <div className="text-xs text-zinc-500">{r.kind}</div>
+                                {r.neo4j_matched_destinations?.length ? (
+                                  <div className="text-[11px] text-zinc-500">
+                                    Neo4j matched: {r.neo4j_matched_destinations.slice(0, 2).join(', ')}
+                                    {r.neo4j_matched_destinations.length > 2 ? '…' : ''}
+                                  </div>
+                                ) : null}
+                              </td>
+                              <td className="py-2 pr-4 tabular-nums">{r.supabase_pois}</td>
+                              <td className="py-2 pr-4 tabular-nums">{r.extracted_pois}</td>
+                              <td className="py-2 pr-4 tabular-nums">{r.sources.wikidata}</td>
+                              <td className="py-2 pr-4 tabular-nums">{r.sources.osm}</td>
+                              <td className="py-2 pr-4 tabular-nums">{r.sources.overture}</td>
+                              <td className="py-2 pr-4 tabular-nums">{r.neo4j_pois}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">

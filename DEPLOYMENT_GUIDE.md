@@ -52,6 +52,7 @@ You need to run these migrations on your **production Supabase** database:
 13. `create_captain_profiles.sql` - Captain profiles
 14. `create_upload_tracking.sql` - Upload tracking
 15. `add_screenshot_data_to_bug_reports.sql` - Bug screenshots
+16. `021_knowledge_nuggets.sql` - Unstructured knowledge inbox (sentence fragments, events, signals)
 
 #### How to Run Migrations:
 
@@ -105,6 +106,7 @@ ANTHROPIC_API_KEY=your-claude-api-key
 ```bash
 GOOGLE_VISION_API_KEY=your-google-vision-key  # For OCR
 GOOGLE_PLACES_API_KEY=your-places-key         # For POI enrichment
+ENABLE_DATA_QUALITY_SCHEDULER=true            # Run nightly Neo4j data-quality job (off by default)
 ```
 
 **WHAT THIS DOES:**
@@ -170,6 +172,7 @@ After deployment, test these pages:
 1. **Captain Dashboard:** `https://your-app.vercel.app/captain`
 2. **Upload & Manual Entry:** `https://your-app.vercel.app/captain/upload`
 3. **Browse, Verify & Enhance:** `https://your-app.vercel.app/captain/browse`
+   - Includes **Nuggets inbox** tab (sentence fragments/signals that need Captain review)
 4. **Upload History:** `https://your-app.vercel.app/captain/history`
 5. **Scraped URLs:** `https://your-app.vercel.app/captain/urls`
 6. **Keyword Monitor:** `https://your-app.vercel.app/captain/keywords`
@@ -246,6 +249,9 @@ create_captain_profiles.sql      → Captain profiles
 create_upload_tracking.sql       → Upload history tracking
 20251220001_upload_tracking_indexes.sql → Performance indexes
 20251227001_experience_graph_core.sql → Experience graph
+021_knowledge_nuggets.sql        → Knowledge Nuggets inbox
+022_experience_entities_geo_indexes.sql → Geo indexes for faster bbox queries
+023_experience_entity_destination_links.sql → Destination membership + per-destination source pointers
 ```
 
 ---

@@ -47,7 +47,7 @@ Transform luxury travel from transactional booking to emotional experience desig
 
 ### For Travelers:
 1. **Theme-Led Discovery**
-   - Visual selection of 12 emotional themes (Romance, Adventure, Wellness, etc.)
+   - Visual selection of 14 emotional themes (Romance, Adventure, Wellness, etc.)
    - No "Where do you want to go?" - Start with feelings
 
 2. **Experience DNA Design**
@@ -84,7 +84,7 @@ Transform luxury travel from transactional booking to emotional experience desig
 - 10 years later, smell lavender → instantly back on that Provence terrace
 
 ### 3. Data-Driven Luxury Intelligence
-- Real-time Google Places enrichment
+- Open-source + owned-input enrichment (uploads/scraping/manual) for MVP; paid enrichers optional later
 - Luxury scoring algorithm (0-10)
 - Quality filters: 4+ stars, high price level, experience-relevant only
 - 350+ yacht destinations with confidence scores
@@ -131,7 +131,7 @@ Transform luxury travel from transactional booking to emotional experience desig
 ## Scope
 
 ### MVP (Current - Beta Live):
-- ✅ Theme selection (12 categories)
+- ✅ Theme selection (14 categories)
 - ✅ Conversational experience builder
 - ✅ Experience Script generation
 - ✅ 300,000+ POI database

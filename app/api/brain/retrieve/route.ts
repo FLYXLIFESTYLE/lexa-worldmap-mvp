@@ -8,8 +8,10 @@
  */
 
 import { NextResponse } from 'next/server';
+import neo4j from 'neo4j-driver';
 import { z } from 'zod';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
+import { resolveCanonicalDestination } from '@/lib/neo4j/destination-resolver';
 
 export const runtime = 'nodejs';
 
@@ -18,6 +20,34 @@ const BodySchema = z.object({
   theme: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(50).default(20),
 });
+
+const QuerySchema = z.object({
+  destination: z.string().min(1),
+  theme: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+});
+
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const parsed = QuerySchema.safeParse({
+    destination: url.searchParams.get('destination') ?? '',
+    theme: url.searchParams.get('theme') ?? undefined,
+    limit: url.searchParams.get('limit') ?? undefined,
+  });
+
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: 'Invalid query', details: parsed.error.flatten() }, { status: 400 });
+  }
+
+  // Reuse the POST implementation by calling it with a JSON body.
+  return POST(
+    new Request(req.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(parsed.data),
+    })
+  );
+}
 
 export async function POST(req: Request) {
   try {
@@ -28,6 +58,7 @@ export async function POST(req: Request) {
     }
 
     const { destination, theme, limit } = parsed.data;
+    const resolved = resolveCanonicalDestination(destination);
 
     const driver = getNeo4jDriver();
     const session = driver.session();
@@ -35,8 +66,8 @@ export async function POST(req: Request) {
     try {
       const query = theme
         ? `
-          MATCH (d:destination {name: $destination})
-          MATCH (p:poi)-[:LOCATED_IN]->(d)
+          MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
+          WHERE any(term IN $destination_terms WHERE toLower(d.name) CONTAINS toLower(term))
           MATCH (p)-[r:FEATURED_IN]->(t:theme_category {name: $theme})
           WITH p, r,
                coalesce(p.luxury_score_base, 0.0) AS luxury,
@@ -58,8 +89,8 @@ export async function POST(req: Request) {
           LIMIT $limit
         `
         : `
-          MATCH (d:destination {name: $destination})
-          MATCH (p:poi)-[:LOCATED_IN]->(d)
+          MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
+          WHERE any(term IN $destination_terms WHERE toLower(d.name) CONTAINS toLower(term))
           WITH p,
                coalesce(p.luxury_score_base, 0.0) AS luxury,
                coalesce(p.confidence_score, 0.0) AS confidence
@@ -77,7 +108,12 @@ export async function POST(req: Request) {
           LIMIT $limit
         `;
 
-      const result = await session.run(query, { destination, theme, limit });
+      const result = await session.run(query, {
+        destination_terms: resolved.terms.length ? resolved.terms : [destination],
+        theme,
+        // Neo4j requires LIMIT to be an integer type (not 20.0 float)
+        limit: neo4j.int(limit),
+      });
       const pois = result.records.map((rec) => ({
         canonical_id: rec.get('canonical_id'),
         name: rec.get('name'),
@@ -91,7 +127,14 @@ export async function POST(req: Request) {
         score: Number(rec.get('score')),
       }));
 
-      return NextResponse.json({ ok: true, destination, theme: theme ?? null, count: pois.length, pois });
+      return NextResponse.json({
+        ok: true,
+        destination,
+        canonicalDestination: resolved.canonical || destination,
+        theme: theme ?? null,
+        count: pois.length,
+        pois,
+      });
     } finally {
       await session.close();
     }

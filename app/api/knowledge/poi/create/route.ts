@@ -9,6 +9,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
 import { createClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  CITY_TO_MVP_DESTINATION,
+  destinationKindForName,
+  slugifyDestination,
+} from '@/lib/neo4j/destination-resolver';
 
 export const runtime = 'nodejs';
 
@@ -164,15 +169,49 @@ export async function POST(req: NextRequest) {
       );
 
       // Create relationship to destination (create destination if doesn't exist)
+      const destName = poiData.destination_name.trim();
+      const kind = destinationKindForName(destName);
+      const canonicalId = slugifyDestination(destName);
+      const parentDestination = CITY_TO_MVP_DESTINATION[destName] ?? null;
       await session.run(
         `
         MATCH (p:poi {poi_uid: $poi_uid})
         MERGE (d:destination {name: $destination_name})
-        MERGE (p)-[:located_in]->(d)
+        SET
+          d.kind = CASE WHEN d.kind IS NULL OR d.kind <> $kind THEN $kind ELSE d.kind END,
+          d.canonical_id = CASE
+            WHEN d.canonical_id IS NULL OR trim(toString(d.canonical_id)) = '' THEN $canonical_id
+            WHEN toString(d.canonical_id) =~ '(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN $canonical_id
+            ELSE d.canonical_id
+          END,
+          d.updated_at = datetime($now)
+        MERGE (p)-[:LOCATED_IN]->(d)
+
+        WITH d
+        CALL {
+          WITH d
+          WITH d WHERE $parent_destination IS NOT NULL
+          MERGE (mvp:destination {name: $parent_destination})
+          SET
+            mvp.kind = CASE WHEN mvp.kind IS NULL OR mvp.kind <> 'mvp_destination' THEN 'mvp_destination' ELSE mvp.kind END,
+            mvp.canonical_id = CASE
+              WHEN mvp.canonical_id IS NULL OR trim(toString(mvp.canonical_id)) = '' THEN $parent_canonical_id
+              WHEN toString(mvp.canonical_id) =~ '(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN $parent_canonical_id
+              ELSE mvp.canonical_id
+            END,
+            mvp.updated_at = datetime($now)
+          MERGE (d)-[:IN_DESTINATION]->(mvp)
+          RETURN 1 AS linked
+        }
         `,
         {
           poi_uid,
-          destination_name: poiData.destination_name,
+          destination_name: destName,
+          kind,
+          canonical_id: canonicalId,
+          parent_destination: parentDestination,
+          parent_canonical_id: parentDestination ? slugifyDestination(parentDestination) : null,
+          now,
         }
       );
 
@@ -182,8 +221,8 @@ export async function POST(req: NextRequest) {
           await session.run(
             `
             MATCH (p:poi {poi_uid: $poi_uid})
-            MERGE (t:theme {name: $themeName})
-            MERGE (p)-[:has_theme]->(t)
+            MERGE (t:theme_category {name: $themeName})
+            MERGE (p)-[:HAS_THEME]->(t)
             `,
             { poi_uid, themeName }
           );
@@ -197,7 +236,7 @@ export async function POST(req: NextRequest) {
             `
             MATCH (p:poi {poi_uid: $poi_uid})
             MERGE (a:activity_type {name: $activityName})
-            MERGE (p)-[:supports_activity]->(a)
+            MERGE (p)-[:SUPPORTS_ACTIVITY]->(a)
             `,
             { poi_uid, activityName }
           );

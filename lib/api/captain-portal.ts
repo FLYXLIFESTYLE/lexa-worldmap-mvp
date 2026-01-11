@@ -301,6 +301,25 @@ export const poisAPI = {
   },
 
   /**
+   * Enrich a POI draft with Tavily + Claude (runs in Next.js).
+   * This writes structured fields + provenance/citations back into extracted_pois.
+   */
+  enrichPOI: async (poiId: string, opts?: { destination?: string }) => {
+    const response = await fetch(`/api/captain/pois/${poiId}/enrich`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(opts || {}),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const err = String(data.error || 'Failed to enrich POI');
+      const details = data.details ? String(data.details) : '';
+      throw new Error(details ? `${err}: ${details}` : err);
+    }
+    return data;
+  },
+
+  /**
    * Delete a POI
    */
   deletePOI: async (poiId: string) => {

@@ -59,8 +59,8 @@ Cursor has limited memory (200k tokens) and forgets previous sessions. Reading t
 
 ### Data Patterns
 - **POI Structure**: Every POI must have: name, coordinates, luxury_score, theme relationships, confidence_score
-- **Theme Categories**: 12 core themes (Romance, Adventure, Wellness, etc.)
-- **Relationship Types**: `LOCATED_IN`, `HAS_THEME`, `SUPPORTS_ACTIVITY`
+- **Theme Categories**: 14 core themes (incl. Nightlife & Entertainment, Sports & Active)
+- **Relationship Types**: `LOCATED_IN`, `HAS_THEME`, `SUPPORTS_ACTIVITY`, `FITS_OCCASION`, `EVOKES` (EmotionalTag), `EVOKES_EMOTION` (Emotion), `IN_DESTINATION` (city → MVP destination)
 - **Luxury Scoring**: 0-10 scale based on rating, price level, reviews, keywords
 - **Confidence Scoring**: 0-100%, default 80% for uploads, captain approval required for >80%
 - **Data Quality**: Excellent, Good, Fair, Poor - visual badges and filtering

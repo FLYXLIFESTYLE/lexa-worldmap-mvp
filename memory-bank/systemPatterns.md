@@ -208,13 +208,21 @@ These are the simple rules captains should follow when reviewing extracted POIs:
 **Node Types**:
 - `poi` - Points of interest (300,000+)
 - `theme_category` - Emotional themes (14)
-- `destination` - Cities, regions, countries (350+)
+- `destination` - MVP yacht destinations + cities/regions (typed via `kind`)
+- `occasion_type` - Facet/filter types (e.g., accessible, photography-worthy, water-based)
+- `Emotion` / `Desire` / `Fear` - Canonical psychological taxonomy (code-based)
+- `EmotionalTag` - UX tagging layer (category/intensity), mapped to canonical taxonomy
 - `yacht_route` - Curated yacht itineraries
 
 **Relationship Types**:
 - `(poi)-[:LOCATED_IN]->(destination)`
 - `(poi)-[:HAS_THEME]->(theme_category)`
 - `(poi)-[:SUPPORTS_ACTIVITY]->(activity)`
+- `(poi)-[:FITS_OCCASION]->(occasion_type)`
+- `(poi)-[:EVOKES]->(EmotionalTag)`
+- `(poi)-[:EVOKES_EMOTION]->(Emotion|Desire|Fear)`
+- `(EmotionalTag)-[:MAPS_TO]->(Emotion|Desire|Fear)`
+- `(destination {kind:'city'})-[:IN_DESTINATION]->(destination {kind:'mvp_destination'})`
 - `(route)-[:INCLUDES_PORT {order: N}]->(destination)`
 
 **Key Properties**:
@@ -278,12 +286,14 @@ User Message (Frontend)
 
 #### 2. **POI Enrichment Flow**:
 ```
-Google Places API
-  → Fetch place details
-  → Calculate luxury score
-  → Store in Neo4j
-  → Link to themes & destinations
-  → Store raw data in Supabase (audit trail)
+MVP enrichment (free/open + owned inputs)
+  → Scrape URL(s) / upload docs / manual enrichment
+  → Extract structured facts + evidence/citations
+  → Update POI drafts in Supabase (reviewable)
+  → Promote verified POIs into Neo4j with relationship edges + traceability
+
+Optional later (paid tier / post-investor)
+  → Paid enrichment APIs (Google Places etc.) behind feature flags
 ```
 
 #### 3. **POI Collection System Flow** (NEW - Dec 2025):
@@ -370,10 +380,10 @@ User clicks theme card
 - Neo4j driver (graph queries)
 - Supabase client (user sync, vector search)
 - Anthropic API (Claude 3.5 Sonnet)
-- Google Places API (POI enrichment)
+- Optional paid enrichment APIs (deferred; not required for MVP brain hardening)
 
 **Neo4j contains**:
-- POI nodes from multiple sources (OSM, Google Places, manual uploads)
+- POI nodes from multiple sources (OSM/open sources + owned uploads/scrapes + optional enrichers)
 - Theme categories (seeded)
 - Yacht destinations (uploaded)
 - Relationships linking everything
@@ -388,10 +398,10 @@ User clicks theme card
 ### Data Source Priorities:
 
 1. **Neo4j** - Primary source for POI recommendations
-2. **Google Places API** - Real-time data enrichment
-3. **Supabase** - User data, session state, caching
-4. **OpenStreetMap** - Initial POI seeding (legacy)
-5. **Manual uploads** - Curated destinations, routes
+2. **Owned inputs (MVP)** - Uploads + URL scraping + manual enrichment (traceable, investor-safe)
+3. **Open sources (MVP)** - OSM/Overture/Wikidata (identity skeletons; named-only ingestion)
+4. **Supabase** - User data, drafts/audit trail, intelligence tables, (future) pgvector
+5. **Paid enrichment APIs (later)** - Optional post-investor / paid-tier phase (not required for MVP brain hardening)
 
 ## Scalability Patterns
 
@@ -399,7 +409,7 @@ User clicks theme card
 - 300,000 POIs in Neo4j (handles well)
 - Single FastAPI instance
 - Supabase free tier
-- Neo4j Aura free tier
+- Neo4j Aura tier must support current dataset (free tier is not sufficient for 300K+ POIs)
 
 ### Future Scale (10,000+ users):
 

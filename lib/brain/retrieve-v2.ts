@@ -1,5 +1,6 @@
 import { getNeo4jDriver } from '@/lib/neo4j/client';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { resolveCanonicalDestination } from '@/lib/neo4j/destination-resolver';
 
 export type BrainCandidateSource = 'neo4j' | 'draft';
 
@@ -82,6 +83,7 @@ export async function retrieveBrainCandidatesV2(
   input: BrainRetrieveV2Input
 ): Promise<{
   destination: string;
+  canonicalDestination: string;
   theme: string | null;
   usedThemes: string[];
   candidates: BrainCandidate[];
@@ -91,12 +93,16 @@ export async function retrieveBrainCandidatesV2(
   if (!destination) {
     return {
       destination: '',
+      canonicalDestination: '',
       theme: input.theme ?? null,
       usedThemes: [],
       candidates: [],
       counts: { neo4j: 0, drafts: 0, returned: 0 },
     };
   }
+
+  const resolved = resolveCanonicalDestination(destination);
+  const canonicalDestination = resolved.canonical || destination;
 
   const limit = Math.min(Math.max(input.limit ?? 20, 1), 50);
   const includeDrafts = input.includeDrafts ?? true;
@@ -115,7 +121,7 @@ export async function retrieveBrainCandidatesV2(
     const query = usedThemes.length
       ? `
         MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
-        WHERE toLower(d.name) CONTAINS toLower($destination)
+        WHERE any(term IN $destination_terms WHERE toLower(d.name) CONTAINS toLower(term))
         OPTIONAL MATCH (p)-[r1:FEATURED_IN]->(t1:theme_category)
         WHERE t1.name IN $themes
         OPTIONAL MATCH (p)-[r2:HAS_THEME]->(t2:theme_category)
@@ -133,7 +139,7 @@ export async function retrieveBrainCandidatesV2(
         RETURN
           p.name AS name,
           coalesce(p.type, p.category, 'poi') AS type,
-          d.name AS destination_name,
+          d.name AS located_in_name,
           updated_at AS updated_at,
           theme_fit AS theme_fit,
           luxury AS luxury,
@@ -146,7 +152,7 @@ export async function retrieveBrainCandidatesV2(
       `
       : `
         MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
-        WHERE toLower(d.name) CONTAINS toLower($destination)
+        WHERE any(term IN $destination_terms WHERE toLower(d.name) CONTAINS toLower(term))
         WITH p, d,
           coalesce(p.updated_at, p.enriched_at, p.created_at) AS updated_at,
           coalesce(p.luxury_score_base, p.luxury_score, 0.0) AS luxury,
@@ -155,7 +161,7 @@ export async function retrieveBrainCandidatesV2(
         RETURN
           p.name AS name,
           coalesce(p.type, p.category, 'poi') AS type,
-          d.name AS destination_name,
+          d.name AS located_in_name,
           updated_at AS updated_at,
           0.0 AS theme_fit,
           luxury AS luxury,
@@ -167,11 +173,14 @@ export async function retrieveBrainCandidatesV2(
         LIMIT 50
       `;
 
-    const res = await session.run(query, { destination, themes: usedThemes });
+    const res = await session.run(query, {
+      destination_terms: resolved.terms.length ? resolved.terms : [destination],
+      themes: usedThemes,
+    });
     neo4jRows = res.records.map((r) => ({
       name: r.get('name'),
       type: r.get('type'),
-      destination_name: r.get('destination_name'),
+      located_in_name: r.get('located_in_name'),
       updated_at: r.get('updated_at'),
       theme_fit: r.get('theme_fit'),
       luxury: r.get('luxury'),
@@ -205,13 +214,19 @@ export async function retrieveBrainCandidatesV2(
         recency,
       });
 
+      const locatedInName = r.located_in_name ? String(r.located_in_name) : null;
+      const note =
+        locatedInName && locatedInName.toLowerCase() !== canonicalDestination.toLowerCase()
+          ? `Located in: ${locatedInName}`
+          : null;
+
       return {
         source: 'neo4j',
         approved,
         label: approved ? 'APPROVED' : 'UNAPPROVED_DRAFT',
         name: String(r.name),
         type: String(r.type || 'poi'),
-        destination: String(r.destination_name || destination),
+        destination: canonicalDestination,
         confidence,
         luxury,
         theme_fit,
@@ -221,6 +236,7 @@ export async function retrieveBrainCandidatesV2(
         source_id: r.source_id ? String(r.source_id) : null,
         source_kind: sourceKind || null,
         updated_at,
+        notes: note,
       };
     });
 
@@ -297,6 +313,7 @@ export async function retrieveBrainCandidatesV2(
 
   return {
     destination,
+    canonicalDestination,
     theme,
     usedThemes,
     candidates: merged,

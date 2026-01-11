@@ -20,6 +20,41 @@ from database.neo4j_client import neo4j_client
 logger = structlog.get_logger()
 router = APIRouter()
 
+MVP_DESTINATIONS = {
+    "French Riviera",
+    "Amalfi Coast",
+    "Balearics",
+    "Cyclades",
+    "Adriatic North",
+    "Adriatic Central",
+    "Adriatic South",
+    "Ionian Sea",
+    "Bahamas",
+    "BVI",
+    "USVI",
+    "French Antilles",
+}
+
+CITY_TO_MVP_DESTINATION = {
+    "Monaco": "French Riviera",
+    "St. Tropez": "French Riviera",
+    "Cannes": "French Riviera",
+    "Nice": "French Riviera",
+}
+
+
+def _slugify_destination(s: str) -> str:
+    import re
+
+    raw = (s or "").strip().lower()
+    raw = re.sub(r"[^a-z0-9]+", "-", raw)
+    raw = re.sub(r"(^-|-$)", "", raw)
+    return raw
+
+
+def _destination_kind(name: str) -> str:
+    return "mvp_destination" if (name or "").strip() in MVP_DESTINATIONS else "city"
+
 
 def _require_admin_token(x_lexa_admin_token: Optional[str]) -> None:
     expected = getattr(settings, "lexa_admin_token", None)
@@ -216,6 +251,10 @@ async def enrich_places(
             try:
                 poi_uid = f"gplaces:{pid}"
                 poi_type = types[0] if types else None
+                destination_name = (request.destination or "").strip()
+                kind = _destination_kind(destination_name)
+                canonical_id = _slugify_destination(destination_name)
+                parent_destination = CITY_TO_MVP_DESTINATION.get(destination_name)
                 await neo4j_client.execute_query(
                     """
                     MERGE (p:poi {poi_uid: $poi_uid})
@@ -239,7 +278,7 @@ async def enrich_places(
                         "place_id": pid,
                         "name": display_name or formatted_address or pid,
                         "type": poi_type,
-                        "destination": request.destination,
+                        "destination": destination_name,
                         "lat": lat,
                         "lon": lon,
                         "rating": rating,
@@ -254,10 +293,34 @@ async def enrich_places(
                     """
                     MATCH (p:poi {poi_uid: $poi_uid})
                     MERGE (d:destination {name: $destination})
-                    MERGE (p)-[:located_in]->(d)
+                    SET
+                      d.kind = coalesce(d.kind, $kind),
+                      d.canonical_id = coalesce(d.canonical_id, $canonical_id),
+                      d.updated_at = datetime()
+                    MERGE (p)-[:LOCATED_IN]->(d)
+
+                    WITH d
+                    CALL {
+                      WITH d
+                      WITH d WHERE $parent_destination IS NOT NULL
+                      MERGE (mvp:destination {name: $parent_destination})
+                      SET
+                        mvp.kind = coalesce(mvp.kind, 'mvp_destination'),
+                        mvp.canonical_id = coalesce(mvp.canonical_id, $parent_canonical_id),
+                        mvp.updated_at = datetime()
+                      MERGE (d)-[:IN_DESTINATION]->(mvp)
+                      RETURN 1 AS linked
+                    }
                     RETURN d
                     """,
-                    {"poi_uid": poi_uid, "destination": request.destination},
+                    {
+                        "poi_uid": poi_uid,
+                        "destination": destination_name,
+                        "kind": kind,
+                        "canonical_id": canonical_id,
+                        "parent_destination": parent_destination,
+                        "parent_canonical_id": _slugify_destination(parent_destination) if parent_destination else None,
+                    },
                 )
                 neo4j_upserted += 1
             except Exception as e:

@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
 import { poisAPI } from '@/lib/api/captain-portal';
 import PortalShell from '@/components/portal/portal-shell';
+import { looksLikeBadPoiName } from '@/lib/brain/poi-contract';
 
 interface POI {
   id: string;
@@ -30,7 +31,31 @@ interface POI {
   themes?: string[] | null;
 }
 
+type NuggetType =
+  | 'note'
+  | 'poi_fragment'
+  | 'brand_signal'
+  | 'event'
+  | 'opening_update'
+  | 'pricing_signal'
+  | 'restriction'
+  | 'other';
+
+interface KnowledgeNugget {
+  id: string;
+  nugget_type: NuggetType;
+  destination: string | null;
+  text: string;
+  source_refs?: any[] | null;
+  citations?: any[] | null;
+  enrichment?: any | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
 type ViewMode = 'list' | 'edit';
+type ListSection = 'pois' | 'nuggets';
 
 export default function CaptainBrowsePage() {
   const router = useRouter();
@@ -40,6 +65,12 @@ export default function CaptainBrowsePage() {
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [pois, setPois] = useState<POI[]>([]);
   const [filteredPois, setFilteredPois] = useState<POI[]>([]);
+
+  const [section, setSection] = useState<ListSection>('pois');
+  const [nuggetsLoading, setNuggetsLoading] = useState(false);
+  const [nuggets, setNuggets] = useState<KnowledgeNugget[]>([]);
+  const [filteredNuggets, setFilteredNuggets] = useState<KnowledgeNugget[]>([]);
+  const [nuggetTypeFilter, setNuggetTypeFilter] = useState<'all' | NuggetType>('all');
   
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,6 +107,7 @@ export default function CaptainBrowsePage() {
         return;
       }
       fetchPOIs();
+      fetchNuggets();
     }
     checkAuth();
   }, [router, supabase.auth]);
@@ -116,6 +148,32 @@ export default function CaptainBrowsePage() {
       console.error('Failed to fetch POIs:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchNuggets = async () => {
+    setNuggetsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('knowledge_nuggets')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+
+      const list = (data || []) as KnowledgeNugget[];
+      const normalized = list.map((n) => ({
+        ...n,
+        source_refs: Array.isArray((n as any).source_refs) ? (n as any).source_refs : [],
+        citations: Array.isArray((n as any).citations) ? (n as any).citations : [],
+        enrichment: (n as any).enrichment || {},
+      }));
+      setNuggets(normalized);
+      setFilteredNuggets(normalized);
+    } catch (e) {
+      console.error('Failed to fetch knowledge nuggets:', e);
+    } finally {
+      setNuggetsLoading(false);
     }
   };
 
@@ -185,6 +243,113 @@ export default function CaptainBrowsePage() {
     
     setFilteredPois(filtered);
   }, [searchQuery, categoryFilter, qualityFilter, scoreFilter, pois]);
+
+  useEffect(() => {
+    let filtered = [...nuggets];
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((n) => {
+        return (
+          (n.text || '').toLowerCase().includes(q) ||
+          (n.destination || '').toLowerCase().includes(q) ||
+          (n.nugget_type || '').toLowerCase().includes(q)
+        );
+      });
+    }
+
+    if (nuggetTypeFilter !== 'all') {
+      filtered = filtered.filter((n) => n.nugget_type === nuggetTypeFilter);
+    }
+
+    setFilteredNuggets(filtered);
+  }, [searchQuery, nuggetTypeFilter, nuggets]);
+
+  const handleNuggetEnrich = async (n: KnowledgeNugget) => {
+    try {
+      const response = await fetch(`/api/captain/nuggets/${n.id}/enrich`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const err = String(data.error || 'Failed to enrich nugget');
+        const details = data.details ? String(data.details) : '';
+        throw new Error(details ? `${err}: ${details}` : err);
+      }
+      await fetchNuggets();
+      alert('✅ Nugget enriched.');
+    } catch (e: any) {
+      alert(`❌ Nugget enrichment failed: ${e?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleConvertNuggetToPoi = async (n: KnowledgeNugget) => {
+    const suggested = String((n.enrichment as any)?.suggested_poi_name || '').trim();
+    const poiName = prompt('Real POI name (required):', suggested || '');
+    if (!poiName || !poiName.trim()) return;
+    if (looksLikeBadPoiName(poiName)) {
+      alert(
+        '❌ That still looks like a sentence fragment. Please enter a real place name (short, proper noun style).'
+      );
+      return;
+    }
+
+    const poiCategory = prompt('Category (restaurant / hotel / attraction / activity / experience):', 'attraction');
+    if (!poiCategory || !poiCategory.trim()) return;
+
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id;
+      if (!userId) {
+        alert('❌ You are not signed in.');
+        return;
+      }
+
+      const description = String((n.enrichment as any)?.summary || '').trim() || n.text.slice(0, 500);
+      const sourceRefs = Array.isArray((n as any).source_refs) ? (n as any).source_refs : [];
+      const citations = Array.isArray((n as any).citations) ? (n as any).citations : [];
+
+      const { error: insertErr } = await supabase.from('extracted_pois').insert({
+        name: poiName.trim(),
+        destination: n.destination,
+        category: poiCategory.trim(),
+        description,
+        confidence_score: 60,
+        verified: false,
+        enhanced: false,
+        promoted_to_main: false,
+        created_by: userId,
+        source_refs: sourceRefs,
+        citations,
+      });
+      if (insertErr) throw insertErr;
+
+      // Optional: delete nugget after converting (keeps inbox clean)
+      if (confirm('Delete this nugget now that it is converted to a POI?')) {
+        const { error: delErr } = await supabase.from('knowledge_nuggets').delete().eq('id', n.id);
+        if (delErr) console.warn('Failed to delete nugget:', delErr);
+      }
+
+      await fetchNuggets();
+      await fetchPOIs();
+      alert('✅ Converted nugget into a POI draft (now visible in the POI list).');
+    } catch (e: any) {
+      alert(`❌ Convert failed: ${e?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleDeleteNugget = async (n: KnowledgeNugget) => {
+    if (!confirm('Delete this nugget?')) return;
+    try {
+      const { error } = await supabase.from('knowledge_nuggets').delete().eq('id', n.id);
+      if (error) throw error;
+      await fetchNuggets();
+    } catch (e: any) {
+      alert(`❌ Delete failed: ${e?.message || 'Unknown error'}`);
+    }
+  };
 
   // Edit POI
   const handleEdit = (poi: POI) => {
@@ -284,6 +449,20 @@ export default function CaptainBrowsePage() {
     }
   };
 
+  const handleEnrich = async (poi: POI) => {
+    try {
+      const ok = confirm(
+        `Enrich "${poi.name}" with real-time web info (Tavily + Claude)?\n\nThis will fill missing fields + add citations.`
+      );
+      if (!ok) return;
+      await poisAPI.enrichPOI(poi.id, poi.destination ? { destination: poi.destination } : undefined);
+      await fetchPOIs();
+      alert('✅ Enrichment complete! Review the updated fields and verify if correct.');
+    } catch (e: any) {
+      alert(`❌ Enrichment failed: ${e?.message || 'Unknown error'}`);
+    }
+  };
+
   const getQualityFromScore = (score: number): 'excellent' | 'good' | 'fair' | 'poor' => {
     if (score >= 90) return 'excellent';
     if (score >= 80) return 'good';
@@ -366,6 +545,40 @@ export default function CaptainBrowsePage() {
         {/* LIST VIEW */}
         {viewMode === 'list' && (
           <>
+            {/* Section Switcher */}
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSection('pois')}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                    section === 'pois'
+                      ? 'bg-lexa-navy text-white border-lexa-navy'
+                      : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  POIs ({pois.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSection('nuggets')}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                    section === 'nuggets'
+                      ? 'bg-lexa-navy text-white border-lexa-navy'
+                      : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  Nuggets ({nuggets.length})
+                </button>
+              </div>
+
+              <div className="text-sm text-gray-600">
+                {section === 'pois'
+                  ? 'Browse and verify POI drafts before promoting.'
+                  : 'Sentence fragments and signals that need Captain review.'}
+              </div>
+            </div>
+
             {/* Search & Filters */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Search & Filter</h2>
@@ -373,76 +586,105 @@ export default function CaptainBrowsePage() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Search POIs
+                    Search
                   </label>
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Name, description, location..."
+                    placeholder={
+                      section === 'pois' ? 'Name, description, location...' : 'Text, destination, type...'
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Category
-                  </label>
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">All Categories</option>
-                    <option value="restaurant">Restaurant</option>
-                    <option value="hotel">Hotel</option>
-                    <option value="attraction">Attraction</option>
-                    <option value="activity">Activity</option>
-                    <option value="experience">Experience</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quality
-                  </label>
-                  <select
-                    value={qualityFilter}
-                    onChange={(e) => setQualityFilter(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">All Quality</option>
-                    <option value="excellent">Excellent</option>
-                    <option value="good">Good</option>
-                    <option value="fair">Fair</option>
-                    <option value="poor">Poor</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confidence Score
-                  </label>
-                  <select
-                    value={scoreFilter}
-                    onChange={(e) => setScoreFilter(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">All Scores</option>
-                    <option value="high">High (&gt;80%)</option>
-                    <option value="medium">Medium (60-80%)</option>
-                    <option value="low">Low (&lt;60%)</option>
-                  </select>
-                </div>
+
+                {section === 'pois' ? (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                      <select
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="all">All Categories</option>
+                        <option value="restaurant">Restaurant</option>
+                        <option value="hotel">Hotel</option>
+                        <option value="attraction">Attraction</option>
+                        <option value="activity">Activity</option>
+                        <option value="experience">Experience</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Quality</label>
+                      <select
+                        value={qualityFilter}
+                        onChange={(e) => setQualityFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="all">All Quality</option>
+                        <option value="excellent">Excellent</option>
+                        <option value="good">Good</option>
+                        <option value="fair">Fair</option>
+                        <option value="poor">Poor</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Confidence Score</label>
+                      <select
+                        value={scoreFilter}
+                        onChange={(e) => setScoreFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="all">All Scores</option>
+                        <option value="high">High (&gt;80%)</option>
+                        <option value="medium">Medium (60-80%)</option>
+                        <option value="low">Low (&lt;60%)</option>
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Nugget type</label>
+                      <select
+                        value={nuggetTypeFilter}
+                        onChange={(e) => setNuggetTypeFilter(e.target.value as any)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="all">All types</option>
+                        <option value="poi_fragment">POI fragment</option>
+                        <option value="event">Event</option>
+                        <option value="opening_update">Opening update</option>
+                        <option value="pricing_signal">Pricing signal</option>
+                        <option value="brand_signal">Brand signal</option>
+                        <option value="restriction">Restriction</option>
+                        <option value="note">Note</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="text-sm text-gray-600 pt-8">
+                        Tip: Use “⚡ Enrich” to classify and extract facts + citations. Use “Convert to POI” only when you
+                        know the real place name.
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
               
               <div className="mt-4 flex items-center justify-between gap-4">
                 <div className="text-sm text-gray-600">
-                  Showing {filteredPois.length} of {pois.length} POIs
+                  {section === 'pois'
+                    ? `Showing ${filteredPois.length} of ${pois.length} POIs`
+                    : `Showing ${filteredNuggets.length} of ${nuggets.length} nuggets`}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {!loading && stats.total > 0 && (
+                  {section === 'pois' && !loading && stats.total > 0 && (
                     <button
                       type="button"
                       onClick={handleBulkVerifyVisible}
@@ -453,7 +695,7 @@ export default function CaptainBrowsePage() {
                     </button>
                   )}
 
-                  {!loading && stats.total === 0 && (
+                  {section === 'pois' && !loading && stats.total === 0 && (
                     <button
                       type="button"
                       onClick={handleBackfill}
@@ -468,132 +710,209 @@ export default function CaptainBrowsePage() {
               </div>
             </div>
 
-            {/* POI List */}
-            <div className="space-y-4">
-              {filteredPois.length === 0 ? (
-                <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                  <div className="text-6xl mb-4">🔍</div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    No POIs Found
-                  </h3>
-                  <p className="text-gray-600">
-                    {stats.total === 0
-                      ? 'You have no POIs yet. Upload a file / scrape a URL, or import from history.'
-                      : 'Try adjusting your search or filters'}
-                  </p>
-                  {!loading && stats.total === 0 && (
-                    <div className="mt-4">
-                      <button
-                        type="button"
-                        onClick={handleBackfill}
-                        disabled={backfillLoading}
-                        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
-                      >
-                        {backfillLoading ? 'Importing…' : 'Import POIs from History'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                filteredPois.map((poi) => (
-                  <div key={poi.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-xl font-semibold text-gray-900">
-                            {poi.name}
-                          </h3>
-                          {poi.verified && (
-                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-                              ✓ Verified
-                            </span>
-                          )}
-                          {poi.promoted_to_main && (
-                            <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
-                              ★ Promoted
-                            </span>
-                          )}
-                          {poi.enhanced && (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
-                              ✨ Enhanced
-                            </span>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                          <span className="flex items-center gap-1">
-                            📍 {poi.destination || '—'}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            🏷️ {poi.category || '—'}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="text-right">
-                        <div className={`text-2xl font-bold ${getScoreColor(poi.confidence_score)}`}>
-                          {poi.confidence_score}%
-                        </div>
-                        <div className="text-xs text-gray-500">Confidence</div>
-                      </div>
-                    </div>
-                    
-                    <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                      {poi.description || '—'}
+            {section === 'pois' ? (
+              /* POI List */
+              <div className="space-y-4">
+                {filteredPois.length === 0 ? (
+                  <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                    <div className="text-6xl mb-4">🔍</div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No POIs Found</h3>
+                    <p className="text-gray-600">
+                      {stats.total === 0
+                        ? 'You have no POIs yet. Upload a file / scrape a URL, or import from history.'
+                        : 'Try adjusting your search or filters'}
                     </p>
-                    
-                    <div className="flex items-center gap-3 mb-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getQualityColor(getQualityFromScore(poi.confidence_score))}`}>
-                        {getQualityFromScore(poi.confidence_score).toUpperCase()}
-                      </span>
-                      
-                      {poi.luxury_score !== null && poi.luxury_score !== undefined && (
-                        <span className="px-3 py-1 bg-lexa-gold/10 text-lexa-navy rounded-full text-xs font-semibold">
-                          ⭐ Luxury: {poi.luxury_score}
-                        </span>
-                      )}
-                      
-                      {(poi.keywords || []).slice(0, 6).map((tag, idx) => (
-                        <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                    
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <div className="text-xs text-gray-500">
-                        Updated {new Date(poi.updated_at).toLocaleDateString()}
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        {!poi.verified && (
-                          <button
-                            onClick={() => handleVerify(poi)}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
-                          >
-                            ✓ Verify
-                          </button>
-                        )}
-                        {poi.verified && !poi.promoted_to_main && (
-                          <button
-                            onClick={() => handlePromote(poi)}
-                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors"
-                          >
-                            ★ Promote
-                          </button>
-                        )}
+                    {!loading && stats.total === 0 && (
+                      <div className="mt-4">
                         <button
-                          onClick={() => handleEdit(poi)}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                          type="button"
+                          onClick={handleBackfill}
+                          disabled={backfillLoading}
+                          className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
                         >
-                          ✏️ Edit & Enhance
+                          {backfillLoading ? 'Importing…' : 'Import POIs from History'}
                         </button>
                       </div>
-                    </div>
+                    )}
                   </div>
-                ))
-              )}
-            </div>
+                ) : (
+                  filteredPois.map((poi) => {
+                    const badName = looksLikeBadPoiName(poi.name);
+                    return (
+                      <div
+                        key={poi.id}
+                        className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-xl font-semibold text-gray-900">{poi.name}</h3>
+                              {poi.verified && (
+                                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                                  ✓ Verified
+                                </span>
+                              )}
+                              {poi.promoted_to_main && (
+                                <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
+                                  ★ Promoted
+                                </span>
+                              )}
+                              {poi.enhanced && (
+                                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                                  ✨ Enhanced
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                              <span className="flex items-center gap-1">📍 {poi.destination || '—'}</span>
+                              <span className="flex items-center gap-1">🏷️ {poi.category || '—'}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <div className={`text-2xl font-bold ${getScoreColor(poi.confidence_score)}`}>
+                              {poi.confidence_score}%
+                            </div>
+                            <div className="text-xs text-gray-500">Confidence</div>
+                          </div>
+                        </div>
+
+                        <p className="text-gray-700 text-sm mb-4 leading-relaxed">{poi.description || '—'}</p>
+
+                        <div className="flex items-center gap-3 mb-4">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${getQualityColor(
+                              getQualityFromScore(poi.confidence_score)
+                            )}`}
+                          >
+                            {getQualityFromScore(poi.confidence_score).toUpperCase()}
+                          </span>
+
+                          {poi.luxury_score !== null && poi.luxury_score !== undefined && (
+                            <span className="px-3 py-1 bg-lexa-gold/10 text-lexa-navy rounded-full text-xs font-semibold">
+                              ⭐ Luxury: {poi.luxury_score}
+                            </span>
+                          )}
+
+                          {(poi.keywords || []).slice(0, 6).map((tag, idx) => (
+                            <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                          <div className="text-xs text-gray-500">
+                            Updated {new Date(poi.updated_at).toLocaleDateString()}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEnrich(poi)}
+                              disabled={badName}
+                              className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={
+                                badName
+                                  ? 'Fix the POI name first (it currently looks like a sentence fragment). Click "Edit & Enhance" and replace it with the real place name.'
+                                  : 'Auto-fill missing data using Tavily + Claude (with citations).'
+                              }
+                            >
+                              ⚡ Enrich
+                            </button>
+                            {!poi.verified && (
+                              <button
+                                onClick={() => handleVerify(poi)}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
+                              >
+                                ✓ Verify
+                              </button>
+                            )}
+                            {poi.verified && !poi.promoted_to_main && (
+                              <button
+                                onClick={() => handlePromote(poi)}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors"
+                              >
+                                ★ Promote
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleEdit(poi)}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                            >
+                              ✏️ Edit & Enhance
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              /* Nuggets List */
+              <div className="space-y-4">
+                {nuggetsLoading ? (
+                  <div className="bg-white rounded-lg shadow-sm p-12 text-center text-gray-600">Loading nuggets…</div>
+                ) : filteredNuggets.length === 0 ? (
+                  <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                    <div className="text-6xl mb-4">📥</div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No Nuggets</h3>
+                    <p className="text-gray-600">When ingestion finds “sentence fragment POIs”, they will show up here.</p>
+                  </div>
+                ) : (
+                  filteredNuggets.map((n) => (
+                    <div
+                      key={n.id}
+                      className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between gap-6">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                              {n.nugget_type}
+                            </span>
+                            <span className="text-sm text-gray-600">📍 {n.destination || '—'}</span>
+                            <span className="text-xs text-gray-500">
+                              Updated {new Date(n.updated_at).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          <div className="text-gray-900 font-semibold mb-2">
+                            Suggested POI: {String((n.enrichment as any)?.suggested_poi_name || '—')}
+                          </div>
+
+                          <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                            {n.text.length > 600 ? `${n.text.slice(0, 600)}…` : n.text}
+                          </p>
+                        </div>
+
+                        <div className="shrink-0 flex flex-col gap-2">
+                          <button
+                            onClick={() => handleNuggetEnrich(n)}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-60"
+                          >
+                            ⚡ Enrich
+                          </button>
+                          <button
+                            onClick={() => handleConvertNuggetToPoi(n)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
+                          >
+                            ✨ Convert to POI
+                          </button>
+                          <button
+                            onClick={() => handleDeleteNugget(n)}
+                            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg text-sm font-semibold hover:bg-gray-300 disabled:opacity-60"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </>
         )}
 

@@ -32,6 +32,7 @@ LEXA is a production-ready conversational AI agent for luxury travel experience 
 ✅ **User Management** - Admin-controlled user creation with roles  
 ✅ **Neo4j Knowledge Graph** - Structured knowledge storage with relationships  
 ✅ **AI-Powered Extraction** - Claude AI extracts structured data from unstructured content  
+✅ **Knowledge Nuggets Inbox** - Keeps valuable sentence fragments/events/signals (not valid POIs yet) for Captain review + enrichment  
 
 ---
 

@@ -49,11 +49,13 @@ export async function GET(req: NextRequest) {
         `
         MATCH (p:poi)
         WHERE p.source = 'manual'
+        OPTIONAL MATCH (p)-[:LOCATED_IN]->(d:destination)
+        OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
         RETURN
           p.poi_uid as poi_uid,
           p.name as name,
           p.type as type,
-          p.destination_name as destination_name,
+          coalesce(mvp.name, d.name, p.destination_name) as destination_name,
           coalesce(p.confidence_score, null) as confidence_score,
           p.website_url as website_url,
           p.created_at as created_at,

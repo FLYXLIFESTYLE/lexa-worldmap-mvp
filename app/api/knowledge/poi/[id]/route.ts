@@ -8,6 +8,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
 import { createClient } from '@/lib/supabase/server';
+import {
+  CITY_TO_MVP_DESTINATION,
+  destinationKindForName,
+  resolveCanonicalDestination,
+  slugifyDestination,
+} from '@/lib/neo4j/destination-resolver';
 
 export const runtime = 'nodejs';
 
@@ -75,16 +81,19 @@ export async function GET(
         `
         MATCH (p:poi {poi_uid: $id})
         
-        OPTIONAL MATCH (p)-[:located_in]->(d:destination)
-        OPTIONAL MATCH (p)-[:has_theme]->(t:theme)
-        OPTIONAL MATCH (p)-[:supports_activity]->(a:activity_type)
-        OPTIONAL MATCH (p)-[:evokes]->(e:Emotion)
+        OPTIONAL MATCH (p)-[:LOCATED_IN]->(d:destination)
+        OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
+        OPTIONAL MATCH (p)-[:HAS_THEME]->(t:theme_category)
+        OPTIONAL MATCH (p)-[:SUPPORTS_ACTIVITY]->(a:activity_type)
+        OPTIONAL MATCH (p)-[:EVOKES]->(et:EmotionalTag)
+        OPTIONAL MATCH (p)-[:EVOKES_EMOTION]->(e:Emotion)
         
         RETURN p,
-               collect(DISTINCT d.name) as destinations,
+               collect(DISTINCT coalesce(mvp.name, d.name)) as destinations,
                collect(DISTINCT t.name) as themes,
                collect(DISTINCT a.name) as activities,
-               collect(DISTINCT e.name) as emotions
+               collect(DISTINCT et.name) as emotional_tags,
+               collect(DISTINCT e.code) as emotions
         `,
         { id }
       );
@@ -142,7 +151,10 @@ export async function GET(
           destinations: record.get('destinations').filter((d: string) => d),
           themes: record.get('themes').filter((t: string) => t),
           activities: record.get('activities').filter((a: string) => a),
-          emotions: record.get('emotions').filter((e: string) => e),
+          emotions: [
+            ...record.get('emotional_tags').filter((x: string) => x),
+            ...record.get('emotions').filter((x: string) => x),
+          ],
         },
       };
 
@@ -288,17 +300,56 @@ export async function PATCH(
 
       // If destination_name was updated, keep located_in relationship consistent (best effort)
       if (updateFields.destination_name) {
+        const destName = String(updateFields.destination_name);
+        const kind = destinationKindForName(destName);
+        const canonicalId = slugifyDestination(destName);
+        const parentDestination = CITY_TO_MVP_DESTINATION[destName] ?? null;
+        const resolved = resolveCanonicalDestination(destName);
         try {
           await session.run(
             `
             MATCH (p:poi {poi_uid: $id})
-            OPTIONAL MATCH (p)-[r:located_in]->(:destination)
+            OPTIONAL MATCH (p)-[r:LOCATED_IN]->(:destination)
             DELETE r
             WITH p
             MERGE (d:destination {name: $destination_name})
-            MERGE (p)-[:located_in]->(d)
+            SET
+              d.kind = CASE WHEN d.kind IS NULL OR d.kind <> $kind THEN $kind ELSE d.kind END,
+              d.canonical_id = CASE
+                WHEN d.canonical_id IS NULL OR trim(toString(d.canonical_id)) = '' THEN $canonical_id
+                WHEN toString(d.canonical_id) =~ '(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN $canonical_id
+                ELSE d.canonical_id
+              END,
+              d.updated_at = datetime($now)
+            MERGE (p)-[:LOCATED_IN]->(d)
+
+            WITH d
+            CALL {
+              WITH d
+              WITH d WHERE $parent_destination IS NOT NULL
+              MERGE (mvp:destination {name: $parent_destination})
+              SET
+                mvp.kind = CASE WHEN mvp.kind IS NULL OR mvp.kind <> 'mvp_destination' THEN 'mvp_destination' ELSE mvp.kind END,
+                mvp.canonical_id = CASE
+                  WHEN mvp.canonical_id IS NULL OR trim(toString(mvp.canonical_id)) = '' THEN $parent_canonical_id
+                  WHEN toString(mvp.canonical_id) =~ '(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN $parent_canonical_id
+                  ELSE mvp.canonical_id
+                END,
+                mvp.updated_at = datetime($now)
+              MERGE (d)-[:IN_DESTINATION]->(mvp)
+              RETURN 1 AS linked
+            }
             `,
-            { id, destination_name: updateFields.destination_name }
+            {
+              id,
+              destination_name: destName,
+              kind,
+              canonical_id: canonicalId,
+              parent_destination: parentDestination,
+              parent_canonical_id: parentDestination ? slugifyDestination(parentDestination) : null,
+              canonical_destination: resolved.canonical || null,
+              now: new Date().toISOString(),
+            }
           );
         } catch {
           // ignore

@@ -181,12 +181,12 @@ Luxury Hotels 2026" - provide rich insights, not just raw data.
 ### EXTRACTION STANDARDS:
 
 **MINIMUM Quality:**
-- At least 3 emotions per experience (with intensities 1-10)
+- At least 3 EmotionalTags per experience (with intensities 1-10)
 - At least 1 client archetype match (with match score and reasoning)
 - Clear evidence citations from source
 
 **GOLD Standard (aim for this):**
-- 5-7 emotions per experience with intensities + evidence
+- 5-7 EmotionalTags per experience with intensities + evidence
 - 2-3 client archetype matches with match scores
 - Trend analysis (what shift it exemplifies)
 - Conversation trigger examples
@@ -196,9 +196,9 @@ Luxury Hotels 2026" - provide rich insights, not just raw data.
 
 Be EXTREMELY thorough - extract EVERYTHING mentioned, even if it seems minor.
 
-Return ONLY valid JSON with this structure:
+Return ONLY valid JSON with this structure (contract-aligned):
 {{
-  "extraction_summary": "Perfect! I've extracted [X hotels/experiences] with [Y emotions mapped], [Z client archetypes]...",
+  "extraction_summary": "Perfect! I've extracted [X hotels/experiences] with [Y emotional mappings], [Z client archetypes]...",
   "pois": [
     {{
       "name": "Full name (e.g., 'Diriyah Palace', 'Zannier Bendor')",
@@ -206,9 +206,9 @@ Return ONLY valid JSON with this structure:
       "location": "City/region (e.g., 'Riyadh, Saudi Arabia', 'Provence, France')",
       "description": "What makes it special, historical context, unique features",
       "emotional_map": [
-        {{"emotion": "Prestige", "intensity": 10, "evidence": "Former royal residence, King's home"}},
-        {{"emotion": "Exclusivity", "intensity": 10, "evidence": "70 rooms, palace hosts, private spa suites"}},
-        {{"emotion": "Discovery", "intensity": 9, "evidence": "First public access to royal palace"}}
+        {{"kind": "EmotionalTag", "name": "Prestige", "intensity_1_10": 10, "evidence": "Former royal residence, King's home", "confidence_0_1": 0.85}},
+        {{"kind": "EmotionalTag", "name": "Exclusivity", "intensity_1_10": 10, "evidence": "70 rooms, palace hosts, private spa suites", "confidence_0_1": 0.85}},
+        {{"kind": "EmotionalTag", "name": "Discovery", "intensity_1_10": 9, "evidence": "First public access to royal palace", "confidence_0_1": 0.75}}
       ],
       "client_archetypes": [
         {{
@@ -256,7 +256,7 @@ Document content:
 
 ## EXTRACTION RULES:
 
-### 1. HOTELS/POIS - Extract with Emotional Intelligence
+### 1. HOTELS/POIS - Extract with EmotionalTag Intelligence
 For EACH hotel, resort, venue, or significant location:
 {{
   "name": "Full name",
@@ -264,7 +264,7 @@ For EACH hotel, resort, venue, or significant location:
   "location": "City, Country or Region",
   "description": "What makes it special - include historical context, unique features, cultural significance",
   "emotional_map": [
-    {{"emotion": "Prestige|Exclusivity|Discovery|etc.", "intensity": 1-10, "evidence": "Quote from source"}}
+    {{"kind": "EmotionalTag", "name": "Prestige|Exclusivity|Discovery|etc.", "intensity_1_10": 1-10, "evidence": "Quote from source", "confidence_0_1": 0.6}}
   ],
   "client_archetypes": [
     {{
@@ -293,11 +293,11 @@ Output:
   "location": "Riyadh, Saudi Arabia",
   "description": "Former royal residence of King Abdulaziz Al Saud (founding father of Saudi Arabia), converted to 70-room luxury hotel. Art Deco architecture, scented with Taif rose, private spa suites.",
   "emotional_map": [
-    {{"emotion": "Prestige", "intensity": 10, "evidence": "Literal royal palace, founding father's home"}},
-    {{"emotion": "Exclusivity", "intensity": 10, "evidence": "Only 70 rooms, palace hosts, private spa suites"}},
-    {{"emotion": "Legacy", "intensity": 9, "evidence": "National historic significance, royal celebrations"}},
-    {{"emotion": "Discovery", "intensity": 9, "evidence": "First public access to royal residence"}},
-    {{"emotion": "Indulgence", "intensity": 9, "evidence": "Palace hosts cater to every request, Taif rose scenting"}}
+    {{"kind": "EmotionalTag", "name": "Prestige", "intensity_1_10": 10, "evidence": "Literal royal palace, founding father's home", "confidence_0_1": 0.9}},
+    {{"kind": "EmotionalTag", "name": "Exclusivity", "intensity_1_10": 10, "evidence": "Only 70 rooms, palace hosts, private spa suites", "confidence_0_1": 0.85}},
+    {{"kind": "EmotionalTag", "name": "Legacy", "intensity_1_10": 9, "evidence": "National historic significance, royal celebrations", "confidence_0_1": 0.8}},
+    {{"kind": "EmotionalTag", "name": "Discovery", "intensity_1_10": 9, "evidence": "First public access to royal residence", "confidence_0_1": 0.75}},
+    {{"kind": "EmotionalTag", "name": "Indulgence", "intensity_1_10": 9, "evidence": "Palace hosts cater to every request, Taif rose scenting", "confidence_0_1": 0.7}}
   ],
   "client_archetypes": [
     {{
@@ -321,7 +321,7 @@ Output:
   "category": "accommodation"
 }}
 
-### 2. EXPERIENCES - Extract with Emotional Mapping
+### 2. EXPERIENCES - Extract with EmotionalTag Mapping
 For EACH experience, activity, treatment, or moment:
 {{
   "experience_title": "Descriptive name",
@@ -330,7 +330,7 @@ For EACH experience, activity, treatment, or moment:
   "location": "Where it takes place",
   "duration": "If mentioned",
   "emotional_map": [
-    {{"emotion": "Indulgence|Serenity|Discovery|etc.", "intensity": 1-10, "evidence": "Why this emotion is evoked"}}
+    {{"kind": "EmotionalTag", "name": "Indulgence|Romance|Discovery|etc.", "intensity_1_10": 1-10, "evidence": "Why this is evoked", "confidence_0_1": 0.6}}
   ],
   "client_archetypes": [
     {{"archetype": "Who would love this", "match_score": 0-100, "why": "Specific appeal"}}

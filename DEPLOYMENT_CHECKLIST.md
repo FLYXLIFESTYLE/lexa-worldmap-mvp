@@ -50,6 +50,8 @@ Quick checklist for deploying to production.
 - [ ] Supabase project created
 - [ ] Migration `001_lexa_schema.sql` run
 - [ ] Migration `create_captain_profiles.sql` run
+- [ ] Migration `021_knowledge_nuggets.sql` run (Knowledge Nuggets inbox)
+- [ ] Migration `023_experience_entity_destination_links.sql` run (Destination membership + per-destination source counts)
 - [ ] Storage bucket `public` created
 - [ ] Storage bucket is **public**
 - [ ] Email templates configured

@@ -31,6 +31,33 @@
 
 ## Recent Major Changes
 
+### January 2026 - LEXA Brain Hardening (Neo4j alignment) ✅/⏳
+
+**What we discovered in Neo4j (important):**
+1. **Destination nodes are overloaded + duplicated**
+   - `:destination` currently mixes **MVP yacht destinations**, **cities** (e.g., Monaco), and some “bounds” style nodes.
+   - This causes duplicates (Monaco twice) and wrong UX (cities showing up as “destinations”).
+2. **Two parallel emotional systems exist**
+   - `:Emotion` exists both as **canonical** (`code`, `layer: LEXA_TAXONOMY`) and **legacy/freeform** (`name` only).
+   - `:EmotionalTag` is a UX tagging layer with `category` (Primary Emotion / Trigger / Desire) and optional `intensity`.
+   - **Decision**: keep `Emotion` and `EmotionalTag` separate, but add an explicit mapping layer so agents stop creating duplicates.
+3. **Two parallel category systems exist**
+   - `:theme_category` = the **14 core themes** used in Chat + Script Engine (high-level “why/vibe”).
+   - `:occasion_type` = a **facet/filter system** (e.g., Accessible, Photography-Worthy, Water-Based).
+   - **Decision**: do not merge; keep both and optionally map.
+
+**New hardening direction (before building new features):**
+- **Destination hierarchy**:
+  - 12 MVP destinations (Set A): French Riviera; Amalfi Coast; Balearics; Cyclades; Adriatic North; Adriatic Central; Adriatic South; Ionian Sea; Bahamas; BVI; USVI; French Antilles
+  - Cities like Monaco/St. Tropez become `kind:'city'` and link into the MVP destination (e.g., Monaco → French Riviera)
+  - One-time scripts:
+    - `docs/neo4j-taxonomy-constraints.cypher` (uniqueness constraints for taxonomy nodes)
+    - `docs/neo4j-destination-normalization.cypher` (types the 12 MVP destinations + key cities and links city→MVP via `IN_DESTINATION`)
+- **Relationship-first graph writes** (no more “arrays only”):
+  - Promote/ingest should write `HAS_THEME`, `EVOKES`, `SUPPORTS_ACTIVITY`, `FITS_OCCASION`, `TAGGED_WITH` with confidence + evidence.
+- **No Foursquare + no paid enrichment APIs for MVP**:
+  - Open sources + scraping + manual enrichment only (investor-safe and legally safer).
+
 ### January 2026 - Captain Approval + Promotion + Unified Portal UI ✅
 
 **What changed (high impact):**
@@ -70,6 +97,8 @@
 ### December 2025 - POI Collection System & Production Deployment
 
 **MAJOR ADDITION: Automated POI Collection System** ✅
+
+**Note (Jan 2026 policy update):** This Google Places-based system exists, but **is optional/deferred** for the MVP brain hardening track because the current policy is **no paid enrichment APIs** for MVP. The investor-safe MVP path is open sources + scraping + manual enrichment, with clear provenance.
 
 **What Was Built:**
 1. **POI Collection Dashboard** (`/admin/poi-collection`)
@@ -298,11 +327,11 @@ User feedback: *"LEXA is focused too much on reading between the lines than actu
 5. **Claude 3.5 Sonnet**: Emotional intelligence conversation
 
 ### Data Strategy:
-1. **Google Places as Primary Source**: Real-time, accurate, comprehensive
-2. **Luxury-Only Focus**: Filter out low-rated, budget POIs
-3. **Emotional Tagging**: Every POI linked to themes
-4. **Yacht Destinations Priority**: High luxury confidence, proven markets
-5. **French Riviera First**: Test market for enrichment pipeline
+1. **Open/free sources + owned inputs for MVP**: Open data (OSM/Overture/Wikidata) + uploads + scraping + manual enrichment
+2. **No Foursquare + no paid enrichment APIs for MVP**: Defer paid APIs (Google Places, etc.) to post-investor / paid-tier phase
+3. **Luxury-Only Focus**: Filter out low-quality POIs; require named+reviewable records
+4. **Explainable Emotional Layer**: Use relationship edges with evidence/confidence (EVOKES/HAS_THEME/etc.)
+5. **Yacht Destinations Priority**: MVP stays yacht-first with the 12 destinations as the top-level backbone
 
 ### User Communication Style:
 - **Beginner-Friendly**: User has never coded

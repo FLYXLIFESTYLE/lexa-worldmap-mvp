@@ -11,13 +11,17 @@ Important policy decisions for MVP:
 - **Avoid unnamed POIs**: do not ingest/create POIs that cannot be reviewed and approved.
 - **Auto-merge** only when match confidence is high; otherwise require manual review.
 
+See also:
+- **Field allowlist + retention policy**: [`docs/LEXA_BRAIN_FIELD_ALLOWLIST_POLICY.md`](docs/LEXA_BRAIN_FIELD_ALLOWLIST_POLICY.md)
+- **Canonical POI contract (Step 2)**: [`docs/LEXA_CANONICAL_POI_CONTRACT.md`](docs/LEXA_CANONICAL_POI_CONTRACT.md)
+
 ---
 
 ## 1) Core principle: a POI must be reviewable
 
 If a record cannot be reviewed and approved by a human, it does not belong in the Brain.
 
-### Hard rejection (do not store / do not queue for approval)
+### Hard rejection (do not store)
 A generated/extracted POI should be **dropped** if any of the following are true:
 - **Name is missing or empty**
 - **Name is clearly a placeholder** (e.g., "Unnamed", "Unknown", "N/A")
@@ -25,6 +29,18 @@ A generated/extracted POI should be **dropped** if any of the following are true
 - **No type/category** that can be mapped into our POI types
 
 Rationale: you cannot approve, score, or relate these reliably.
+
+### Route-to-nugget (do not create a POI, but do not lose the information)
+Some “POIs” coming from uploads/scrapes are actually **valuable sentence fragments** (e.g., “by the French family behind Pernod Ricard…”).
+
+Policy:
+- If `name` **looks like a sentence/paragraph fragment**, we do **NOT** store it as a POI draft.
+- Instead, we store it as a **Knowledge Nugget** in `knowledge_nuggets` so it can be enriched, classified, and (optionally) converted to a real POI by a Captain.
+
+Captain workflow:
+- Review nuggets in **Captain Portal → Browse, Verify & Enhance → Nuggets tab**
+- Use **⚡ Enrich** to extract structured facts + citations
+- Use **✨ Convert to POI** only after confirming the real place name
 
 ---
 

@@ -64,11 +64,14 @@ export async function GET(req: NextRequest) {
       const candidateLimit = Math.min(200, Math.max(limit * 10, 50));
       let cypherQuery = `
         MATCH (p:poi)
+        OPTIONAL MATCH (p)-[:LOCATED_IN]->(d:destination)
+        OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
+        WITH p, coalesce(mvp.name, d.name, p.destination_name) AS dest_name
         WHERE (
           toLower(p.name) CONTAINS toLower($query)
           OR replace(replace(replace(replace(toLower(p.name),' ',''),'-',''),'.',''),'\'','') CONTAINS $q_norm
-          OR toLower(p.destination_name) CONTAINS toLower($query)
-          OR toLower(p.type) CONTAINS toLower($query)
+          OR toLower(coalesce(dest_name,'')) CONTAINS toLower($query)
+          OR toLower(coalesce(p.type, p.category, '')) CONTAINS toLower($query)
         )
       `;
 
@@ -80,7 +83,7 @@ export async function GET(req: NextRequest) {
       } = { query, q_norm: qNorm, limit: candidateLimit };
 
       if (destination) {
-        cypherQuery += ` AND toLower(p.destination_name) = toLower($destination)`;
+        cypherQuery += ` AND toLower(coalesce(dest_name,'')) = toLower($destination)`;
         params.destination = destination;
       }
 
@@ -88,7 +91,7 @@ export async function GET(req: NextRequest) {
         RETURN p.poi_uid as poi_uid,
                p.name as name,
                p.type as type,
-               p.destination_name as destination_name,
+               dest_name as destination_name,
                p.lat as lat,
                p.lon as lon,
                coalesce(p.luxury_score_verified, null) as luxury_score_verified,

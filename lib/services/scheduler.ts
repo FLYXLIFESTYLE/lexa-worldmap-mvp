@@ -13,6 +13,15 @@ let scheduledTask: ReturnType<typeof cron.schedule> | null = null;
  * Schedules data quality check to run at midnight every day
  */
 export function initializeScheduler(): void {
+  // For local development, we keep the dev server stable by default.
+  // The data quality job can be heavy (Neo4j memory/timeouts) and isn't needed for UI work.
+  // Enable it explicitly in production (or locally) by setting:
+  //   ENABLE_DATA_QUALITY_SCHEDULER=true
+  if (process.env.ENABLE_DATA_QUALITY_SCHEDULER !== 'true') {
+    console.log('[Scheduler] Disabled (set ENABLE_DATA_QUALITY_SCHEDULER=true to enable)');
+    return;
+  }
+
   if (scheduledTask) {
     console.log('[Scheduler] Already initialized');
     return;

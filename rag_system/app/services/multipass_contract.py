@@ -23,10 +23,20 @@ class Citation(TypedDict, total=False):
 
 
 class EmotionSignal(TypedDict, total=False):
+    """
+    Canonical emotional signal.
+
+    IMPORTANT:
+    - LEXA’s 9 “core dimensions” (Prestige/Exclusivity/Discovery/...) should be represented as
+      kind='EmotionalTag', NOT Neo4j kind='Emotion'.
+    - Neo4j `:Emotion` is code-based (AWE, PEACE, etc.) and can be added optionally.
+    """
+    kind: Literal["EmotionalTag", "Emotion", "Desire", "Fear"]
+    code: str                 # optional for canonical taxonomies (Emotion/Desire/Fear)
     name: str
-    intensity: int             # 1–10
+    intensity_1_10: int        # 1–10
     evidence: str
-    confidence: float          # 0–1
+    confidence_0_1: float      # 0–1
     citations: List[Citation]
 
 
@@ -47,7 +57,7 @@ class Venue(TypedDict, total=False):
     kind: str                  # restaurant|hotel|spa|beach|venue|provider|palace|private_island
     location: str
     description: str
-    emotional_map: List[EmotionSignal]  # NEW: Map to LEXA's 9 emotions with intensities
+    emotional_map: List[EmotionSignal]  # Map to LEXA EmotionalTags (and optional Emotion codes)
     client_archetypes: List[Dict]       # NEW: Which archetypes would love this
     room_count: Optional[int]           # NEW: For hotels/resorts
     opening_date: Optional[str]         # NEW: For new properties
@@ -178,7 +188,7 @@ def describe_contract() -> Dict[str, object]:
         "passes": ["outline", "expand", "validate", "report"],
         "package_fields": {
             "experience_overview": "Short narrative of what this experience/product is.",
-            "emotional_map": "List of emotions with intensity 1–10, evidence, citations, confidence. Use LEXA's 9 core emotions.",
+            "emotional_map": "List of emotional signals with intensity 1–10, evidence, citations, confidence. Use LEXA EmotionalTags (9 core dimensions) and optionally Neo4j Emotion codes.",
             "sub_experiences": "50+ possible moments/activities with emotional mapping for each.",
             "destinations": "Cities/regions with emotional mapping.",
             "venues": "Hotels/restaurants/spas with MANDATORY emotional_map (intensities 1-10) and client_archetypes (match scores 0-100).",

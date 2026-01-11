@@ -17,7 +17,7 @@
 - [x] Copy consistency updates (remove em-dash, update landing page messaging)
 
 ### Theme System
-- [x] 12 core theme categories defined
+- [x] 14 core theme categories defined (incl. Nightlife & Entertainment, Sports & Active)
 - [x] Theme seeding API (`/api/admin/seed-themes`)
 - [x] ThemeSelector component with images
 - [x] Unsplash image integration (next.config.ts)
@@ -33,8 +33,15 @@
 - [x] 14 theme categories in graph
 - [x] 350+ yacht destinations uploaded
 - [x] Luxury scoring algorithm implemented
-- [x] Google Places API integration
+- [x] Google Places API integration (legacy/optional; not required for MVP brain hardening)
 - [x] Google Vision API (OCR) integration
+- [x] Brain data requirements doc created (`docs/LEXA_BRAIN_DATA_REQUIREMENTS.md`)
+- [x] Supabase migration created to store investor-grade POI fields first-class (`supabase/migrations/020_extracted_pois_brain_fields.sql`)
+- [x] Storage mapper updated to write those new fields (`rag_system/app/services/intelligence_storage.py`)
+- [x] Foursquare ingestion removed from destination ingest script (legal-safe MVP policy)
+- [x] Neo4j taxonomy constraints script added (`docs/neo4j-taxonomy-constraints.cypher`)
+- [x] Neo4j destination normalization script added (`docs/neo4j-destination-normalization.cypher`)
+- [x] Promotion writes typed destinations (MVP destinations vs cities) + city→MVP links (Monaco/St. Tropez etc.)
 
 ### Admin Portal
 - [x] Admin navigation component
@@ -95,6 +102,9 @@
 - [x] Theme-Led Conversation guide
 - [x] Context Memory System documented
 - [x] POI Data Requirements defined
+- [x] Field allowlist + retention policy defined (`docs/LEXA_BRAIN_FIELD_ALLOWLIST_POLICY.md`)
+- [x] Canonical POI contract defined (`docs/LEXA_CANONICAL_POI_CONTRACT.md`)
+- [x] Brain hardening plan updated to reflect Neo4j taxonomy + destination issues
 - [x] Google Places enrichment guide
 - [x] Safe theme migration guide
 - [x] Yacht destinations Q&A
@@ -108,6 +118,8 @@
 - Crawl provider URLs (with sub-pages) + file uploads
 - Multi-pass extraction (outline → expand → validate/dedupe → report)
 - Confidence scoring; >80% only after captain approval
+- **Neo4j retrieval query updates**: update retrieval to prefer `(:destination {kind:'mvp_destination'})` and handle city→MVP traversal via `IN_DESTINATION`
+- **Data quality extension**: detect/merge duplicate destinations + manage legacy taxonomy aliases (if needed)
 - Write canonical nodes/edges to Neo4j; audit trail + embeddings in Postgres/pgvector
 - Separate real counts vs. estimated potential coverage; source-backed claims only
 
@@ -119,7 +131,7 @@
 ### High Priority (Goal 3: Grounded Retrieval & Recommendations)
 - Hybrid Neo4j + pgvector retrieval (next)
 - Ranking by confidence + emotion fit + captain verification (partially implemented: Neo4j grounding + POI verification/promotion)
-- Explainable recommendations with citations (next)
+- Explainable recommendations with citations (next; relies on relationship edges + stored evidence)
 
 ### Revenue Workstreams (Planned)
 - Upsell system: Tiered scripts → day-by-day → booking links/coords → planning → white glove concierge

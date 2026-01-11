@@ -1124,11 +1124,14 @@ async def neo4j_quality_report(destination: str = "French Riviera", limit: int =
         destinations = await neo4j_client.execute_query(
             """
             MATCH (poi:poi)
-            WHERE poi.destination_name IS NOT NULL
-            RETURN poi.destination_name AS destination,
+            OPTIONAL MATCH (poi)-[:LOCATED_IN]->(d:destination)
+            OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
+            WITH poi, coalesce(mvp.name, d.name, poi.destination_name) AS destination
+            WHERE destination IS NOT NULL
+            RETURN destination AS destination,
                    count(poi) AS total_pois,
-                   sum(CASE WHEN poi.luxury_score >= 0.5 THEN 1 ELSE 0 END) AS luxury_pois,
-                   sum(CASE WHEN poi.google_place_id IS NOT NULL THEN 1 ELSE 0 END) AS google_enriched,
+                   sum(CASE WHEN coalesce(poi.luxury_score_verified, poi.luxury_score_base, poi.luxury_score, poi.luxuryScore) >= 7 THEN 1 ELSE 0 END) AS luxury_pois,
+                   sum(CASE WHEN poi.google_place_id IS NOT NULL OR poi.place_id IS NOT NULL THEN 1 ELSE 0 END) AS google_enriched,
                    sum(CASE WHEN poi.google_rating IS NOT NULL THEN 1 ELSE 0 END) AS with_ratings
             ORDER BY luxury_pois DESC
             LIMIT $limit
@@ -1140,9 +1143,12 @@ async def neo4j_quality_report(destination: str = "French Riviera", limit: int =
         coverage = await neo4j_client.execute_query(
             """
             MATCH (poi:poi)
-            WHERE poi.destination_name = $destination
+            OPTIONAL MATCH (poi)-[:LOCATED_IN]->(d:destination)
+            OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
+            WITH poi, coalesce(mvp.name, d.name, poi.destination_name) AS dest
+            WHERE toLower(dest) = toLower($destination)
             WITH count(poi) AS total,
-                 sum(CASE WHEN poi.luxury_score >= 0.5 THEN 1 ELSE 0 END) AS luxury_pois,
+                 sum(CASE WHEN coalesce(poi.luxury_score_verified, poi.luxury_score_base, poi.luxury_score, poi.luxuryScore) >= 7 THEN 1 ELSE 0 END) AS luxury_pois,
                  sum(CASE WHEN poi.google_place_id IS NULL THEN 1 ELSE 0 END) AS missing_google_place_id,
                  sum(CASE WHEN poi.google_rating IS NULL THEN 1 ELSE 0 END) AS missing_google_rating,
                  sum(CASE WHEN poi.personality_romantic IS NULL THEN 1 ELSE 0 END) AS missing_personality_scores
@@ -1159,8 +1165,11 @@ async def neo4j_quality_report(destination: str = "French Riviera", limit: int =
         link_coverage = await neo4j_client.execute_query(
             """
             MATCH (poi:poi)
-            WHERE poi.destination_name = $destination
-            OPTIONAL MATCH (poi)-[:OFFERS]->(a:activity_type)
+            OPTIONAL MATCH (poi)-[:LOCATED_IN]->(d:destination)
+            OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
+            WITH poi, coalesce(mvp.name, d.name, poi.destination_name) AS dest
+            WHERE toLower(dest) = toLower($destination)
+            OPTIONAL MATCH (poi)-[:SUPPORTS_ACTIVITY]->(a:activity_type)
             OPTIONAL MATCH (a)-[:EVOKES]->(e:EmotionalTag)
             OPTIONAL MATCH (a)-[:APPEALS_TO]->(ca:ClientArchetype)
             WITH poi,
@@ -1180,7 +1189,10 @@ async def neo4j_quality_report(destination: str = "French Riviera", limit: int =
         duplicates = await neo4j_client.execute_query(
             """
             MATCH (poi:poi)
-            WHERE poi.destination_name = $destination AND poi.name IS NOT NULL
+            OPTIONAL MATCH (poi)-[:LOCATED_IN]->(d:destination)
+            OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
+            WITH poi, coalesce(mvp.name, d.name, poi.destination_name) AS dest
+            WHERE toLower(dest) = toLower($destination) AND poi.name IS NOT NULL
             WITH toLower(trim(poi.name)) AS norm_name, count(*) AS c
             WHERE c > 1
             RETURN norm_name AS name, c AS count

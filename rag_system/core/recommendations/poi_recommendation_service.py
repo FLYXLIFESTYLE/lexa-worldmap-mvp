@@ -15,6 +15,40 @@ from core.ailessia.weighted_archetype_calculator import (
 
 logger = structlog.get_logger()
 
+MVP_DESTINATIONS = {
+    "French Riviera",
+    "Amalfi Coast",
+    "Balearics",
+    "Cyclades",
+    "Adriatic North",
+    "Adriatic Central",
+    "Adriatic South",
+    "Ionian Sea",
+    "Bahamas",
+    "BVI",
+    "USVI",
+    "French Antilles",
+}
+
+CITY_TO_MVP_DESTINATION = {
+    "Monaco": "French Riviera",
+    "St. Tropez": "French Riviera",
+    "Cannes": "French Riviera",
+    "Nice": "French Riviera",
+}
+
+
+def resolve_destination_terms(destination: str) -> List[str]:
+    raw = (destination or "").strip()
+    if not raw:
+        return []
+    if raw in MVP_DESTINATIONS:
+        return [raw]
+    parent = CITY_TO_MVP_DESTINATION.get(raw)
+    if parent:
+        return [raw, parent]
+    return [raw]
+
 
 class POIRecommendationService:
     """
@@ -58,8 +92,13 @@ class POIRecommendationService:
 
         # Build Cypher query for personality matching
         query = """
-        MATCH (poi:poi)-[:OFFERS]->(a:activity_type)
-        WHERE poi.destination_name = $destination
+        MATCH (poi:poi)-[:SUPPORTS_ACTIVITY]->(a:activity_type)
+        MATCH (poi)-[:LOCATED_IN]->(d:destination)
+        OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
+        WHERE any(term IN $destination_terms WHERE
+          toLower(d.name) CONTAINS toLower(term)
+          OR toLower(coalesce(mvp.name,'')) CONTAINS toLower(term)
+        )
           AND coalesce(poi.luxury_score_verified, poi.luxury_score_base, poi.luxury_score, poi.luxuryScore) >= $min_luxury_score
           AND poi.personality_romantic IS NOT NULL
           AND NOT a.name IN ['Standard Experience', 'General Luxury Experience']
@@ -113,7 +152,7 @@ class POIRecommendationService:
         """
         
         params = {
-            "destination": destination,
+            "destination_terms": resolve_destination_terms(destination),
             "min_luxury_score": min_luxury_score,
             "min_fit_score": min_fit_score,
             "romantic": client_weights.romantic,
@@ -183,9 +222,14 @@ class POIRecommendationService:
             min_luxury_score = min_luxury_score * 10.0
 
         query = """
-        MATCH (poi:poi)-[:OFFERS]->(a:activity_type)-[:EVOKES]->(e:EmotionalTag)
+        MATCH (poi:poi)-[:SUPPORTS_ACTIVITY]->(a:activity_type)-[:EVOKES]->(e:EmotionalTag)
+        MATCH (poi)-[:LOCATED_IN]->(d:destination)
+        OPTIONAL MATCH (d)-[:IN_DESTINATION]->(mvp:destination {kind: 'mvp_destination'})
         MATCH (a)-[:APPEALS_TO]->(ca:ClientArchetype)
-        WHERE poi.destination_name = $destination
+        WHERE any(term IN $destination_terms WHERE
+          toLower(d.name) CONTAINS toLower(term)
+          OR toLower(coalesce(mvp.name,'')) CONTAINS toLower(term)
+        )
           AND coalesce(poi.luxury_score_verified, poi.luxury_score_base, poi.luxury_score, poi.luxuryScore) >= $min_luxury_score
           AND e.name IN $desired_emotions
           AND NOT a.name IN ['Standard Experience', 'General Luxury Experience']
@@ -211,7 +255,7 @@ class POIRecommendationService:
         """
         
         params = {
-            "destination": destination,
+            "destination_terms": resolve_destination_terms(destination),
             "desired_emotions": desired_emotions,
             "min_luxury_score": min_luxury_score,
             "limit": limit

@@ -20,6 +20,7 @@ type Args = {
   destination: string;
   wikidata: boolean;
   overturePath: string | null;
+  osmPath: string | null;
   projectNeo4j: boolean;
 };
 
@@ -29,6 +30,7 @@ function parseArgs(argv: string[]): Args {
 
   let wikidata = false;
   let overturePath: string | null = null;
+  let osmPath: string | null = null;
   let projectNeo4j = false;
 
   for (let i = 1; i < argv.length; i++) {
@@ -36,9 +38,10 @@ function parseArgs(argv: string[]): Args {
     if (a === '--wikidata') wikidata = true;
     else if (a === '--projectNeo4j') projectNeo4j = true;
     else if (a === '--overture') overturePath = argv[++i] ?? null;
+    else if (a === '--osm') osmPath = argv[++i] ?? null;
   }
 
-  return { destination, wikidata, overturePath, projectNeo4j };
+  return { destination, wikidata, overturePath, osmPath, projectNeo4j };
 }
 
 function q(s: string) {
@@ -67,6 +70,11 @@ async function main() {
   if (args.overturePath) {
     console.log('--- Step: Overture (GeoJSON file) ---');
     runOrThrow(`npm run ingest:overture -- ${q(args.destination)} ${q(args.overturePath)}`);
+  }
+
+  if (args.osmPath) {
+    console.log('--- Step: OSM (JSONL file) ---');
+    runOrThrow(`npm run ingest:osm -- ${q(args.destination)} ${q(args.osmPath)}`);
   }
 
   if (args.projectNeo4j) {

@@ -78,6 +78,14 @@ export default function CaptainPortalPage() {
       badge: 'Primary',
     },
     {
+      icon: '🧠',
+      title: 'Knowledge Nuggets (Inbox)',
+      description: 'Unstructured snippets from uploads/URLs (events, openings, brand signals). Enrich and convert to POIs when needed.',
+      href: '/captain/nuggets',
+      color: 'from-fuchsia-500 to-fuchsia-600',
+      badge: 'New',
+    },
+    {
       icon: '📈',
       title: 'Market Insights',
       description: 'Strategic intelligence: Ask questions, get cruise recommendations, analyze demand patterns',

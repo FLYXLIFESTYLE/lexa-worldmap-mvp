@@ -69,7 +69,7 @@ Five senses as memory anchors:
 #### 1. **Theme Selection** (Stage 0 - NEW!)
 Instead of "Where do you want to go?"
 
-→ Visual selection of 12 theme categories with stunning images:
+→ Visual selection of 14 theme categories with stunning images:
 1. Romance & Intimacy 💕
 2. Adventure & Exploration 🏔️
 3. Wellness & Transformation 🧘
@@ -82,6 +82,8 @@ Instead of "Where do you want to go?"
 10. Family Luxury 👨‍👩‍👧‍👦
 11. Celebration & Milestones 🎉
 12. Solitude & Reflection 🌅
+13. Nightlife & Entertainment 🎶
+14. Sports & Active ⚽
 
 Each theme shows:
 - Evocative image
@@ -187,10 +189,10 @@ RETURN poi
 - **Relationships**: `LOCATED_IN`, `HAS_THEME`, `SUPPORTS_ACTIVITY`
 
 ### Data Sources:
-1. **OpenStreetMap** (initial POIs)
-2. **Google Places API** (enrichment: ratings, reviews, pricing, photos)
-3. **Manual uploads** (yacht destinations, curated experiences)
-4. **Foursquare** (activity data - planned)
+1. **Open sources (MVP)**: OSM / Overture / Wikidata (identity skeletons; named-only ingestion)
+2. **Owned inputs (MVP)**: uploads + URL scraping + manual enrichment (traceable, investor-safe)
+3. **Paid enrichment APIs (later)**: optional behind feature flags / paid tier (Google Places, etc.)
+4. **Foursquare**: deferred until an enterprise contract explicitly permits the use-case
 
 ### Luxury Scoring Algorithm:
 ```

@@ -9,6 +9,7 @@
     "lint": "eslint",
     "ingest:wikidata": "tsx scripts/ingest-wikidata-destination.ts",
     "ingest:overture": "tsx scripts/ingest-overture-geojson.ts",
+    "ingest:osm": "tsx scripts/ingest-osm-jsonl.ts",
     "ingest:fsq": "tsx scripts/ingest-fsq-os-json.ts",
     "project:neo4j": "tsx scripts/project-destination-to-neo4j.ts",
     "estimate:overlap": "tsx scripts/estimate-source-overlap.ts",

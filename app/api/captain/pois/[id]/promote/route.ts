@@ -2,8 +2,85 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
+import { looksLikeBadPoiName } from '@/lib/brain/poi-contract';
 
 export const runtime = 'nodejs';
+
+function asStringArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x): x is string => typeof x === 'string')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function safeJsonParse<T>(v: unknown): T | null {
+  if (typeof v !== 'string') return null;
+  try {
+    return JSON.parse(v) as T;
+  } catch {
+    return null;
+  }
+}
+
+function asJsonArray(v: unknown): any[] {
+  if (Array.isArray(v)) return v;
+  const parsed = safeJsonParse<any[]>(v);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function asJsonObject(v: unknown): Record<string, any> | null {
+  if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, any>;
+  const parsed = safeJsonParse<Record<string, any>>(v);
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+}
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+function normalizeDimensionName(name: string): string {
+  const raw = name.trim();
+  const key = raw.toLowerCase();
+  const map: Record<string, string> = {
+    exclusivity: 'Exclusivity',
+    prestige: 'Prestige',
+    discovery: 'Discovery',
+    indulgence: 'Indulgence',
+    romance: 'Romance',
+    adventure: 'Adventure',
+    legacy: 'Legacy',
+    freedom: 'Freedom',
+    transformation: 'Transformation',
+  };
+  return map[key] || raw;
+}
+
+const MVP_DESTINATIONS = new Set([
+  'French Riviera',
+  'Amalfi Coast',
+  'Balearics',
+  'Cyclades',
+  'Adriatic North',
+  'Adriatic Central',
+  'Adriatic South',
+  'Ionian Sea',
+  'Bahamas',
+  'BVI',
+  'USVI',
+  'French Antilles',
+]);
+
+const CITY_TO_MVP_DESTINATION: Record<string, string> = {
+  Monaco: 'French Riviera',
+  'St. Tropez': 'French Riviera',
+  Cannes: 'French Riviera',
+  Nice: 'French Riviera',
+};
 
 export async function POST(
   req: Request,
@@ -57,6 +134,31 @@ export async function POST(
       return NextResponse.json({ error: 'POI not found' }, { status: 404 });
     }
 
+    // Hard gate: prevent promoting obvious junk names (paragraph fragments).
+    if (looksLikeBadPoiName(String(poi.name || ''))) {
+      return NextResponse.json(
+        {
+          error: 'POI name looks invalid',
+          details:
+            'This POI name looks like a sentence/paragraph fragment. Please edit it to the real place name before verifying/promoting.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Hard gate: promotion requires provenance (investor-grade traceability)
+    const sourceRefs = Array.isArray((poi as any).source_refs) ? (poi as any).source_refs : [];
+    if (!sourceRefs.length) {
+      return NextResponse.json(
+        {
+          error: 'Missing provenance',
+          details:
+            'This POI has no source_refs yet. Add at least one source (or run Enrich) before promoting to Neo4j.',
+        },
+        { status: 400 }
+      );
+    }
+
     if (!poi.verified) {
       return NextResponse.json(
         { error: 'POI must be verified before promotion' },
@@ -69,6 +171,8 @@ export async function POST(
     const now = new Date().toISOString();
     const contributorName =
       (profile?.display_name || profile?.full_name || user.email || '').toString();
+    const relConfidence =
+      typeof poi.confidence_score === 'number' ? poi.confidence_score / 100.0 : 0.8;
 
     const driver = getNeo4jDriver();
     const session = driver.session();
@@ -119,19 +223,335 @@ export async function POST(
       );
 
       if (poi.destination) {
+        const destName = String(poi.destination).trim();
+        const isMvpDestination = MVP_DESTINATIONS.has(destName);
+        const kind = isMvpDestination ? 'mvp_destination' : 'city';
+        const canonicalId = slugify(destName);
+        const parentDestination =
+          !isMvpDestination && CITY_TO_MVP_DESTINATION[destName]
+            ? CITY_TO_MVP_DESTINATION[destName]
+            : null;
+
         await session.run(
           `
           MATCH (p:poi {poi_uid: $poi_uid})
           MERGE (d:destination {name: $destination_name})
-          MERGE (p)-[:located_in]->(d)
+          SET
+            d.kind = CASE WHEN d.kind IS NULL OR d.kind <> $kind THEN $kind ELSE d.kind END,
+            d.canonical_id = CASE
+              WHEN d.canonical_id IS NULL OR trim(toString(d.canonical_id)) = '' THEN $canonical_id
+              WHEN toString(d.canonical_id) =~ '(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN $canonical_id
+              ELSE d.canonical_id
+            END,
+            d.updated_at = datetime($now)
+          MERGE (p)-[:LOCATED_IN]->(d)
+
+          WITH d
+          CALL {
+            WITH d
+            WITH d WHERE $parent_destination IS NOT NULL
+            MERGE (mvp:destination {name: $parent_destination})
+            SET
+              mvp.kind = CASE WHEN mvp.kind IS NULL OR mvp.kind <> 'mvp_destination' THEN 'mvp_destination' ELSE mvp.kind END,
+              mvp.canonical_id = CASE
+                WHEN mvp.canonical_id IS NULL OR trim(toString(mvp.canonical_id)) = '' THEN $parent_canonical_id
+                WHEN toString(mvp.canonical_id) =~ '(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN $parent_canonical_id
+                ELSE mvp.canonical_id
+              END,
+              mvp.updated_at = datetime($now)
+            MERGE (d)-[:IN_DESTINATION]->(mvp)
+            RETURN 1 AS linked
+          }
           `,
-          { poi_uid, destination_name: poi.destination }
+          {
+            poi_uid,
+            destination_name: destName,
+            kind,
+            canonical_id: canonicalId,
+            parent_destination: parentDestination,
+            parent_canonical_id: parentDestination ? slugify(parentDestination) : null,
+            now,
+          }
         );
       }
 
-      // Optional: store keywords/themes as arrays (easy search later)
       const keywords = Array.isArray(poi.keywords) ? poi.keywords : [];
       const themes = Array.isArray(poi.themes) ? poi.themes : [];
+
+      // Write theme relationships (explainable retrieval)
+      if (themes.length) {
+        await session.run(
+          `
+          MATCH (p:poi {poi_uid: $poi_uid})
+          UNWIND $themes AS tName
+          WITH p, trim(toString(tName)) AS themeName
+          WHERE themeName <> ''
+          MERGE (t:theme_category {name: themeName})
+          MERGE (p)-[r:HAS_THEME]->(t)
+          ON CREATE SET
+            r.confidence = $confidence,
+            r.evidence = 'captain_promote:themes',
+            r.source_id = $source_id,
+            r.inferred_by = 'captain',
+            r.created_at = datetime($now)
+          ON MATCH SET
+            r.confidence = CASE WHEN $confidence > coalesce(r.confidence, 0) THEN $confidence ELSE r.confidence END,
+            r.updated_at = datetime($now)
+          `,
+          { poi_uid, themes, confidence: relConfidence, source_id: poi.id, now }
+        );
+      }
+
+      // Emotional map → relationships (EmotionalTag + optional Emotion codes)
+      const emotionalMap = asJsonArray(poi.emotional_map);
+      const tagSignals: Array<{
+        name: string;
+        slug: string;
+        intensity: number | null;
+        confidence: number | null;
+        evidence: string | null;
+      }> = [];
+      const emotionSignals: Array<{
+        code: string;
+        name: string | null;
+        intensity: number | null;
+        confidence: number | null;
+        evidence: string | null;
+      }> = [];
+
+      for (const s of emotionalMap) {
+        if (!s || typeof s !== 'object') continue;
+        const kindRaw = (s as any).kind;
+        const kind = typeof kindRaw === 'string' ? kindRaw : null;
+
+        // Backward-compat: older shape uses { emotion, intensity, evidence }
+        if (!kind && typeof (s as any).emotion === 'string') {
+          const n = normalizeDimensionName((s as any).emotion);
+          tagSignals.push({
+            name: n,
+            slug: slugify(n),
+            intensity:
+              typeof (s as any).intensity === 'number' ? (s as any).intensity : null,
+            confidence:
+              typeof (s as any).confidence_0_1 === 'number'
+                ? (s as any).confidence_0_1
+                : typeof (s as any).confidence === 'number'
+                  ? (s as any).confidence
+                  : null,
+            evidence: typeof (s as any).evidence === 'string' ? (s as any).evidence : null,
+          });
+          continue;
+        }
+
+        if (kind === 'EmotionalTag') {
+          const nameRaw = (s as any).name;
+          if (typeof nameRaw !== 'string' || !nameRaw.trim()) continue;
+          const n = normalizeDimensionName(nameRaw);
+          tagSignals.push({
+            name: n,
+            slug: slugify(n),
+            intensity:
+              typeof (s as any).intensity_1_10 === 'number'
+                ? (s as any).intensity_1_10
+                : typeof (s as any).intensity === 'number'
+                  ? (s as any).intensity
+                  : null,
+            confidence:
+              typeof (s as any).confidence_0_1 === 'number'
+                ? (s as any).confidence_0_1
+                : typeof (s as any).confidence === 'number'
+                  ? (s as any).confidence
+                  : null,
+            evidence: typeof (s as any).evidence === 'string' ? (s as any).evidence : null,
+          });
+        } else if (kind === 'Emotion') {
+          const code = typeof (s as any).code === 'string' ? (s as any).code.trim() : '';
+          if (!code) continue; // important: avoid creating name-only Emotion duplicates
+          emotionSignals.push({
+            code,
+            name: typeof (s as any).name === 'string' ? (s as any).name : null,
+            intensity:
+              typeof (s as any).intensity_1_10 === 'number'
+                ? (s as any).intensity_1_10
+                : typeof (s as any).intensity === 'number'
+                  ? (s as any).intensity
+                  : null,
+            confidence:
+              typeof (s as any).confidence_0_1 === 'number'
+                ? (s as any).confidence_0_1
+                : typeof (s as any).confidence === 'number'
+                  ? (s as any).confidence
+                  : null,
+            evidence: typeof (s as any).evidence === 'string' ? (s as any).evidence : null,
+          });
+        }
+      }
+
+      if (tagSignals.length) {
+        await session.run(
+          `
+          MATCH (p:poi {poi_uid: $poi_uid})
+          UNWIND $tags AS tag
+          MERGE (t:EmotionalTag {name: tag.name})
+          SET t.slug = coalesce(t.slug, tag.slug)
+          MERGE (p)-[r:EVOKES]->(t)
+          ON CREATE SET
+            r.confidence = coalesce(tag.confidence, $confidence),
+            r.evidence = coalesce(tag.evidence, 'captain_promote:emotional_tag'),
+            r.intensity_1_10 = tag.intensity,
+            r.source_id = $source_id,
+            r.inferred_by = 'captain',
+            r.created_at = datetime($now)
+          ON MATCH SET
+            r.confidence = CASE
+              WHEN coalesce(tag.confidence, $confidence) > coalesce(r.confidence, 0) THEN coalesce(tag.confidence, $confidence)
+              ELSE r.confidence
+            END,
+            r.intensity_1_10 = coalesce(tag.intensity, r.intensity_1_10),
+            r.updated_at = datetime($now)
+          `,
+          { poi_uid, tags: tagSignals, confidence: relConfidence, source_id: poi.id, now }
+        );
+      }
+
+      if (emotionSignals.length) {
+        await session.run(
+          `
+          MATCH (p:poi {poi_uid: $poi_uid})
+          UNWIND $emotions AS em
+          MERGE (e:Emotion {code: em.code})
+          SET e.name = coalesce(e.name, em.name)
+          MERGE (p)-[r:EVOKES_EMOTION]->(e)
+          ON CREATE SET
+            r.confidence = coalesce(em.confidence, $confidence),
+            r.evidence = coalesce(em.evidence, 'captain_promote:emotion'),
+            r.intensity_1_10 = em.intensity,
+            r.source_id = $source_id,
+            r.inferred_by = 'captain',
+            r.created_at = datetime($now)
+          ON MATCH SET
+            r.confidence = CASE
+              WHEN coalesce(em.confidence, $confidence) > coalesce(r.confidence, 0) THEN coalesce(em.confidence, $confidence)
+              ELSE r.confidence
+            END,
+            r.intensity_1_10 = coalesce(em.intensity, r.intensity_1_10),
+            r.updated_at = datetime($now)
+          `,
+          { poi_uid, emotions: emotionSignals, confidence: relConfidence, source_id: poi.id, now }
+        );
+      }
+
+      // Occasions + activities from enrichment (if present)
+      const enrichment = asJsonObject(poi.enrichment) || {};
+      const occasionNames = asStringArray(enrichment.occasion_types || enrichment.occasionTypes);
+      const activityNames = asStringArray(enrichment.activity_types || enrichment.activityTypes);
+
+      if (occasionNames.length) {
+        const occasions = occasionNames.map((name) => ({
+          name: name.trim(),
+          slug: slugify(name),
+        }));
+        await session.run(
+          `
+          MATCH (p:poi {poi_uid: $poi_uid})
+          UNWIND $occasions AS oc
+          MERGE (o:occasion_type {slug: oc.slug})
+          SET o.name = coalesce(o.name, oc.name)
+          MERGE (p)-[r:FITS_OCCASION]->(o)
+          ON CREATE SET
+            r.confidence = $confidence,
+            r.evidence = 'captain_promote:occasion',
+            r.source_id = $source_id,
+            r.inferred_by = 'captain',
+            r.created_at = datetime($now)
+          ON MATCH SET
+            r.confidence = CASE WHEN $confidence > coalesce(r.confidence, 0) THEN $confidence ELSE r.confidence END,
+            r.updated_at = datetime($now)
+          `,
+          { poi_uid, occasions, confidence: relConfidence, source_id: poi.id, now }
+        );
+      }
+
+      if (activityNames.length) {
+        const activities = activityNames.map((name) => ({
+          name: name.trim(),
+        }));
+        await session.run(
+          `
+          MATCH (p:poi {poi_uid: $poi_uid})
+          UNWIND $activities AS ac
+          MERGE (a:activity_type {name: ac.name})
+          MERGE (p)-[r:SUPPORTS_ACTIVITY]->(a)
+          ON CREATE SET
+            r.confidence = $confidence,
+            r.evidence = 'captain_promote:activity',
+            r.source_id = $source_id,
+            r.inferred_by = 'captain',
+            r.created_at = datetime($now)
+          ON MATCH SET
+            r.confidence = CASE WHEN $confidence > coalesce(r.confidence, 0) THEN $confidence ELSE r.confidence END,
+            r.updated_at = datetime($now)
+          `,
+          { poi_uid, activities, confidence: relConfidence, source_id: poi.id, now }
+        );
+      }
+
+      // Client archetypes (if present)
+      const clientArchetypes = asJsonArray(poi.client_archetypes);
+      if (clientArchetypes.length) {
+        const archetypes = clientArchetypes
+          .map((a) => {
+            if (!a || typeof a !== 'object') return null;
+            const name =
+              typeof (a as any).name === 'string'
+                ? (a as any).name
+                : typeof (a as any).archetype === 'string'
+                  ? (a as any).archetype
+                  : '';
+            if (!name.trim()) return null;
+            const matchScore =
+              typeof (a as any).match_score_0_100 === 'number'
+                ? (a as any).match_score_0_100
+                : typeof (a as any).match_score === 'number'
+                  ? (a as any).match_score
+                  : null;
+            return {
+              name: name.trim(),
+              match_score_0_100: matchScore,
+              why: typeof (a as any).why === 'string' ? (a as any).why : null,
+              confidence: typeof (a as any).confidence_0_1 === 'number' ? (a as any).confidence_0_1 : null,
+            };
+          })
+          .filter(Boolean);
+
+        if (archetypes.length) {
+          await session.run(
+            `
+            MATCH (p:poi {poi_uid: $poi_uid})
+            UNWIND $archetypes AS ar
+            MERGE (c:ClientArchetype {name: ar.name})
+            MERGE (p)-[r:IDEAL_FOR_ARCHETYPE]->(c)
+            ON CREATE SET
+              r.match_score_0_100 = ar.match_score_0_100,
+              r.confidence = coalesce(ar.confidence, $confidence),
+              r.evidence = coalesce(ar.why, 'captain_promote:archetype'),
+              r.source_id = $source_id,
+              r.inferred_by = 'captain',
+              r.created_at = datetime($now)
+            ON MATCH SET
+              r.match_score_0_100 = coalesce(ar.match_score_0_100, r.match_score_0_100),
+              r.confidence = CASE
+                WHEN coalesce(ar.confidence, $confidence) > coalesce(r.confidence, 0) THEN coalesce(ar.confidence, $confidence)
+                ELSE r.confidence
+              END,
+              r.updated_at = datetime($now)
+            `,
+            { poi_uid, archetypes, confidence: relConfidence, source_id: poi.id, now }
+          );
+        }
+      }
+
+      // Optional: store keywords/themes as arrays (easy search later)
       if (keywords.length || themes.length) {
         await session.run(
           `
