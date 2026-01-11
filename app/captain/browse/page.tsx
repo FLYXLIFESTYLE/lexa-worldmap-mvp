@@ -97,6 +97,7 @@ export default function CaptainBrowsePage() {
     lowQuality: 0,
     avgConfidence: 0
   });
+  const [poiTotalAvailable, setPoiTotalAvailable] = useState(0);
 
   // Auth check
   useEffect(() => {
@@ -116,8 +117,11 @@ export default function CaptainBrowsePage() {
   const fetchPOIs = async () => {
     setLoading(true);
     try {
-      const res = await poisAPI.getPOIs({ skip: 0, limit: 100 });
+      // NOTE: previously this was 100, which made the UI look like imports “didn't work”.
+      // We'll fetch a larger page so imported POIs show up immediately.
+      const res = await poisAPI.getPOIs({ skip: 0, limit: 1000 });
       const list = (res.pois || []) as POI[];
+      setPoiTotalAvailable(Number(res.total || 0));
 
       // Normalize arrays (keywords/themes can be null)
       const normalized = list.map((p) => ({
@@ -545,7 +549,7 @@ export default function CaptainBrowsePage() {
         {/* Stats Dashboard */}
         <div className="grid grid-cols-5 gap-4 mb-8">
           <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+            <div className="text-2xl font-bold text-gray-900">{poiTotalAvailable || stats.total}</div>
             <div className="text-sm text-gray-600">Total POIs</div>
           </div>
           <div className="bg-white rounded-lg shadow-sm p-4">
@@ -581,7 +585,7 @@ export default function CaptainBrowsePage() {
                       : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50'
                   }`}
                 >
-                  POIs ({pois.length})
+                  POIs ({poiTotalAvailable || pois.length})
                 </button>
                 <button
                   type="button"
@@ -703,7 +707,7 @@ export default function CaptainBrowsePage() {
               <div className="mt-4 flex items-center justify-between gap-4">
                 <div className="text-sm text-gray-600">
                   {section === 'pois'
-                    ? `Showing ${filteredPois.length} of ${pois.length} POIs`
+                    ? `Showing ${filteredPois.length} of ${poiTotalAvailable || pois.length} POIs`
                     : `Showing ${filteredNuggets.length} of ${nuggets.length} nuggets`}
                 </div>
 
