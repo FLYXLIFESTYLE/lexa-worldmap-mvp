@@ -68,10 +68,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Invalid query', details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const ownerId = process.env.CRON_POI_OWNER_ID || '';
+    // Accept either env var name (beginner-friendly / avoids brittle config):
+    // - CRON_POI_USER_ID (what you set in Vercel)
+    // - CRON_POI_OWNER_ID (older name used in docs)
+    const ownerId = process.env.CRON_POI_USER_ID || process.env.CRON_POI_OWNER_ID || '';
     if (!ownerId) {
       return NextResponse.json(
-        { error: 'Server not configured', details: 'Set CRON_POI_OWNER_ID (your admin user id)' },
+        { error: 'Server not configured', details: 'Set CRON_POI_USER_ID (your Supabase user UUID)' },
         { status: 500 }
       );
     }
