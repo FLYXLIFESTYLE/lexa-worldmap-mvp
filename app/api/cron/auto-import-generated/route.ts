@@ -5,15 +5,24 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 export const runtime = 'nodejs';
 
 const QuerySchema = z.object({
-  destination: z.string().min(1),
+  // If omitted, this cron will auto-import across MVP destinations in small batches.
+  destination: z.string().min(1).optional(),
   source: z.enum(['osm', 'wikidata', 'overture', 'any']).optional().default('any'),
   limit: z.coerce.number().int().min(1).max(5000).optional().default(500),
+  // Only used when destination is omitted (cron "sweep" mode)
+  maxDestinations: z.coerce.number().int().min(1).max(20).optional().default(3),
 });
 
 function isVercelCron(req: Request): boolean {
   const h = req.headers.get('x-vercel-cron');
   return !!h;
 }
+
+const CRON_DEFAULTS = {
+  limit: 250,
+  maxDestinations: 3,
+  source: 'any' as const,
+};
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -52,6 +61,128 @@ function sourceUrlFor(source: 'osm' | 'wikidata' | 'overture', sourceId: string)
   return null;
 }
 
+async function importForDestination(args: {
+  destinationName: string;
+  source: 'osm' | 'wikidata' | 'overture' | 'any';
+  limit: number;
+  ownerId: string;
+}) {
+  const { destinationName, source, limit, ownerId } = args;
+  const nowIso = new Date().toISOString();
+
+  const { data: dest, error: destErr } = await supabaseAdmin
+    .from('destinations_geo')
+    .select('id,name')
+    .eq('name', destinationName)
+    .maybeSingle();
+  if (destErr) throw new Error(destErr.message);
+  if (!dest) throw new Error(`Destination not found: ${destinationName}`);
+
+  // Prefer destination-source link table if present.
+  let links: Array<{ entity_id: string; source: string; source_id: string }> = [];
+  try {
+    let q = supabaseAdmin
+      .from('experience_entity_destination_sources')
+      .select('entity_id,source,source_id')
+      .eq('destination_id', dest.id)
+      .order('entity_id', { ascending: true });
+    if (source !== 'any') q = q.eq('source', source);
+    const { data, error } = await q.limit(limit);
+    if (error) throw error;
+    links = (data || []) as any;
+  } catch {
+    // fallback: (source rows) join (entities) by destination_id
+    let q = supabaseAdmin
+      .from('experience_entity_sources')
+      .select('source,source_id, entity_id, experience_entities!inner(destination_id)')
+      .eq('experience_entities.destination_id', dest.id);
+    if (source !== 'any') q = q.eq('source', source);
+    const { data } = await q.limit(limit);
+    links = (data || [])
+      .map((r: any) => ({ entity_id: r.entity_id, source: r.source, source_id: r.source_id }))
+      .filter((r: any) => !!r.entity_id && !!r.source && !!r.source_id);
+  }
+
+  const entityIds = Array.from(new Set(links.map((l) => String(l.entity_id)).filter(Boolean)));
+  if (!entityIds.length) return { destination: dest.name, created: 0, requested: 0 };
+
+  // Load entities in chunks
+  const entitiesById = new Map<string, any>();
+  for (const ids of chunk(entityIds, 200)) {
+    const { data, error } = await supabaseAdmin
+      .from('experience_entities')
+      .select('id,name,lat,lon,address,website,phone,categories,tags,source_hints')
+      .in('id', ids);
+    if (error) throw new Error(error.message);
+    for (const e of data || []) entitiesById.set(String((e as any).id), e);
+  }
+
+  const rows = links
+    .map((l) => {
+      const e = entitiesById.get(String(l.entity_id));
+      if (!e) return null;
+
+      const src = String(l.source) as 'osm' | 'wikidata' | 'overture' | string;
+      const srcId = String(l.source_id);
+      const name = normalizeText(e.name);
+      if (!name) return null;
+
+      const lat = typeof e.lat === 'number' ? e.lat : e.lat ? Number(e.lat) : null;
+      const lon = typeof e.lon === 'number' ? e.lon : e.lon ? Number(e.lon) : null;
+      const category = inferCategory(e);
+      const srcUrl =
+        src === 'osm' || src === 'wikidata' || src === 'overture' ? sourceUrlFor(src as any, srcId) : null;
+
+      const source_refs = [
+        {
+          source_type: src,
+          source_id: srcId,
+          source_url: srcUrl,
+          captured_at: nowIso,
+        },
+      ];
+
+      return {
+        created_by: ownerId,
+        name,
+        destination: dest.name,
+        category,
+        description: null,
+        address: e.address ?? null,
+        latitude: lat,
+        longitude: lon,
+        confidence_score: 60,
+        verified: false,
+        enhanced: false,
+        promoted_to_main: false,
+        source_refs,
+        citations: [],
+        enrichment: {},
+        updated_at: nowIso,
+        generated_source: src,
+        generated_source_id: srcId,
+        generated_entity_id: e.id,
+        generated_destination_id: dest.id,
+      };
+    })
+    .filter(Boolean) as any[];
+
+  if (!rows.length) return { destination: dest.name, created: 0, requested: links.length };
+
+  const { data: inserted, error: upsertErr } = await supabaseAdmin
+    .from('extracted_pois')
+    .upsert(rows, { onConflict: 'generated_source,generated_source_id' })
+    .select('id');
+
+  if (upsertErr) throw new Error(upsertErr.message);
+
+  return {
+    destination: dest.name,
+    created: inserted?.length ?? 0,
+    requested: rows.length,
+  };
+}
+
 export async function GET(req: Request) {
   try {
     if (!isVercelCron(req)) {
@@ -61,8 +192,9 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const parsed = QuerySchema.safeParse({
       destination: url.searchParams.get('destination') ?? undefined,
-      source: url.searchParams.get('source') ?? undefined,
-      limit: url.searchParams.get('limit') ?? undefined,
+      source: url.searchParams.get('source') ?? CRON_DEFAULTS.source,
+      limit: url.searchParams.get('limit') ?? CRON_DEFAULTS.limit,
+      maxDestinations: url.searchParams.get('maxDestinations') ?? CRON_DEFAULTS.maxDestinations,
     });
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid query', details: parsed.error.flatten() }, { status: 400 });
@@ -79,126 +211,55 @@ export async function GET(req: Request) {
       );
     }
 
-    const { destination, source, limit } = parsed.data;
-    const nowIso = new Date().toISOString();
+    const { destination, source, limit, maxDestinations } = parsed.data;
 
-    const { data: dest, error: destErr } = await supabaseAdmin
+    // If destination is provided, do a single-destination import (manual/debug or targeted cron).
+    if (destination) {
+      const res = await importForDestination({ destinationName: destination, source, limit, ownerId });
+      return NextResponse.json({
+        success: true,
+        mode: 'single',
+        ...res,
+        note: 'Idempotent upsert into extracted_pois.',
+      });
+    }
+
+    // Cron sweep mode: import across MVP destinations in small batches (no query params needed).
+    const { data: dests, error: destsErr } = await supabaseAdmin
       .from('destinations_geo')
-      .select('id,name')
-      .eq('name', destination)
-      .maybeSingle();
-    if (destErr) return NextResponse.json({ error: 'Failed to load destination', details: destErr.message }, { status: 500 });
-    if (!dest) return NextResponse.json({ error: 'Destination not found', details: destination }, { status: 404 });
+      .select('name,kind')
+      .eq('kind', 'mvp_destination')
+      .order('name', { ascending: true })
+      .limit(maxDestinations);
+    if (destsErr) return NextResponse.json({ error: 'Failed to load destinations', details: destsErr.message }, { status: 500 });
 
-    // Prefer destination-source link table if present.
-    let links: Array<{ entity_id: string; source: string; source_id: string }> = [];
-    try {
-      let q = supabaseAdmin
-        .from('experience_entity_destination_sources')
-        .select('entity_id,source,source_id')
-        .eq('destination_id', dest.id);
-      if (source !== 'any') q = q.eq('source', source);
-      const { data, error } = await q.limit(limit);
-      if (error) throw error;
-      links = (data || []) as any;
-    } catch {
-      // fallback: (source rows) join (entities) by destination_id
-      let q = supabaseAdmin
-        .from('experience_entity_sources')
-        .select('source,source_id, entity_id, experience_entities!inner(destination_id)')
-        .eq('experience_entities.destination_id', dest.id);
-      if (source !== 'any') q = q.eq('source', source);
-      const { data } = await q.limit(limit);
-      links = (data || [])
-        .map((r: any) => ({ entity_id: r.entity_id, source: r.source, source_id: r.source_id }))
-        .filter((r: any) => !!r.entity_id && !!r.source && !!r.source_id);
-    }
+    const results: Array<{ destination: string; created: number; requested: number; error?: string }> = [];
+    let totalCreated = 0;
+    let totalRequested = 0;
 
-    const entityIds = Array.from(new Set(links.map((l) => String(l.entity_id)).filter(Boolean)));
-    if (!entityIds.length) {
-      return NextResponse.json({ success: true, created: 0, requested: 0, destination: dest.name });
-    }
-
-    // Load entities in chunks
-    const entitiesById = new Map<string, any>();
-    for (const ids of chunk(entityIds, 200)) {
-      const { data, error } = await supabaseAdmin
-        .from('experience_entities')
-        .select('id,name,lat,lon,address,website,phone,categories,tags,source_hints')
-        .in('id', ids);
-      if (error) return NextResponse.json({ error: 'Failed to load entities', details: error.message }, { status: 500 });
-      for (const e of data || []) entitiesById.set(String((e as any).id), e);
-    }
-
-    const rows = links
-      .map((l) => {
-        const e = entitiesById.get(String(l.entity_id));
-        if (!e) return null;
-
-        const src = String(l.source) as 'osm' | 'wikidata' | 'overture' | string;
-        const srcId = String(l.source_id);
-        const name = normalizeText(e.name);
-        if (!name) return null;
-
-        const lat = typeof e.lat === 'number' ? e.lat : e.lat ? Number(e.lat) : null;
-        const lon = typeof e.lon === 'number' ? e.lon : e.lon ? Number(e.lon) : null;
-        const category = inferCategory(e);
-        const srcUrl =
-          src === 'osm' || src === 'wikidata' || src === 'overture' ? sourceUrlFor(src as any, srcId) : null;
-
-        const source_refs = [
-          {
-            source_type: src,
-            source_id: srcId,
-            source_url: srcUrl,
-            captured_at: nowIso,
-          },
-        ];
-
-        return {
-          created_by: ownerId,
-          name,
-          destination: dest.name,
-          category,
-          description: null,
-          address: e.address ?? null,
-          latitude: lat,
-          longitude: lon,
-          confidence_score: 60,
-          verified: false,
-          enhanced: false,
-          promoted_to_main: false,
-          source_refs,
-          citations: [],
-          enrichment: {},
-          updated_at: nowIso,
-          generated_source: src,
-          generated_source_id: srcId,
-          generated_entity_id: e.id,
-          generated_destination_id: dest.id,
-        };
-      })
-      .filter(Boolean) as any[];
-
-    if (!rows.length) {
-      return NextResponse.json({ success: true, created: 0, requested: links.length, destination: dest.name });
-    }
-
-    const { data: inserted, error: upsertErr } = await supabaseAdmin
-      .from('extracted_pois')
-      .upsert(rows, { onConflict: 'generated_source,generated_source_id' })
-      .select('id');
-
-    if (upsertErr) {
-      return NextResponse.json({ error: 'Import failed', details: upsertErr.message }, { status: 500 });
+    for (const d of dests || []) {
+      const name = String((d as any).name || '').trim();
+      if (!name) continue;
+      try {
+        const r = await importForDestination({ destinationName: name, source, limit, ownerId });
+        results.push(r);
+        totalCreated += r.created;
+        totalRequested += r.requested;
+      } catch (e: any) {
+        results.push({ destination: name, created: 0, requested: 0, error: String(e?.message || e) });
+      }
     }
 
     return NextResponse.json({
       success: true,
-      created: inserted?.length ?? 0,
-      requested: rows.length,
-      destination: dest.name,
-      note: 'This is intended for Vercel Cron automation (idempotent upsert).',
+      mode: 'sweep',
+      source,
+      limit_per_destination: limit,
+      destinations_processed: results.length,
+      total_created: totalCreated,
+      total_requested: totalRequested,
+      results,
+      note: 'Cron sweep mode: idempotent upsert into extracted_pois across MVP destinations.',
     });
   } catch (error) {
     return NextResponse.json(
