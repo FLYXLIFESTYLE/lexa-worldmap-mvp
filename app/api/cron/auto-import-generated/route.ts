@@ -14,8 +14,27 @@ const QuerySchema = z.object({
 });
 
 function isVercelCron(req: Request): boolean {
+  // Vercel Cron SHOULD send `x-vercel-cron`, but in some environments we observed it missing.
+  // As a safe MVP fallback, also allow the official Vercel cron user-agent.
   const h = req.headers.get('x-vercel-cron');
-  return !!h;
+  if (h) return true;
+
+  const ua = String(req.headers.get('user-agent') || '').toLowerCase();
+  if (ua.includes('vercel-cron')) return true;
+
+  // Optional: allow manual triggering with a secret token (if you set CRON_SECRET in Vercel)
+  try {
+    const secret = process.env.CRON_SECRET || '';
+    if (secret) {
+      const url = new URL(req.url);
+      const token = url.searchParams.get('token') || '';
+      if (token && token === secret) return true;
+    }
+  } catch {
+    // ignore
+  }
+
+  return false;
 }
 
 const CRON_DEFAULTS = {

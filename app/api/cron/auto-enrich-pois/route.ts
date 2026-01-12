@@ -48,7 +48,24 @@ function isVercelCron(req: Request): boolean {
   // Vercel Cron adds this header. It's not a perfect security mechanism,
   // but it's enough for MVP automation without hardcoding secrets in repo.
   const h = req.headers.get('x-vercel-cron');
-  return !!h;
+  if (h) return true;
+
+  const ua = String(req.headers.get('user-agent') || '').toLowerCase();
+  if (ua.includes('vercel-cron')) return true;
+
+  // Optional: allow manual triggering with a secret token (if you set CRON_SECRET in Vercel)
+  try {
+    const secret = process.env.CRON_SECRET || '';
+    if (secret) {
+      const url = new URL(req.url);
+      const token = url.searchParams.get('token') || '';
+      if (token && token === secret) return true;
+    }
+  } catch {
+    // ignore
+  }
+
+  return false;
 }
 
 function needsEnrichment(p: any): boolean {
