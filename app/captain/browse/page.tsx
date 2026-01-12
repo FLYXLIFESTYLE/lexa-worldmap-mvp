@@ -119,9 +119,16 @@ export default function CaptainBrowsePage() {
     try {
       // NOTE: previously this was 100, which made the UI look like imports “didn't work”.
       // We'll fetch a larger page so imported POIs show up immediately.
-      const res = await poisAPI.getPOIs({ skip: 0, limit: 1000 });
-      const list = (res.pois || []) as POI[];
-      setPoiTotalAvailable(Number(res.total || 0));
+      // IMPORTANT:
+      // Use the Next.js API for POIs so it reads the SAME Supabase table
+      // that "Import Generated POIs" writes into.
+      // (The legacy Render backend can point at a different Supabase project.)
+      const res = await fetch('/api/captain/pois?skip=0&limit=1000', { method: 'GET' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data.details || data.error || 'Failed to fetch POIs'));
+
+      const list = (data.pois || []) as POI[];
+      setPoiTotalAvailable(Number(data.total || 0));
 
       // Normalize arrays (keywords/themes can be null)
       const normalized = list.map((p) => ({
