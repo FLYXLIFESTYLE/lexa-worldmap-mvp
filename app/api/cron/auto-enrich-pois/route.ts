@@ -22,18 +22,21 @@ const CRON_DEFAULTS = {
   searchDepth: 'basic' as const,
 };
 
+const nullToUndefined = (v: unknown) => (v === null ? undefined : v);
+const opt = <T extends z.ZodTypeAny>(schema: T) => z.preprocess(nullToUndefined, schema.optional());
+
 const EnrichmentPatchSchema = z.object({
-  category: z.string().min(1).optional(),
-  destination: z.string().min(1).optional(),
-  description: z.string().min(1).max(1200).optional(),
-  booking_info: z.string().min(1).max(800).optional(),
-  best_time: z.string().min(1).max(300).optional(),
-  luxury_score: z.number().int().min(0).max(10).optional(),
-  luxury_indicators: z.array(z.string().min(1)).optional(),
-  themes: z.array(z.string().min(1)).optional(),
-  keywords: z.array(z.string().min(1)).optional(),
-  website_url: z.string().url().optional(),
-  citations: z.array(CitationSchema).optional(),
+  category: opt(z.string().min(1)),
+  destination: opt(z.string().min(1)),
+  description: opt(z.string().min(1).max(1200)),
+  booking_info: opt(z.string().min(1).max(800)),
+  best_time: opt(z.string().min(1).max(300)),
+  luxury_score: opt(z.number().int().min(0).max(10)),
+  luxury_indicators: opt(z.array(z.string().min(1))),
+  themes: opt(z.array(z.string().min(1))),
+  keywords: opt(z.array(z.string().min(1))),
+  website_url: opt(z.string().url()),
+  citations: opt(z.array(CitationSchema)),
 });
 
 function sha1(input: string): string {

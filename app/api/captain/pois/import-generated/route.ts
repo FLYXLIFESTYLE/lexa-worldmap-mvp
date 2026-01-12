@@ -185,7 +185,23 @@ export async function POST(req: Request) {
       .filter(Boolean) as any[];
 
     if (!rows.length) {
-      return NextResponse.json({ success: true, created: 0, requested: links.length, destination: dest.name });
+      return NextResponse.json({ success: true, upserted: 0, created_new: 0, requested: links.length, destination: dest.name });
+    }
+
+    // Count existing rows for this destination+source (so we can report "new" vs "already had")
+    let beforeCount = 0;
+    try {
+      if (source !== 'any') {
+        const { count } = await supabaseAdmin
+          .from('extracted_pois')
+          .select('id', { head: true, count: 'exact' })
+          .eq('destination', dest.name)
+          .eq('generated_source', source)
+          .eq('created_by', userId);
+        beforeCount = Number(count || 0);
+      }
+    } catch {
+      // best-effort only
     }
 
     // Upsert by generated source key (requires migration 024)
@@ -198,9 +214,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Import failed', details: upsertErr.message }, { status: 500 });
     }
 
+    let afterCount = beforeCount;
+    try {
+      if (source !== 'any') {
+        const { count } = await supabaseAdmin
+          .from('extracted_pois')
+          .select('id', { head: true, count: 'exact' })
+          .eq('destination', dest.name)
+          .eq('generated_source', source)
+          .eq('created_by', userId);
+        afterCount = Number(count || 0);
+      }
+    } catch {
+      // best-effort only
+    }
+
+    const createdNew = Math.max(0, afterCount - beforeCount);
+
     return NextResponse.json({
       success: true,
-      created: inserted?.length ?? 0,
+      // NOTE: Supabase upsert returns rows that were inserted OR updated.
+      // So this is "upserted", not necessarily "newly created".
+      upserted: inserted?.length ?? 0,
+      created_new: createdNew,
       requested: rows.length,
       destination: dest.name,
     });

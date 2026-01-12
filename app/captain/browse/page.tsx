@@ -221,7 +221,12 @@ export default function CaptainBrowsePage() {
         throw new Error(String(data.details || data.error || 'Import failed'));
       }
       await fetchPOIs();
-      alert(`✅ Imported ${data.created || 0} generated POIs into the review list for ${destination}.`);
+      const upserted = Number(data.upserted ?? data.created ?? 0);
+      const createdNew = Number(data.created_new ?? 0);
+      alert(
+        `✅ Imported/Updated ${upserted} generated POIs for ${destination}. ` +
+          (createdNew ? `New: ${createdNew}.` : `No new POIs (already imported).`)
+      );
     } catch (e: any) {
       alert(`❌ Import generated POIs failed: ${e?.message || 'Unknown error'}`);
     }

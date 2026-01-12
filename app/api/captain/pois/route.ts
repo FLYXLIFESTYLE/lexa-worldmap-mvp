@@ -77,7 +77,8 @@ export async function GET(req: Request) {
     }
 
     // Order + pagination
-    q = q.order('created_at', { ascending: false }).range(skip, skip + limit - 1);
+    // Stable ordering: many rows can share the same created_at second during bulk imports.
+    q = q.order('created_at', { ascending: false }).order('id', { ascending: false }).range(skip, skip + limit - 1);
 
     const { data, error, count } = await q;
     if (error) {

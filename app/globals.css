@@ -11,6 +11,15 @@
   --lexa-gold: 212 175 55;
   --lexa-cream: 250 248 243;
   --lexa-text: 28 25 23;
+
+  /**
+   * Fonts (no external provider)
+   * We used to load Geist via Google Fonts at build-time, but that can fail
+   * on some networks. Use a safe system stack for reliability.
+   */
+  --font-geist-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans",
+    "Liberation Sans", sans-serif;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   
   /* Neutrals */
   --zinc-50: 250 250 250;
