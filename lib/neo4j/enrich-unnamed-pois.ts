@@ -79,9 +79,8 @@ export async function enrichUnnamedPOIs(): Promise<EnrichmentResult> {
         if (enrichedName) {
           // Update POI with found name
           // Convert ID to Neo4j Integer to handle 64-bit node IDs safely
-          const poiIdValue = typeof poi.id === 'object' && poi.id?.toNumber 
-            ? neo4j.int(poi.id.toNumber())
-            : neo4j.int(Number(poi.id));
+          // poi.id is a string, so we parse it as a number and wrap it in neo4j.int()
+          const poiIdValue = neo4j.int(Number(poi.id));
           
           await session.run(`
             MATCH (p:poi)

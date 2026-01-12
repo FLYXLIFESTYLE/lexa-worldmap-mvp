@@ -341,9 +341,8 @@ async function mergeDuplicateGroup(
 
   // Delete duplicate
   // Convert ID to Neo4j Integer to handle 64-bit node IDs safely
-  const duplicateIdValue = typeof duplicatePOI.id === 'object' && duplicatePOI.id?.toNumber 
-    ? neo4j.int(duplicatePOI.id.toNumber())
-    : neo4j.int(Number(duplicatePOI.id));
+  // POI.id is a string, so we parse it as a number and wrap it in neo4j.int()
+  const duplicateIdValue = neo4j.int(Number(duplicatePOI.id));
   
   await session.run(`
     MATCH (p:poi)
@@ -458,12 +457,9 @@ async function mergeRelationships(
       RETURN count(newRel) as merged
     `, {
       // Convert IDs to Neo4j Integer to handle 64-bit node IDs safely
-      keptId: typeof keptPOI.id === 'object' && keptPOI.id?.toNumber 
-        ? neo4j.int(keptPOI.id.toNumber())
-        : neo4j.int(Number(keptPOI.id)),
-      duplicateId: typeof duplicatePOI.id === 'object' && duplicatePOI.id?.toNumber 
-        ? neo4j.int(duplicatePOI.id.toNumber())
-        : neo4j.int(Number(duplicatePOI.id)),
+      // POI.id is a string, so we parse it as a number and wrap it in neo4j.int()
+      keptId: neo4j.int(Number(keptPOI.id)),
+      duplicateId: neo4j.int(Number(duplicatePOI.id)),
     });
 
     mergedCount += result.records[0]?.get('merged')?.toNumber() || 0;

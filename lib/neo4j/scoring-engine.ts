@@ -385,9 +385,8 @@ export async function scoreAllUnscored(): Promise<{
 
         // Update POI in database
         // Convert ID to Neo4j Integer to handle 64-bit node IDs safely
-        const poiIdValue = typeof poiId === 'object' && poiId?.toNumber 
-          ? neo4j.int(poiId.toNumber())
-          : neo4j.int(Number(poiId));
+        // poiId is a string, so we parse it as a number and wrap it in neo4j.int()
+        const poiIdValue = neo4j.int(Number(poiId));
         
         await session.run(`
           MATCH (p:poi)
