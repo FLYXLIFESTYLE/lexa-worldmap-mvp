@@ -411,9 +411,8 @@ async function mergeProperties(
 
   if (Object.keys(updates).length > 0) {
     // Convert ID to Neo4j Integer to handle 64-bit node IDs safely
-    const keptIdValue = typeof keptPOI.id === 'object' && keptPOI.id?.toNumber 
-      ? neo4j.int(keptPOI.id.toNumber())
-      : neo4j.int(Number(keptPOI.id));
+    // POI.id is a string, so we parse it as a number and wrap it in neo4j.int()
+    const keptIdValue = neo4j.int(Number(keptPOI.id));
     
     await session.run(`
       MATCH (p:poi)
