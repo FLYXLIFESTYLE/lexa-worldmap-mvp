@@ -43,9 +43,8 @@ async function getContributor(
         RETURN p.contributed_by as userId, p.contributor_name as displayName
       `;
       // Convert ID to Neo4j Integer to handle 64-bit node IDs safely
-      const poiIdInt = typeof poiId === 'object' && poiId?.toNumber 
-        ? neo4j.int(poiId.toNumber())
-        : neo4j.int(Number(poiId));
+      // poiId is a string, so we parse it as a number and wrap it in neo4j.int()
+      const poiIdInt = neo4j.int(Number(poiId));
       params = { poiId, poiIdInt };
     } else if (knowledgeId) {
       query = `
