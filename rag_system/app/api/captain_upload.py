@@ -18,8 +18,36 @@ from app.services.supabase_auth import get_current_user
 
 router = APIRouter(prefix="/api/captain/upload", tags=["Upload"])
 
-# Max file size (50MB - increased to support larger documents)
-MAX_FILE_SIZE = 50 * 1024 * 1024
+# Upload hardening (Brain Hardening):
+# - Strict file type allowlist
+# - Max size 25MB (prevents timeouts + keeps costs predictable)
+MAX_FILE_SIZE = 25 * 1024 * 1024
+
+# Note: We allow images because the Captain Portal supports OCR extraction.
+ALLOWED_MIME_TYPES = {
+    "application/pdf",
+    "text/plain",
+    "application/json",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # docx
+    "application/msword",  # doc
+    "image/png",
+    "image/jpeg",
+}
+ALLOWED_EXTENSIONS = {"pdf", "txt", "json", "docx", "doc", "png", "jpg", "jpeg"}
+
+
+def _is_allowed_upload(file: UploadFile) -> bool:
+    """
+    Best-effort allowlist based on content-type + filename extension.
+    Some clients send a generic content-type, so we allow either signal.
+    """
+    try:
+        filename = (file.filename or "").strip()
+    except Exception:
+        filename = ""
+    ext = filename.split(".")[-1].lower() if "." in filename else ""
+    ctype = (file.content_type or "").lower()
+    return (ctype in ALLOWED_MIME_TYPES) or (ext in ALLOWED_EXTENSIONS)
 
 
 def _safe_err_msg(e: Exception) -> str:
@@ -253,6 +281,13 @@ async def upload_file(
     print(f"Size: {file.size if hasattr(file, 'size') else 'unknown'}")
     
     try:
+        # Hard reject unsupported file types early
+        if not _is_allowed_upload(file):
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported file type. Allowed: pdf, docx, doc, txt, json, png, jpg/jpeg."
+            )
+
         # Read file content
         content = await file.read()
         file_size = len(content)
@@ -261,7 +296,7 @@ async def upload_file(
         if file_size > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=413,
-                detail=f"File too large ({file_size / 1024 / 1024:.1f}MB). Max 50MB."
+                detail=f"File too large ({file_size / 1024 / 1024:.1f}MB). Max 25MB."
             )
         
         # Save to temp file
