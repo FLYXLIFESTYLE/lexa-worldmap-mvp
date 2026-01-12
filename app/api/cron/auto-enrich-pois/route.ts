@@ -28,6 +28,7 @@ const opt = <T extends z.ZodTypeAny>(schema: T) => z.preprocess(nullToUndefined,
 const EnrichmentPatchSchema = z.object({
   category: opt(z.string().min(1)),
   destination: opt(z.string().min(1)),
+  city: opt(z.string().min(1).max(120)),
   description: opt(z.string().min(1).max(1200)),
   booking_info: opt(z.string().min(1).max(800)),
   best_time: opt(z.string().min(1).max(300)),
@@ -97,7 +98,10 @@ export async function GET(req: Request) {
     let q = supabaseAdmin
       .from('extracted_pois')
       .select(
-        'id,name,destination,category,description,luxury_score,keywords,themes,source_refs,citations,enrichment,updated_at,promoted_to_main'
+        // NOTE: do NOT select `city` here. Supabase migrations are manual in prod; selecting a missing
+        // column would hard-fail the cron. We'll still *attempt* to update city; if the column doesn't
+        // exist yet, we retry without it.
+        'id,name,destination,category,description,confidence_score,luxury_score,keywords,themes,source_refs,citations,enrichment,updated_at,promoted_to_main'
       )
       .eq('promoted_to_main', false)
       .order('updated_at', { ascending: true })
@@ -189,6 +193,7 @@ JSON shape (include only what you can support):
 {
   "category": string,
   "destination": string,
+  "city": string,
   "description": string,
   "booking_info": string,
   "best_time": string,
@@ -269,23 +274,37 @@ Notes:
         if (!currentDesc && extracted.data.description) updates.description = extracted.data.description;
         if (!poi.category && extracted.data.category) updates.category = extracted.data.category;
         if (!poi.destination && extracted.data.destination) updates.destination = extracted.data.destination;
+        const currentCity = (poi as any).city;
+        if ((!currentCity || String(currentCity).trim() === '') && extracted.data.city) updates.city = extracted.data.city;
         if ((poi.luxury_score === null || poi.luxury_score === undefined) && typeof extracted.data.luxury_score === 'number') {
           updates.luxury_score = extracted.data.luxury_score;
         }
         if ((!Array.isArray(poi.keywords) || poi.keywords.length === 0) && extracted.data.keywords) updates.keywords = extracted.data.keywords;
         if ((!Array.isArray(poi.themes) || poi.themes.length === 0) && extracted.data.themes) updates.themes = extracted.data.themes;
 
+        // Confidence policy: after enrichment, ensure at least 70% (never reduce).
+        const currentConfidence =
+          typeof (poi as any).confidence_score === 'number' ? (poi as any).confidence_score : Number((poi as any).confidence_score || 0);
+        const desiredConfidence = Math.max(currentConfidence || 0, 70);
+        if ((currentConfidence || 0) < desiredConfidence) updates.confidence_score = desiredConfidence;
+
         // Mark as enhanced if we changed anything besides provenance.
         const changedAny =
           'description' in updates ||
           'category' in updates ||
           'destination' in updates ||
+          'city' in updates ||
           'luxury_score' in updates ||
           'keywords' in updates ||
           'themes' in updates;
         if (changedAny) updates.enhanced = true;
 
-        const { error: updateErr } = await supabaseAdmin.from('extracted_pois').update(updates).eq('id', poiId);
+        let updateErr = (await supabaseAdmin.from('extracted_pois').update(updates).eq('id', poiId)).error;
+        // Back-compat: if `city` column doesn't exist yet in prod, retry without it.
+        if (updateErr && String(updateErr.message || '').toLowerCase().includes('column') && String(updateErr.message || '').toLowerCase().includes('city')) {
+          const { city: _city, ...withoutCity } = updates;
+          updateErr = (await supabaseAdmin.from('extracted_pois').update(withoutCity).eq('id', poiId)).error;
+        }
         if (updateErr) throw new Error(updateErr.message);
 
         processed.push({ id: poiId, ok: true });

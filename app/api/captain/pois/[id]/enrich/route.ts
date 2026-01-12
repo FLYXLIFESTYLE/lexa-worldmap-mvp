@@ -25,6 +25,7 @@ const opt = <T extends z.ZodTypeAny>(schema: T) => z.preprocess(nullToUndefined,
 const EnrichmentPatchSchema = z.object({
   category: opt(z.string().min(1)),
   destination: opt(z.string().min(1)),
+  city: opt(z.string().min(1).max(120)),
   description: opt(z.string().min(1).max(1200)),
   booking_info: opt(z.string().min(1).max(800)),
   best_time: opt(z.string().min(1).max(300)),
@@ -208,6 +209,7 @@ JSON shape (only include fields you are confident about):
 {
   "category": string,
   "destination": string,
+  "city": string,
   "description": string,
   "website_url": string,
   "booking_info": string,
@@ -309,6 +311,7 @@ Notes:
     };
 
     if (!destination && patch.destination) updates.destination = patch.destination;
+    if (isEmptyText((poi as any).city) && patch.city) updates.city = patch.city;
     if (isEmptyText(poi.category) && patch.category) updates.category = patch.category;
     if (isEmptyText(poi.description) && patch.description) updates.description = patch.description;
     if (isEmptyText(poi.booking_info) && patch.booking_info) updates.booking_info = patch.booking_info;
@@ -348,11 +351,25 @@ Notes:
     if ((poi.luxury_score_confidence === null || poi.luxury_score_confidence === undefined) && typeof patch.luxury_score_confidence === 'number') {
       updates.luxury_score_confidence = patch.luxury_score_confidence;
     }
-    if ((poi.confidence_score === null || poi.confidence_score === undefined) && typeof patch.confidence_score === 'number') {
-      updates.confidence_score = patch.confidence_score;
-    }
+    // Confidence policy:
+    // - After successful enrichment, confidence should be at least 70%.
+    // - Upload-based POIs already default to 80% and should not be reduced.
+    // - Manual Captain/Admin edits can raise to 100% (handled elsewhere).
+    const currentConfidence = typeof poi.confidence_score === 'number' ? poi.confidence_score : Number(poi.confidence_score || 0);
+    const patchConfidence = typeof patch.confidence_score === 'number' ? patch.confidence_score : 0;
+    const desiredConfidence = Math.max(currentConfidence || 0, patchConfidence || 0, 70);
+    if ((currentConfidence || 0) < desiredConfidence) updates.confidence_score = desiredConfidence;
 
-    const { error: updateError } = await admin.from('extracted_pois').update(updates).eq('id', id);
+    let updateError = (await admin.from('extracted_pois').update(updates).eq('id', id)).error;
+    // Back-compat: if `city` column doesn't exist yet in prod, retry without it.
+    if (
+      updateError &&
+      String(updateError.message || '').toLowerCase().includes('column') &&
+      String(updateError.message || '').toLowerCase().includes('city')
+    ) {
+      const { city: _city, ...withoutCity } = updates;
+      updateError = (await admin.from('extracted_pois').update(withoutCity).eq('id', id)).error;
+    }
     if (updateError) {
       return NextResponse.json({ error: 'Failed to save enrichment', details: updateError.message }, { status: 500 });
     }

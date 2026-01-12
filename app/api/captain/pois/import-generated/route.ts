@@ -9,6 +9,9 @@ const BodySchema = z.object({
   destination: z.string().min(1),
   source: z.enum(['osm', 'wikidata', 'overture', 'any']).optional().default('any'),
   limit: z.number().int().min(1).max(5000).optional().default(500),
+  // Allows importing the "next batch" deterministically.
+  // Example: first run skip=0 limit=500, second run skip=500 limit=500.
+  skip: z.number().int().min(0).max(500000).optional().default(0),
 });
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -77,7 +80,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid payload', details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { destination, source, limit } = parsed.data;
+    const { destination, source, limit, skip } = parsed.data;
     const userId = auth.user!.id;
 
     // Load destination_geo row
@@ -98,7 +101,9 @@ export async function POST(req: Request) {
         .select('entity_id,source,source_id')
         .eq('destination_id', dest.id);
       if (source !== 'any') q = q.eq('source', source);
-      const { data, error } = await q.limit(limit);
+      // Deterministic ordering so skip/limit always selects the same slice.
+      q = q.order('source', { ascending: true }).order('source_id', { ascending: true });
+      const { data, error } = await q.range(skip, skip + limit - 1);
       if (error) throw error;
       links = (data || []) as any;
     } catch {
@@ -108,7 +113,8 @@ export async function POST(req: Request) {
         .select('source,source_id, entity_id, experience_entities!inner(destination_id)')
         .eq('experience_entities.destination_id', dest.id);
       if (source !== 'any') q = q.eq('source', source);
-      const { data } = await q.limit(limit);
+      q = q.order('source', { ascending: true }).order('source_id', { ascending: true });
+      const { data } = await q.range(skip, skip + limit - 1);
       links = (data || [])
         .map((r: any) => ({ entity_id: r.entity_id, source: r.source, source_id: r.source_id }))
         .filter((r: any) => !!r.entity_id && !!r.source && !!r.source_id);
@@ -239,6 +245,9 @@ export async function POST(req: Request) {
       created_new: createdNew,
       requested: rows.length,
       destination: dest.name,
+      skip,
+      limit,
+      source,
     });
   } catch (error) {
     return NextResponse.json(

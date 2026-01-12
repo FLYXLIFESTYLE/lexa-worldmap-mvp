@@ -17,6 +17,7 @@ interface POI {
   id: string;
   name: string;
   destination: string | null;
+  city?: string | null;
   category: string | null;
   description: string | null;
   confidence_score: number;
@@ -84,6 +85,7 @@ export default function CaptainBrowsePage() {
   const [editedName, setEditedName] = useState('');
   const [editedDescription, setEditedDescription] = useState('');
   const [editedLocation, setEditedLocation] = useState('');
+  const [editedCity, setEditedCity] = useState('');
   const [editedCategory, setEditedCategory] = useState('');
   const [editedConfidence, setEditedConfidence] = useState(80);
   const [editedLuxuryScore, setEditedLuxuryScore] = useState(0);
@@ -207,6 +209,8 @@ export default function CaptainBrowsePage() {
     const destination = prompt('Destination name (must match destinations list):', 'French Riviera') || '';
     if (!destination.trim()) return;
     const source = (prompt('Source (osm / wikidata / overture / any):', 'osm') || 'osm').trim().toLowerCase();
+    const skipRaw = (prompt('Skip (offset) — use 0 for first batch, 500 for next batch, etc.:', '0') || '0').trim();
+    const skip = Math.max(0, Number(skipRaw) || 0);
     const limitRaw = (prompt('How many to import (max 5000):', '500') || '500').trim();
     const limit = Math.max(1, Math.min(5000, Number(limitRaw) || 500));
 
@@ -214,7 +218,7 @@ export default function CaptainBrowsePage() {
       const res = await fetch('/api/captain/pois/import-generated', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ destination, source, limit }),
+        body: JSON.stringify({ destination, source, limit, skip }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -224,7 +228,7 @@ export default function CaptainBrowsePage() {
       const upserted = Number(data.upserted ?? data.created ?? 0);
       const createdNew = Number(data.created_new ?? 0);
       alert(
-        `✅ Imported/Updated ${upserted} generated POIs for ${destination}. ` +
+        `✅ Imported/Updated ${upserted} generated POIs for ${destination} (skip=${skip}, limit=${limit}). ` +
           (createdNew ? `New: ${createdNew}.` : `No new POIs (already imported).`)
       );
     } catch (e: any) {
@@ -241,9 +245,15 @@ export default function CaptainBrowsePage() {
     if (!confirm(`Verify (approve) ${ids.length} POIs?`)) return;
 
     try {
-      const res = await poisAPI.bulkVerify(ids, true);
+      const res = await fetch('/api/captain/pois/bulk-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, verified: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data.details || data.error || 'Bulk verify failed'));
       await fetchPOIs();
-      alert(`✅ Verified ${res.updated} of ${res.requested} POIs.`);
+      alert(`✅ Verified ${Number((data as any).updated || 0)} of ${Number((data as any).requested || ids.length)} POIs.`);
     } catch (e: any) {
       alert(`❌ Bulk verify failed: ${e?.message || 'Unknown error'}`);
     }
@@ -258,7 +268,8 @@ export default function CaptainBrowsePage() {
       filtered = filtered.filter(poi =>
         poi.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (poi.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (poi.destination || '').toLowerCase().includes(searchQuery.toLowerCase())
+        (poi.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (poi.city || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     
@@ -397,6 +408,7 @@ export default function CaptainBrowsePage() {
     setEditedName(poi.name);
     setEditedDescription(poi.description || '');
     setEditedLocation(poi.destination || '');
+    setEditedCity((poi.city as any) || '');
     setEditedCategory(poi.category || 'restaurant');
     setEditedConfidence(poi.confidence_score);
     setEditedLuxuryScore(poi.luxury_score || 0);
@@ -414,32 +426,31 @@ export default function CaptainBrowsePage() {
         .map((t) => t.trim())
         .filter(Boolean);
 
-      const wantsHighConfidence = editedConfidence > 80;
-
       let updatedPoi: POI | null = null;
 
-      // Rule: scores >80 require verification (this is the "Captain approval")
-      if (wantsHighConfidence && !selectedPoi.verified) {
-        const ok = confirm(
-          'To set confidence above 80%, you must VERIFY this POI (Captain approval). Verify now?'
-        );
-        if (!ok) return;
-
-        const res = await poisAPI.verifyPOI(selectedPoi.id, true, editedConfidence);
-        updatedPoi = (res as any).poi as POI;
-      } else {
-        const res = await poisAPI.updatePOI(selectedPoi.id, {
+      // Save directly to the same Supabase table we browse from (local Next.js API).
+      // Policy:
+      // - Enrichment sets confidence >= 70%
+      // - Uploads start at 80%
+      // - Captain/Admin can set up to 100% manually
+      const res = await fetch(`/api/captain/pois/${selectedPoi.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: editedName,
           destination: editedLocation,
+          city: editedCity,
           category: editedCategory,
           description: editedDescription,
-          confidence_score: wantsHighConfidence ? editedConfidence : editedConfidence,
+          confidence_score: editedConfidence,
           luxury_score: editedLuxuryScore || undefined,
           keywords: nextKeywords,
           enhanced: true,
-        });
-        updatedPoi = (res as any).poi as POI;
-      }
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data.details || data.error || 'Failed to save POI'));
+      updatedPoi = (data as any).poi as POI;
 
       setPois((prev) => prev.map((p) => (p.id === selectedPoi.id ? { ...p, ...updatedPoi! } : p)));
       alert('✅ POI saved successfully!');
@@ -447,7 +458,7 @@ export default function CaptainBrowsePage() {
       setViewMode('list');
       setSelectedPoi(null);
     } catch (error) {
-      alert('❌ Failed to save POI');
+      alert(`❌ Failed to save POI: ${(error as any)?.message || 'Unknown error'}`);
     }
   };
 
@@ -456,12 +467,18 @@ export default function CaptainBrowsePage() {
     if (!confirm(`Mark "${poi.name}" as verified?`)) return;
     
     try {
-      const res = await poisAPI.verifyPOI(poi.id, true);
-      const updated = (res as any).poi as POI;
+      const res = await fetch(`/api/captain/pois/${poi.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verified: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data.details || data.error || 'Failed to verify POI'));
+      const updated = (data as any).poi as POI;
       setPois((prev) => prev.map((p) => (p.id === poi.id ? { ...p, ...updated } : p)));
       alert('✅ POI verified!');
     } catch (error) {
-      alert('❌ Failed to verify POI');
+      alert(`❌ Failed to verify POI: ${(error as any)?.message || 'Unknown error'}`);
     }
   };
 
@@ -477,7 +494,9 @@ export default function CaptainBrowsePage() {
     if (!confirm(`Promote "${poi.name}" to official knowledge (Neo4j)?`)) return;
 
     try {
-      await poisAPI.promotePOI(poi.id);
+      const res = await fetch(`/api/captain/pois/${poi.id}/promote`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data.details || data.error || 'Failed to promote POI'));
       setPois((prev) =>
         prev.map((p) =>
           p.id === poi.id ? { ...p, promoted_to_main: true, updated_at: new Date().toISOString() } : p
@@ -495,7 +514,14 @@ export default function CaptainBrowsePage() {
         `Enrich "${poi.name}" with real-time web info (Tavily + Claude)?\n\nThis will fill missing fields + add citations.`
       );
       if (!ok) return;
-      await poisAPI.enrichPOI(poi.id, poi.destination ? { destination: poi.destination } : undefined);
+      // Use local Next.js API so we enrich the same Supabase table the UI displays.
+      const res = await fetch(`/api/captain/pois/${poi.id}/enrich`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(poi.destination ? { destination: poi.destination } : {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data.details || data.error || 'Failed to enrich POI'));
       await fetchPOIs();
       alert('✅ Enrichment complete! Review the updated fields and verify if correct.');
     } catch (e: any) {
@@ -549,10 +575,10 @@ export default function CaptainBrowsePage() {
       mission={[
         { label: 'VERIFY', text: 'Check POI accuracy and mark as verified.' },
         { label: 'ENHANCE', text: 'Improve descriptions and add missing details.' },
-        { label: 'CONFIDENCE', text: 'Scores >80% require captain verification.' },
+        { label: 'CONFIDENCE', text: 'Uploads default to 80%. Enrichment raises to 70%. Captain/Admin can set up to 100%.' },
       ]}
       quickTips={[
-        'Verify first, then increase confidence above 80%.',
+        'Set confidence to reflect how reliable the data is (0–100%).',
         'Use tags to make search and matching easier for LEXA.',
         'Only promote POIs after they are verified and clean.',
       ]}
@@ -816,7 +842,9 @@ export default function CaptainBrowsePage() {
                             </div>
 
                             <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                              <span className="flex items-center gap-1">📍 {poi.destination || '—'}</span>
+                            <span className="flex items-center gap-1">
+                              📍 {poi.city ? `${poi.city} · ${poi.destination || '—'}` : poi.destination || '—'}
+                            </span>
                               <span className="flex items-center gap-1">🏷️ {poi.category || '—'}</span>
                             </div>
                           </div>
@@ -996,7 +1024,7 @@ export default function CaptainBrowsePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
                   <select
@@ -1018,6 +1046,17 @@ export default function CaptainBrowsePage() {
                     type="text"
                     value={editedLocation}
                     onChange={(e) => setEditedLocation(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                  <input
+                    type="text"
+                    value={editedCity}
+                    onChange={(e) => setEditedCity(e.target.value)}
+                    placeholder="e.g., Cannes"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -1064,7 +1103,7 @@ export default function CaptainBrowsePage() {
                     className="w-full"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Scores &gt;80% require verification (captain approval)
+                    Tip: enrichment lifts to 70%, uploads start at 80%, Captain/Admin can set up to 100%
                   </p>
                 </div>
 
