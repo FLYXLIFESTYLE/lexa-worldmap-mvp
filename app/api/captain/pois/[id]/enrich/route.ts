@@ -49,6 +49,27 @@ function isEmptyText(v: unknown): boolean {
   return !v || (typeof v === 'string' && v.trim() === '');
 }
 
+function extractJsonObjectFromText(raw: string): string | null {
+  const t = String(raw || '').trim();
+  if (!t) return null;
+
+  // 1) Handle fenced code blocks (```json ... ```)
+  const fenced = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) {
+    const cand = fenced[1].trim();
+    if (cand.startsWith('{') && cand.endsWith('}')) return cand;
+  }
+
+  // 2) Fallback: take substring from first "{" to last "}"
+  const first = t.indexOf('{');
+  const last = t.lastIndexOf('}');
+  if (first !== -1 && last !== -1 && last > first) {
+    return t.slice(first, last + 1);
+  }
+
+  return null;
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -214,17 +235,27 @@ Notes:
       messages: [{ role: 'user', content: userMsg }],
     });
 
-    const text = resp.content.find((c) => c.type === 'text')?.text || '';
-    const jsonMatch = text.match(/\{[\s\S]*\}$/);
-    if (!jsonMatch) {
-      return NextResponse.json({ error: 'Claude output invalid', details: 'No JSON object found in response' }, { status: 500 });
+    const rawOut = resp.content.find((c) => c.type === 'text')?.text || '';
+    const jsonText = extractJsonObjectFromText(rawOut);
+    if (!jsonText) {
+      return NextResponse.json(
+        {
+          error: 'Claude output invalid',
+          details: 'No JSON object found in response',
+          sample: rawOut.slice(0, 600),
+        },
+        { status: 502 }
+      );
     }
 
     let patchRaw: unknown;
     try {
-      patchRaw = JSON.parse(jsonMatch[0]);
-    } catch (e) {
-      return NextResponse.json({ error: 'Claude output invalid', details: 'Failed to parse JSON' }, { status: 500 });
+      patchRaw = JSON.parse(jsonText);
+    } catch {
+      return NextResponse.json(
+        { error: 'Claude output invalid', details: 'Failed to parse JSON', sample: jsonText.slice(0, 600) },
+        { status: 502 }
+      );
     }
 
     const patchParsed = EnrichmentPatchSchema.safeParse(patchRaw);
