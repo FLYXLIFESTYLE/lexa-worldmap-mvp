@@ -57,6 +57,20 @@ These are the simple rules captains should follow when reviewing extracted POIs:
 2. **Raise confidence carefully**
    - If you increase confidence above 80, do it only after verifying the POI is accurate and complete.
 
+   **Quality badge meaning (derived):**
+   - Excellent: confidence ≥ 90
+   - Good: confidence ≥ 80
+   - Fair: confidence 60–79
+   - Poor: confidence < 60
+   - There is no separate “fair” field — it updates automatically when confidence changes.
+
+   **Quality badge meaning (derived):**
+   - Excellent: confidence ≥ 90
+   - Good: confidence ≥ 80
+   - Fair: confidence 60–79
+   - Poor: confidence < 60
+   - There is no separate “fair” field — it updates automatically when confidence changes.
+
 3. **Promote only clean, verified POIs**
    - Promotion writes a canonical POI into **Neo4j** (official knowledge).
    - Only promote when name/destination/category/description are correct and keywords/themes are reasonable.

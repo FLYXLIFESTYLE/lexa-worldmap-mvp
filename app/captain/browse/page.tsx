@@ -78,6 +78,12 @@ export default function CaptainBrowsePage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [qualityFilter, setQualityFilter] = useState('all');
   const [scoreFilter, setScoreFilter] = useState('all');
+  const [enrichedFilter, setEnrichedFilter] = useState<'all' | 'enriched' | 'not_enriched'>('all');
+  const [minLuxuryScore, setMinLuxuryScore] = useState<number>(0);
+  const [tagFilter, setTagFilter] = useState<string>('');
+
+  // Bulk selection
+  const [selectedPoiIds, setSelectedPoiIds] = useState<Set<string>>(new Set());
   
   // Edit State
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -259,6 +265,117 @@ export default function CaptainBrowsePage() {
     }
   };
 
+  const isPoiSelected = (id: string) => selectedPoiIds.has(id);
+
+  const togglePoiSelected = (id: string) => {
+    setSelectedPoiIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedPoiIds(new Set());
+
+  const selectAllVisible = () => {
+    setSelectedPoiIds((prev) => {
+      const next = new Set(prev);
+      for (const p of filteredPois) next.add(p.id);
+      return next;
+    });
+  };
+
+  const unselectAllVisible = () => {
+    setSelectedPoiIds((prev) => {
+      const next = new Set(prev);
+      for (const p of filteredPois) next.delete(p.id);
+      return next;
+    });
+  };
+
+  const handleBulkVerifySelected = async () => {
+    const ids = Array.from(selectedPoiIds);
+    if (!ids.length) return alert('Select at least one POI first.');
+    if (!confirm(`Verify (approve) ${ids.length} selected POIs?`)) return;
+    try {
+      const res = await fetch('/api/captain/pois/bulk-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, verified: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data.details || data.error || 'Bulk verify failed'));
+      clearSelection();
+      await fetchPOIs();
+      alert(`✅ Verified ${Number((data as any).updated || 0)} of ${Number((data as any).requested || ids.length)} POIs.`);
+    } catch (e: any) {
+      alert(`❌ Bulk verify failed: ${e?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleBulkMarkEnhanced = async () => {
+    const ids = Array.from(selectedPoiIds);
+    if (!ids.length) return alert('Select at least one POI first.');
+    if (!confirm(`Mark ${ids.length} selected POIs as "Enhanced"?`)) return;
+    try {
+      const res = await fetch('/api/captain/pois/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, patch: { enhanced: true } }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data.details || data.error || 'Bulk update failed'));
+      clearSelection();
+      await fetchPOIs();
+      alert(`✅ Updated ${Number((data as any).updated || 0)} of ${Number((data as any).requested || ids.length)} POIs.`);
+    } catch (e: any) {
+      alert(`❌ Bulk update failed: ${e?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleBulkSetConfidence = async () => {
+    const ids = Array.from(selectedPoiIds);
+    if (!ids.length) return alert('Select at least one POI first.');
+    const raw = prompt('Set confidence score for selected POIs (0-100):', '80') || '';
+    const v = Math.max(0, Math.min(100, Number(raw) || 0));
+    if (!confirm(`Set confidence to ${v}% for ${ids.length} selected POIs?`)) return;
+    try {
+      const res = await fetch('/api/captain/pois/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, patch: { confidence_score: v } }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data.details || data.error || 'Bulk update failed'));
+      clearSelection();
+      await fetchPOIs();
+      alert(`✅ Updated ${Number((data as any).updated || 0)} of ${Number((data as any).requested || ids.length)} POIs.`);
+    } catch (e: any) {
+      alert(`❌ Bulk update failed: ${e?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleBulkDeleteSelected = async () => {
+    const ids = Array.from(selectedPoiIds);
+    if (!ids.length) return alert('Select at least one POI first.');
+    if (!confirm(`Delete ${ids.length} selected POIs?\n\nThis cannot be undone.`)) return;
+    try {
+      const res = await fetch('/api/captain/pois/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(data.details || data.error || 'Bulk delete failed'));
+      clearSelection();
+      await fetchPOIs();
+      alert(`🗑️ Deleted ${Number((data as any).deleted || 0)} of ${Number((data as any).requested || ids.length)} POIs.`);
+    } catch (e: any) {
+      alert(`❌ Bulk delete failed: ${e?.message || 'Unknown error'}`);
+    }
+  };
+
   // Apply filters
   useEffect(() => {
     let filtered = [...pois];
@@ -273,9 +390,36 @@ export default function CaptainBrowsePage() {
       );
     }
     
+    // Enriched
+    if (enrichedFilter === 'enriched') {
+      filtered = filtered.filter((poi) => !!poi.enhanced);
+    } else if (enrichedFilter === 'not_enriched') {
+      filtered = filtered.filter((poi) => !poi.enhanced);
+    }
+
     // Category
     if (categoryFilter !== 'all') {
       filtered = filtered.filter(poi => poi.category === categoryFilter);
+    }
+
+    // Luxury score
+    if (minLuxuryScore > 0) {
+      filtered = filtered.filter((poi) => (typeof poi.luxury_score === 'number' ? poi.luxury_score : 0) >= minLuxuryScore);
+    }
+
+    // Tag / hashtag filter (keywords)
+    if (tagFilter.trim()) {
+      const wanted = tagFilter
+        .split(',')
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      if (wanted.length) {
+        filtered = filtered.filter((poi) => {
+          const kws = Array.isArray(poi.keywords) ? poi.keywords : [];
+          const set = new Set(kws.map((k) => String(k || '').trim().toLowerCase()).filter(Boolean));
+          return wanted.every((w) => set.has(w));
+        });
+      }
     }
     
     // Quality
@@ -293,7 +437,7 @@ export default function CaptainBrowsePage() {
     }
     
     setFilteredPois(filtered);
-  }, [searchQuery, categoryFilter, qualityFilter, scoreFilter, pois]);
+  }, [searchQuery, enrichedFilter, minLuxuryScore, tagFilter, categoryFilter, qualityFilter, scoreFilter, pois]);
 
   useEffect(() => {
     let filtered = [...nuggets];
@@ -741,6 +885,46 @@ export default function CaptainBrowsePage() {
                   </>
                 )}
               </div>
+
+              {/* Advanced filters (POIs) */}
+              {section === 'pois' && (
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Enriched</label>
+                    <select
+                      value={enrichedFilter}
+                      onChange={(e) => setEnrichedFilter(e.target.value as any)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">All</option>
+                      <option value="enriched">Enriched (Enhanced)</option>
+                      <option value="not_enriched">Not enriched</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Min Luxury Score</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10}
+                      value={minLuxuryScore}
+                      onChange={(e) => setMinLuxuryScore(Math.max(0, Math.min(10, Number(e.target.value || 0))))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g. 6"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Hashtags (keywords)</label>
+                    <input
+                      type="text"
+                      value={tagFilter}
+                      onChange={(e) => setTagFilter(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g. michelin, waterfront"
+                    />
+                  </div>
+                </div>
+              )}
               
               <div className="mt-4 flex items-center justify-between gap-4">
                 <div className="text-sm text-gray-600">
@@ -785,6 +969,69 @@ export default function CaptainBrowsePage() {
                   )}
                 </div>
               </div>
+
+              {/* Bulk selection + actions (POIs) */}
+              {section === 'pois' && (
+                <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-t border-gray-200 pt-4">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={filteredPois.length > 0 && filteredPois.every((p) => selectedPoiIds.has(p.id))}
+                        onChange={(e) => (e.target.checked ? selectAllVisible() : unselectAllVisible())}
+                      />
+                      Select all visible
+                    </label>
+                    <div className="text-sm text-gray-600">
+                      Selected: <span className="font-semibold text-gray-900">{selectedPoiIds.size}</span>
+                    </div>
+                    {selectedPoiIds.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={clearSelection}
+                        className="text-sm text-gray-600 hover:text-gray-900 underline"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleBulkVerifySelected}
+                      className="px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700"
+                      title="Verify selected POIs"
+                    >
+                      Verify selected
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBulkMarkEnhanced}
+                      className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
+                      title="Mark selected POIs as enhanced (without running enrichment)"
+                    >
+                      Mark enhanced
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBulkSetConfidence}
+                      className="px-3 py-2 rounded-lg bg-slate-700 text-white text-sm font-semibold hover:bg-slate-800"
+                      title="Set confidence score for selected POIs"
+                    >
+                      Set confidence
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBulkDeleteSelected}
+                      className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700"
+                      title="Delete selected POIs"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {section === 'pois' ? (
@@ -823,6 +1070,12 @@ export default function CaptainBrowsePage() {
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
+                              <input
+                                type="checkbox"
+                                checked={isPoiSelected(poi.id)}
+                                onChange={() => togglePoiSelected(poi.id)}
+                                title="Select this POI for bulk actions"
+                              />
                               <h3 className="text-xl font-semibold text-gray-900">{poi.name}</h3>
                               {poi.verified && (
                                 <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
@@ -864,6 +1117,7 @@ export default function CaptainBrowsePage() {
                             className={`px-3 py-1 rounded-full text-xs font-semibold ${getQualityColor(
                               getQualityFromScore(poi.confidence_score)
                             )}`}
+                            title="Quality is derived from confidence: Excellent ≥90, Good ≥80, Fair 60–79, Poor <60. Change confidence to change this badge."
                           >
                             {getQualityFromScore(poi.confidence_score).toUpperCase()}
                           </span>

@@ -70,6 +70,7 @@ export default function CEODashboardPage() {
   const [poiCountsError, setPoiCountsError] = useState<string | null>(null);
   const [poiCounts, setPoiCounts] = useState<PoiCountsRow[] | null>(null);
   const [poiCountsUpdatedAt, setPoiCountsUpdatedAt] = useState<string | null>(null);
+  const [poiCountsAutoRefresh, setPoiCountsAutoRefresh] = useState(false);
 
   useEffect(() => {
     try {
@@ -149,6 +150,44 @@ export default function CEODashboardPage() {
     refreshPoiCounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!poiCountsAutoRefresh) return;
+    const t = setInterval(() => {
+      refreshPoiCounts();
+    }, 2 * 60 * 1000); // every 2 minutes (keeps CEO view "live" without spamming Neo4j)
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poiCountsAutoRefresh]);
+
+  const poiKpis = useMemo(() => {
+    if (!poiCounts?.length) return null;
+    const mvp = poiCounts.filter((r) => r.kind === 'mvp_destination');
+    const rows = mvp.length ? mvp : poiCounts;
+
+    const sum = (arr: number[]) => arr.reduce((a, b) => a + (Number(b) || 0), 0);
+    const totalSupabasePois = sum(rows.map((r) => r.supabase_pois));
+    const totalDraftPois = sum(rows.map((r) => r.extracted_pois));
+    const totalNeo4jPois = sum(rows.map((r) => r.neo4j_pois));
+    const totalWikidata = sum(rows.map((r) => r.sources?.wikidata || 0));
+    const totalOsm = sum(rows.map((r) => r.sources?.osm || 0));
+    const totalOverture = sum(rows.map((r) => r.sources?.overture || 0));
+
+    const coveredDestinations = rows.filter((r) => (r.supabase_pois || 0) > 0 || (r.extracted_pois || 0) > 0).length;
+    const totalDestinations = rows.length;
+
+    return {
+      totalSupabasePois,
+      totalDraftPois,
+      totalNeo4jPois,
+      totalWikidata,
+      totalOsm,
+      totalOverture,
+      coveredDestinations,
+      totalDestinations,
+      scopeLabel: mvp.length ? 'MVP destinations' : 'all destinations',
+    };
+  }, [poiCounts]);
 
   return (
     <PortalShell
@@ -528,7 +567,7 @@ export default function CEODashboardPage() {
                     <div className="text-xs font-semibold text-zinc-500">07 - Snapshot</div>
                     <h2 className="text-2xl font-bold text-lexa-navy mt-1">Live KPIs (Investor Snapshot)</h2>
                     <p className="text-sm text-zinc-600 mt-1">
-                      Currently placeholders. Next step: connect to live Supabase + Neo4j.
+                      Live counts from Supabase + Neo4j (admin-only).
                     </p>
                   </div>
                   <button
@@ -542,12 +581,44 @@ export default function CEODashboardPage() {
                   </button>
                 </div>
 
-                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <label className="inline-flex items-center gap-2 text-sm text-zinc-700">
+                    <input
+                      type="checkbox"
+                      checked={poiCountsAutoRefresh}
+                      onChange={(e) => setPoiCountsAutoRefresh(e.target.checked)}
+                    />
+                    Auto-refresh (every 2 minutes)
+                  </label>
+                  <div className="text-xs text-zinc-500">{poiKpis ? `Scope: ${poiKpis.scopeLabel}` : ''}</div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {[
-                    { label: 'Total POIs', value: '340k+', note: 'Neo4j + imports', tone: 'bg-blue-50 border-blue-200 text-blue-900' },
-                    { label: 'Luxury-scored', value: '85k+', note: 'score > 6.0', tone: 'bg-purple-50 border-purple-200 text-purple-900' },
-                    { label: 'Chats', value: '1.2k+', note: 'all time', tone: 'bg-emerald-50 border-emerald-200 text-emerald-900' },
-                    { label: 'ARR', value: '€304k', note: 'demo math', tone: 'bg-amber-50 border-amber-200 text-amber-900' },
+                    {
+                      label: 'Supabase POIs',
+                      value: poiKpis ? poiKpis.totalSupabasePois.toLocaleString() : '—',
+                      note: 'Canonical entities (experience graph)',
+                      tone: 'bg-blue-50 border-blue-200 text-blue-900',
+                    },
+                    {
+                      label: 'Draft POIs',
+                      value: poiKpis ? poiKpis.totalDraftPois.toLocaleString() : '—',
+                      note: 'Captain review list (extracted_pois)',
+                      tone: 'bg-purple-50 border-purple-200 text-purple-900',
+                    },
+                    {
+                      label: 'Neo4j POIs',
+                      value: poiKpis ? poiKpis.totalNeo4jPois.toLocaleString() : '—',
+                      note: 'Graph POIs',
+                      tone: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+                    },
+                    {
+                      label: 'Coverage',
+                      value: poiKpis ? `${poiKpis.coveredDestinations}/${poiKpis.totalDestinations}` : '—',
+                      note: 'Destinations with any POIs',
+                      tone: 'bg-amber-50 border-amber-200 text-amber-900',
+                    },
                   ].map((k) => (
                     <div key={k.label} className={`rounded-xl border p-4 ${k.tone}`}>
                       <div className="text-xs font-semibold">{k.label}</div>
@@ -556,6 +627,21 @@ export default function CEODashboardPage() {
                     </div>
                   ))}
                 </div>
+
+                {!!poiKpis && (
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {[
+                      { label: 'Wikidata sources', v: poiKpis.totalWikidata },
+                      { label: 'OSM sources', v: poiKpis.totalOsm },
+                      { label: 'Overture sources', v: poiKpis.totalOverture },
+                    ].map((x) => (
+                      <div key={x.label} className="bg-white border border-zinc-200 rounded-xl p-3">
+                        <div className="text-xs font-semibold text-zinc-600">{x.label}</div>
+                        <div className="text-xl font-bold text-zinc-900 mt-1 tabular-nums">{x.v.toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <div className="mt-6 bg-white border border-zinc-200 rounded-xl p-4">
                   <div className="flex items-center justify-between gap-3">

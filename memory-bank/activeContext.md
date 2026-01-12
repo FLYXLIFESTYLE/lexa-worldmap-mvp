@@ -1,6 +1,6 @@
 # Active Context
 
-**Last Updated**: January 5, 2026
+**Last Updated**: January 12, 2026
 
 ## Current Focus: MVP Completion for Investor Demo
 
@@ -73,6 +73,17 @@
    - Verification now stores audit fields (`verified_by`, `verified_at`).
    - Ownership enforced (non-admins only edit/verify their own extracted POIs).
 
+5. **Captain Browse now supports real operations at scale (bulk + filters)**
+   - Bulk select (per-row checkbox + select-all visible) and bulk actions:
+     - Verify selected
+     - Mark enhanced (without enrichment)
+     - Set confidence for selected
+     - Delete selected
+   - Advanced filters: enriched/enhanced, min luxury score, keyword/hashtag match, plus existing category + confidence filters.
+   - City is a first-class concept (separate from destination region):
+     - UI allows editing `city` in “Edit & Enhance”
+     - Enrichment attempts to extract `city` when supported by sources (stored in `extracted_pois.city` once migrated)
+
 3. **Promotion is now real (official knowledge)**
    - Verified POIs can be **Promoted** into Neo4j as canonical `:poi` nodes.
    - Postgres `extracted_pois.promoted_to_main` is set and metadata stores promotion audit info (who/when + `neo4j_poi_uid`).
@@ -93,6 +104,10 @@
    - The assistant receives a short “Grounded Knowledge” list:
      - `[APPROVED]` items: safe to name as venues
      - `[DRAFT]` items: must be labeled as unapproved
+
+### January 2026 - CEO Dashboard now shows live POI coverage ✅
+- `/ceo-dashboard` slide “Live KPIs” pulls admin-only live counts from `/api/admin/poi-counts` (Supabase + Neo4j)
+- Shows totals + per-destination table + optional auto-refresh
 
 ### December 2025 - POI Collection System & Production Deployment
 

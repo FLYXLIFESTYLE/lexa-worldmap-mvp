@@ -88,6 +88,10 @@
 ### Captain Approval & Promotion (POIs)
 - [x] Verification audit trail on extracted POIs (`verified_by`, `verified_at`)
 - [x] Promotion to official Neo4j knowledge via `/api/captain/pois/[id]/promote` (writes canonical `:poi` + marks `extracted_pois.promoted_to_main`)
+- [x] Captain Browse: bulk select + bulk actions (verify, delete, mark enhanced, set confidence)
+- [x] Captain Browse: advanced filters (enriched/enhanced, min luxury score, keyword/hashtag match)
+- [x] Captain Browse: city field editable in “Edit & Enhance” (stored in `extracted_pois.city` after migration)
+- [x] Confidence policy: enrichment ensures confidence >= 70% (never reduces upload defaults like 80%)
 
 ### Scripts & Tools
 - [x] French Riviera enrichment script (`scripts/enrich-french-riviera.ts`)
@@ -111,6 +115,7 @@
 - [x] Google Vision setup guide
 - [x] **Memory Bank system implemented** (this file!)
 - [x] Captain upload UX refresh: quick summary on file rows; item-level confidence (0–100% UI, stored as fractions); bulk select/delete for POIs/Experiences/Providers; providers separated from competitors; streamlined editor (removed top slider/emotion/count boxes)
+- [x] CEO Dashboard “Live KPIs” wired to live database counts (`/api/admin/poi-counts`)
 
 ## What's Left to Build 🚧
 
