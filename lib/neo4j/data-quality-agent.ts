@@ -18,6 +18,7 @@ import { logQualityCheck } from '../services/logger';
 import { addSeasonalAvailability } from './relationship-inference';
 import { scoreAllUnscored } from './scoring-engine';
 import type { Driver, Session } from 'neo4j-driver';
+import * as neo4j from 'neo4j-driver';
 
 // ============================================================================
 // Type Definitions
@@ -339,11 +340,16 @@ async function mergeDuplicateGroup(
   const relationshipsMerged = await mergeRelationships(session, keptPOI, duplicatePOI);
 
   // Delete duplicate
+  // Convert ID to Neo4j Integer to handle 64-bit node IDs safely
+  const duplicateIdValue = typeof duplicatePOI.id === 'object' && duplicatePOI.id?.toNumber 
+    ? neo4j.int(duplicatePOI.id.toNumber())
+    : neo4j.int(Number(duplicatePOI.id));
+  
   await session.run(`
     MATCH (p:poi)
     WHERE id(p) = $duplicateId
     DETACH DELETE p
-  `, { duplicateId: parseInt(duplicatePOI.id) });
+  `, { duplicateId: duplicateIdValue });
 
   console.log(`  Merged POI ${duplicatePOI.id} into ${keptPOI.id}`);
 
@@ -405,12 +411,17 @@ async function mergeProperties(
   }
 
   if (Object.keys(updates).length > 0) {
+    // Convert ID to Neo4j Integer to handle 64-bit node IDs safely
+    const keptIdValue = typeof keptPOI.id === 'object' && keptPOI.id?.toNumber 
+      ? neo4j.int(keptPOI.id.toNumber())
+      : neo4j.int(Number(keptPOI.id));
+    
     await session.run(`
       MATCH (p:poi)
       WHERE id(p) = $keptId
       SET p += $updates
     `, {
-      keptId: parseInt(keptPOI.id),
+      keptId: keptIdValue,
       updates,
     });
   }
@@ -446,8 +457,13 @@ async function mergeRelationships(
       
       RETURN count(newRel) as merged
     `, {
-      keptId: parseInt(keptPOI.id),
-      duplicateId: parseInt(duplicatePOI.id),
+      // Convert IDs to Neo4j Integer to handle 64-bit node IDs safely
+      keptId: typeof keptPOI.id === 'object' && keptPOI.id?.toNumber 
+        ? neo4j.int(keptPOI.id.toNumber())
+        : neo4j.int(Number(keptPOI.id)),
+      duplicateId: typeof duplicatePOI.id === 'object' && duplicatePOI.id?.toNumber 
+        ? neo4j.int(duplicatePOI.id.toNumber())
+        : neo4j.int(Number(duplicatePOI.id)),
     });
 
     mergedCount += result.records[0]?.get('merged')?.toNumber() || 0;

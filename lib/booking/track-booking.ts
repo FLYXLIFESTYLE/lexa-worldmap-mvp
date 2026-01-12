@@ -5,6 +5,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
+import * as neo4j from 'neo4j-driver';
 
 export interface BookingData {
   userId: string;
@@ -38,10 +39,14 @@ async function getContributor(
     if (poiId) {
       query = `
         MATCH (p:poi)
-        WHERE id(p) = toInteger($poiId) OR p.poi_uid = $poiId
+        WHERE id(p) = $poiIdInt OR p.poi_uid = $poiId
         RETURN p.contributed_by as userId, p.contributor_name as displayName
       `;
-      params = { poiId };
+      // Convert ID to Neo4j Integer to handle 64-bit node IDs safely
+      const poiIdInt = typeof poiId === 'object' && poiId?.toNumber 
+        ? neo4j.int(poiId.toNumber())
+        : neo4j.int(Number(poiId));
+      params = { poiId, poiIdInt };
     } else if (knowledgeId) {
       query = `
         MATCH (k:Knowledge {knowledge_id: $knowledgeId})

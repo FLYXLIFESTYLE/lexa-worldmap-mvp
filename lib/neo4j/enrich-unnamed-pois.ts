@@ -5,6 +5,7 @@
 
 import { getNeo4jDriver } from './client';
 import type { Session } from 'neo4j-driver';
+import * as neo4j from 'neo4j-driver';
 
 interface UnnamedPOI {
   id: string;
@@ -77,6 +78,11 @@ export async function enrichUnnamedPOIs(): Promise<EnrichmentResult> {
 
         if (enrichedName) {
           // Update POI with found name
+          // Convert ID to Neo4j Integer to handle 64-bit node IDs safely
+          const poiIdValue = typeof poi.id === 'object' && poi.id?.toNumber 
+            ? neo4j.int(poi.id.toNumber())
+            : neo4j.int(Number(poi.id));
+          
           await session.run(`
             MATCH (p:poi)
             WHERE id(p) = $id
@@ -85,7 +91,7 @@ export async function enrichUnnamedPOIs(): Promise<EnrichmentResult> {
               p.enriched_at = datetime(),
               p.enrichment_source = $source
           `, {
-            id: parseInt(poi.id),
+            id: poiIdValue,
             name: enrichedName.name,
             source: enrichedName.source,
           });

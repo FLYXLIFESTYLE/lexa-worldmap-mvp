@@ -15,6 +15,13 @@ const QuerySchema = z.object({
   destination: z.string().min(1).optional(),
 });
 
+// Default values for Vercel cron (when no query params provided)
+const CRON_DEFAULTS = {
+  batch: 1,
+  maxResults: 3,
+  searchDepth: 'basic' as const,
+};
+
 const EnrichmentPatchSchema = z.object({
   category: z.string().min(1).optional(),
   destination: z.string().min(1).optional(),
@@ -64,10 +71,11 @@ export async function GET(req: Request) {
     }
 
     const url = new URL(req.url);
+    // Use defaults when called from Vercel cron (no query params) or parse from URL
     const parsed = QuerySchema.safeParse({
-      batch: url.searchParams.get('batch') ?? undefined,
-      maxResults: url.searchParams.get('maxResults') ?? undefined,
-      searchDepth: url.searchParams.get('searchDepth') ?? undefined,
+      batch: url.searchParams.get('batch') ?? CRON_DEFAULTS.batch,
+      maxResults: url.searchParams.get('maxResults') ?? CRON_DEFAULTS.maxResults,
+      searchDepth: url.searchParams.get('searchDepth') ?? CRON_DEFAULTS.searchDepth,
       destination: url.searchParams.get('destination') ?? undefined,
     });
     if (!parsed.success) {

@@ -2,7 +2,7 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/cron/auto-enrich-pois?batch=1&maxResults=3&searchDepth=basic",
+      "path": "/api/cron/auto-enrich-pois",
       "schedule": "*/30 * * * *"
     }
   ]

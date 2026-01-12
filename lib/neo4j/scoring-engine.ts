@@ -8,6 +8,7 @@
 
 import { getNeo4jDriver } from './client';
 import Anthropic from '@anthropic-ai/sdk';
+import * as neo4j from 'neo4j-driver';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -383,6 +384,11 @@ export async function scoreAllUnscored(): Promise<{
         const scoring = await calculateLuxuryScore(poiData);
 
         // Update POI in database
+        // Convert ID to Neo4j Integer to handle 64-bit node IDs safely
+        const poiIdValue = typeof poiId === 'object' && poiId?.toNumber 
+          ? neo4j.int(poiId.toNumber())
+          : neo4j.int(Number(poiId));
+        
         await session.run(`
           MATCH (p:poi)
           WHERE id(p) = $id
@@ -392,7 +398,7 @@ export async function scoreAllUnscored(): Promise<{
             p.luxury_evidence = $evidence,
             p.scored_at = datetime()
         `, {
-          id: parseInt(poiId),
+          id: poiIdValue,
           luxury_score: scoring.luxury_score,
           confidence: scoring.confidence,
           evidence: scoring.evidence.join('; '),
