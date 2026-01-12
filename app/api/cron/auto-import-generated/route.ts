@@ -197,7 +197,7 @@ export async function GET(req: Request) {
       maxDestinations: url.searchParams.get('maxDestinations') ?? CRON_DEFAULTS.maxDestinations,
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid query', details: parsed.error.flatten() }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid query', details: JSON.stringify(parsed.error.flatten()) }, { status: 400 });
     }
 
     // Accept either env var name (beginner-friendly / avoids brittle config):
@@ -225,21 +225,32 @@ export async function GET(req: Request) {
     }
 
     // Cron sweep mode: import across MVP destinations in small batches (no query params needed).
-    const { data: dests, error: destsErr } = await supabaseAdmin
+    // IMPORTANT: rotate through destinations so we don't always import only the first N.
+    const { data: destsAll, error: destsErr } = await supabaseAdmin
       .from('destinations_geo')
-      .select('name,kind')
+      .select('name')
       .eq('kind', 'mvp_destination')
-      .order('name', { ascending: true })
-      .limit(maxDestinations);
+      .order('name', { ascending: true });
     if (destsErr) return NextResponse.json({ error: 'Failed to load destinations', details: destsErr.message }, { status: 500 });
+
+    const names = (destsAll || []).map((d: any) => String(d?.name || '').trim()).filter(Boolean);
+    if (!names.length) {
+      return NextResponse.json({ success: true, mode: 'sweep', destinations_processed: 0, total_created: 0, total_requested: 0 });
+    }
+
+    // 30-minute slot index (matches our cron cadence). This creates a deterministic rotation.
+    const slot = Math.floor(Date.now() / (30 * 60 * 1000));
+    const start = slot % names.length;
+    const selected: string[] = [];
+    for (let i = 0; i < Math.min(maxDestinations, names.length); i++) {
+      selected.push(names[(start + i) % names.length]);
+    }
 
     const results: Array<{ destination: string; created: number; requested: number; error?: string }> = [];
     let totalCreated = 0;
     let totalRequested = 0;
 
-    for (const d of dests || []) {
-      const name = String((d as any).name || '').trim();
-      if (!name) continue;
+    for (const name of selected) {
       try {
         const r = await importForDestination({ destinationName: name, source, limit, ownerId });
         results.push(r);

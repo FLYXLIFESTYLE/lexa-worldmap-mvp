@@ -313,7 +313,12 @@ export const poisAPI = {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const err = String(data.error || 'Failed to enrich POI');
-      const details = data.details ? String(data.details) : '';
+      const details =
+        data.details === undefined || data.details === null
+          ? ''
+          : typeof data.details === 'string'
+            ? data.details
+            : JSON.stringify(data.details);
       throw new Error(details ? `${err}: ${details}` : err);
     }
     return data;

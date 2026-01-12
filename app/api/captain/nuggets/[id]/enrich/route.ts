@@ -221,7 +221,10 @@ Notes:
 
     const extracted = NuggetEnrichmentSchema.safeParse(parsed);
     if (!extracted.success) {
-      return NextResponse.json({ error: 'Claude output invalid', details: extracted.error.flatten() }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Claude output invalid', details: JSON.stringify(extracted.error.flatten()) },
+        { status: 502 }
+      );
     }
 
     const existingSourceRefs = Array.isArray(nugget.source_refs) ? nugget.source_refs : [];

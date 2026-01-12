@@ -260,7 +260,10 @@ Notes:
 
     const patchParsed = EnrichmentPatchSchema.safeParse(patchRaw);
     if (!patchParsed.success) {
-      return NextResponse.json({ error: 'Claude output invalid', details: patchParsed.error.flatten() }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Claude output invalid', details: JSON.stringify(patchParsed.error.flatten()) },
+        { status: 502 }
+      );
     }
     const patch = patchParsed.data;
 
