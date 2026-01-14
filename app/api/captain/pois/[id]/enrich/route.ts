@@ -43,6 +43,11 @@ const EnrichmentPatchSchema = z.object({
   luxury_score_confidence: opt(z.number().int().min(0).max(100)),
   citations: opt(z.array(CitationSchema)),
   website_url: opt(z.string().url()),
+  // New: Script contribution evaluation (enrich-first architecture)
+  script_contribution_score: opt(z.number().int().min(0).max(100)),
+  emotion_potential: opt(z.array(z.string().min(1))),
+  activity_types: opt(z.array(z.string().min(1))),
+  theme_alignments: opt(z.array(z.string().min(1))),
 });
 
 function sha1(input: string): string {
@@ -193,7 +198,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       })
       .join('\n');
 
-    const system = `You are a careful data extraction assistant for LEXA.
+    const system = `You are a careful data extraction assistant for LEXA, an AI travel experience designer.
 
 CRITICAL RULES:
 - Use ONLY the provided sources. If a fact is not supported, output null/omit it.
@@ -203,7 +208,20 @@ CRITICAL RULES:
 - Prefer short, investor-safe descriptions (<= 1200 chars).
 
 Task:
-Given a POI name and destination context, extract a useful enrichment patch for a travel assistant.
+Extract enrichment data AND evaluate if this POI can contribute to experience scripts.
+
+SCRIPT CONTRIBUTION EVALUATION:
+Analyze if this POI can:
+1. Evoke emotions (peace, connection, awe, freedom, belonging, significance)
+2. Support activities (dining, sailing, cultural immersion, wellness, celebration)
+3. Fit experience themes (Mediterranean Indulgence, Wellness Retreat, Cultural Discovery, etc.)
+4. Enhance narratives (has story potential, not just "a hotel" but "why THIS hotel?")
+
+Score "script_contribution_score" (0-100):
+- 0-30: Generic/junk (embassy, parking lot, generic business)
+- 40-60: Functional (hotel/restaurant with no special attributes)
+- 70-85: Good experience value (has emotional/activity/theme potential)
+- 90-100: Exceptional (unique, emotionally resonant, story-rich)
 
 JSON shape (only include fields you are confident about):
 {
@@ -224,12 +242,20 @@ JSON shape (only include fields you are confident about):
   "luxury_score_confidence": 0-100,
   "citations": [
     { "source_ref_index": number, "anchor": string, "quote_snippet": string }
-  ]
+  ],
+  "script_contribution_score": 0-100,
+  "emotion_potential": ["peace", "connection", "awe", "freedom", "belonging", "joy", "significance"],
+  "activity_types": ["dining", "sailing", "cultural_immersion", "wellness", "celebration", "exploration"],
+  "theme_alignments": ["Mediterranean_Indulgence", "Wellness_Retreat", "Cultural_Discovery", "Adventure", "Romance"]
 }
 
 Notes:
 - source_ref_index refers to SOURCE N above.
-- anchor can be "tavily:SOURCE_N".`;
+- anchor can be "tavily:SOURCE_N".
+- emotion_potential: which emotions can this POI evoke? (based on context, not just keywords)
+- activity_types: which activities does this POI support? (what can you DO here?)
+- theme_alignments: which experience themes does this POI fit?
+- script_contribution_score: overall RAG value (can it make a script better?)`;
 
     const userMsg = `POI: ${poiName}\nDestination: ${destination || 'unknown'}\n\n${numberedSources}`;
 
@@ -351,6 +377,21 @@ Notes:
     if ((poi.luxury_score_confidence === null || poi.luxury_score_confidence === undefined) && typeof patch.luxury_score_confidence === 'number') {
       updates.luxury_score_confidence = patch.luxury_score_confidence;
     }
+
+    // Script contribution evaluation (enrich-first architecture)
+    if (typeof patch.script_contribution_score === 'number') {
+      updates.script_contribution_score = patch.script_contribution_score;
+    }
+    if (Array.isArray(patch.emotion_potential) && patch.emotion_potential.length) {
+      updates.emotion_potential = patch.emotion_potential;
+    }
+    if (Array.isArray(patch.activity_types) && patch.activity_types.length) {
+      updates.activity_types = patch.activity_types;
+    }
+    if (Array.isArray(patch.theme_alignments) && patch.theme_alignments.length) {
+      updates.theme_alignments = patch.theme_alignments;
+    }
+
     // Confidence policy:
     // - After successful enrichment, confidence should be at least 70%.
     // - Upload-based POIs already default to 80% and should not be reduced.
@@ -423,10 +464,38 @@ Notes:
       // ignore if table doesn't exist yet
     }
 
+    // Post-enrichment quality gate: Auto-delete if POI scored too low for scripts
+    // Only applies to auto-imported POIs (not Captain uploads), and only if not verified yet
+    const scriptScore = typeof patch.script_contribution_score === 'number' ? patch.script_contribution_score : null;
+    const luxScore = typeof patch.luxury_score === 'number' ? patch.luxury_score : null;
+    const isAutoImported = !!(poi as any).generated_source; // has generated_source field
+    const isVerified = !!poi.verified;
+
+    if (isAutoImported && !isVerified && scriptScore !== null && scriptScore < 40 && (luxScore === null || luxScore < 4)) {
+      // Low script value + low luxury = junk POI, delete it
+      try {
+        await admin.from('extracted_pois').delete().eq('id', id);
+        return NextResponse.json({
+          success: true,
+          action: 'deleted',
+          reason: 'Low script contribution value (quality gate)',
+          scores: { script_contribution: scriptScore, luxury: luxScore },
+          note: 'This POI was auto-deleted because it scored too low for experience scripts.',
+        });
+      } catch {
+        // If delete fails, just return success (enrichment succeeded even if cleanup didn't)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       updated_fields: Object.keys(updates),
       tavily: { query: tavilyResult.query, sources: sources.length },
+      scores: {
+        script_contribution: scriptScore,
+        luxury: luxScore,
+        confidence: updates.confidence_score,
+      },
     });
   } catch (error) {
     console.error('POI enrich error:', error);
