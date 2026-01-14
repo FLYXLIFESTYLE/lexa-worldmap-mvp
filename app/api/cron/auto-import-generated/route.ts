@@ -248,7 +248,7 @@ export async function GET(req: Request) {
     const { data: destsAll, error: destsErr } = await supabaseAdmin
       .from('destinations_geo')
       .select('name')
-      .eq('kind', 'mvp_destination')
+      .eq('kind', 'region')
       .order('name', { ascending: true });
     if (destsErr) return NextResponse.json({ error: 'Failed to load destinations', details: destsErr.message }, { status: 500 });
 
