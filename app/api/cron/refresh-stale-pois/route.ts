@@ -88,9 +88,10 @@ export async function GET(req: Request) {
     const processed: Array<{ id: string; name: string; ok: boolean; error?: string }> = [];
 
     for (const poi of stalePois) {
+      const poiName = String(poi.name || '').trim();
+      const destination = String(poi.destination || '').trim();
+      
       try {
-        const poiName = String(poi.name || '').trim();
-        const destination = String(poi.destination || '').trim();
         if (!poiName || !destination) continue;
 
         // 1) Tavily search
