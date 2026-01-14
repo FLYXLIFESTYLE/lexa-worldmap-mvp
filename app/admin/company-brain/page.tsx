@@ -186,7 +186,15 @@ export default function CompanyBrainPage() {
     >
       {/* Upload Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-4">📤 Upload Historical Conversations</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-semibold text-gray-900">📤 Upload Historical Conversations</h2>
+          <a
+            href="/admin/company-brain/review"
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+          >
+            🔍 Review Sections
+          </a>
+        </div>
         <p className="text-gray-600 mb-6">
           Upload exported ChatGPT conversations (PDF, Word, Excel, or text). Same extraction as Captain Upload.
         </p>
