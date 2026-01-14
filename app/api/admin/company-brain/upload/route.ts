@@ -21,7 +21,9 @@ import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import pdf from 'pdf-parse';
+
+// pdf-parse uses CommonJS, import via require in Node.js route
+const pdf = require('pdf-parse');
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for large documents
