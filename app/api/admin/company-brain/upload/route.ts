@@ -22,9 +22,6 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 
-// pdf-parse uses CommonJS, import via require in Node.js route
-const pdf = require('pdf-parse');
-
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for large documents
 
@@ -65,17 +62,7 @@ async function requireAdmin() {
 async function extractTextFromBuffer(buffer: Buffer, filename: string): Promise<string> {
   const ext = filename.toLowerCase().split('.').pop();
 
-  // PDF files
-  if (ext === 'pdf') {
-    try {
-      const data = await pdf(buffer);
-      return data.text || '';
-    } catch (error) {
-      throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  // Text files (.txt, .md, etc.)
+  // Text files (.txt, .md, etc.) - ONLY supported format for MVP
   if (ext === 'txt' || ext === 'md') {
     try {
       return buffer.toString('utf-8');
@@ -84,12 +71,16 @@ async function extractTextFromBuffer(buffer: Buffer, filename: string): Promise<
     }
   }
 
-  // Word documents (.doc, .docx) - TODO: Add mammoth or similar library
-  if (ext === 'doc' || ext === 'docx') {
-    throw new Error('Word document support coming soon. Please export as PDF or text for now.');
+  // PDF/Word - requires external parsing (coming post-MVP)
+  if (ext === 'pdf') {
+    throw new Error('PDF support coming soon. Please export ChatGPT conversation as .txt file (ChatGPT → Share → Export as text).');
   }
 
-  throw new Error(`Unsupported file type: ${ext}. Please use PDF or text files.`);
+  if (ext === 'doc' || ext === 'docx') {
+    throw new Error('Word support coming soon. Please export ChatGPT conversation as .txt file.');
+  }
+
+  throw new Error(`Unsupported file type: ${ext}. Please use .txt or .md files (export ChatGPT conversation as text).`);
 }
 
 export async function POST(req: Request) {

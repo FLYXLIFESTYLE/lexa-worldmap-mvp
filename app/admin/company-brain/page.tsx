@@ -188,7 +188,7 @@ export default function CompanyBrainPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
         <h2 className="text-2xl font-semibold text-gray-900 mb-4">📤 Upload Historical Conversations</h2>
         <p className="text-gray-600 mb-6">
-          Upload exported ChatGPT conversations (PDF, Word, or text files). The agent will extract company DNA, experience scripts, and valuable ideas.
+          Upload exported ChatGPT conversations as <strong>text files (.txt)</strong>. Go to ChatGPT → Share → Export conversation → Download as text.
         </p>
 
         <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-purple-400 transition-all">
@@ -196,7 +196,7 @@ export default function CompanyBrainPage() {
             type="file"
             id="company-brain-upload"
             multiple
-            accept=".pdf,.doc,.docx,.txt,.md"
+            accept=".txt,.md"
             onChange={(e) => handleUpload(e.target.files)}
             className="hidden"
           />
@@ -206,7 +206,10 @@ export default function CompanyBrainPage() {
               Click, Drag & Drop ChatGPT Conversations
             </p>
             <p className="text-sm text-gray-500">
-              Word documents (.doc, .docx) from ChatGPT export
+              Text files (.txt, .md) from ChatGPT export
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              ChatGPT → Share → Export → Download as text
             </p>
           </label>
         </div>
