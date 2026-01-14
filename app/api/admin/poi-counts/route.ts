@@ -86,7 +86,7 @@ async function countExtractedPoisByDestinationName(destinationName: string): Pro
   return count ?? 0;
 }
 
-async function countSourcesByDestination(destId: string, source: 'wikidata' | 'osm' | 'overture'): Promise<number> {
+async function countSourcesByDestination(destId: string, source: 'wikidata' | 'osm' | 'overture' | 'foursquare_os'): Promise<number> {
   // Prefer the destination-specific source pointers (accurate per destination).
   try {
     const { count, error } = await supabaseAdmin
@@ -161,12 +161,13 @@ export async function GET() {
     // Supabase counts in parallel (fast; uses indexes)
     const supabaseCounts = await Promise.all(
       rows.map(async (d) => {
-        const [supabase_pois, extracted_pois, wikidata_sources, osm_sources, overture_sources] = await Promise.all([
+        const [supabase_pois, extracted_pois, wikidata_sources, osm_sources, overture_sources, foursquare_sources] = await Promise.all([
           countExperienceEntitiesByDestination(d.id),
           countExtractedPoisByDestinationName(d.name),
           countSourcesByDestination(d.id, 'wikidata'),
           countSourcesByDestination(d.id, 'osm'),
           countSourcesByDestination(d.id, 'overture'),
+          countSourcesByDestination(d.id, 'foursquare_os'),
         ]);
 
         return {
@@ -179,6 +180,7 @@ export async function GET() {
             wikidata: wikidata_sources,
             osm: osm_sources,
             overture: overture_sources,
+            foursquare: foursquare_sources,
           },
         };
       }),

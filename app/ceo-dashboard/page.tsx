@@ -17,7 +17,7 @@ type PoiCountsRow = {
   kind: string;
   supabase_pois: number;
   extracted_pois: number;
-  sources: { wikidata: number; osm: number; overture: number };
+  sources: { wikidata: number; osm: number; overture: number; foursquare: number };
   neo4j_pois: number;
   neo4j_matched_destinations: string[];
 };
@@ -172,6 +172,7 @@ export default function CEODashboardPage() {
     const totalWikidata = sum(rows.map((r) => r.sources?.wikidata || 0));
     const totalOsm = sum(rows.map((r) => r.sources?.osm || 0));
     const totalOverture = sum(rows.map((r) => r.sources?.overture || 0));
+    const totalFoursquare = sum(rows.map((r) => r.sources?.foursquare || 0));
 
     const coveredDestinations = rows.filter((r) => (r.supabase_pois || 0) > 0 || (r.extracted_pois || 0) > 0).length;
     const totalDestinations = rows.length;
@@ -183,6 +184,7 @@ export default function CEODashboardPage() {
       totalWikidata,
       totalOsm,
       totalOverture,
+      totalFoursquare,
       coveredDestinations,
       totalDestinations,
       scopeLabel: mvp.length ? 'MVP destinations' : 'all destinations',
@@ -634,6 +636,7 @@ export default function CEODashboardPage() {
                       { label: 'Wikidata sources', v: poiKpis.totalWikidata },
                       { label: 'OSM sources', v: poiKpis.totalOsm },
                       { label: 'Overture sources', v: poiKpis.totalOverture },
+                      { label: 'Foursquare sources', v: poiKpis.totalFoursquare },
                     ].map((x) => (
                       <div key={x.label} className="bg-white border border-zinc-200 rounded-xl p-3">
                         <div className="text-xs font-semibold text-zinc-600">{x.label}</div>
@@ -668,16 +671,17 @@ export default function CEODashboardPage() {
 
                   {!!poiCounts?.length && (
                     <div className="mt-4 overflow-auto">
-                      <table className="min-w-[900px] w-full text-sm">
+                      <table className="min-w-[1000px] w-full text-sm">
                         <thead>
                           <tr className="text-left text-xs text-zinc-600">
                             <th className="py-2 pr-4">Destination</th>
-                            <th className="py-2 pr-4">Supabase POIs</th>
-                            <th className="py-2 pr-4">Draft POIs</th>
-                            <th className="py-2 pr-4">Wikidata</th>
-                            <th className="py-2 pr-4">OSM</th>
-                            <th className="py-2 pr-4">Overture</th>
-                            <th className="py-2 pr-4">Neo4j POIs</th>
+                            <th className="py-2 pr-4 text-right">Supabase</th>
+                            <th className="py-2 pr-4 text-right">Draft</th>
+                            <th className="py-2 pr-4 text-right">Wikidata</th>
+                            <th className="py-2 pr-4 text-right">OSM</th>
+                            <th className="py-2 pr-4 text-right">Overture</th>
+                            <th className="py-2 pr-4 text-right">Foursquare</th>
+                            <th className="py-2 pr-4 text-right">Neo4j</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -693,14 +697,26 @@ export default function CEODashboardPage() {
                                   </div>
                                 ) : null}
                               </td>
-                              <td className="py-2 pr-4 tabular-nums">{r.supabase_pois}</td>
-                              <td className="py-2 pr-4 tabular-nums">{r.extracted_pois}</td>
-                              <td className="py-2 pr-4 tabular-nums">{r.sources.wikidata}</td>
-                              <td className="py-2 pr-4 tabular-nums">{r.sources.osm}</td>
-                              <td className="py-2 pr-4 tabular-nums">{r.sources.overture}</td>
-                              <td className="py-2 pr-4 tabular-nums">{r.neo4j_pois}</td>
+                              <td className="py-2 pr-4 tabular-nums text-right">{r.supabase_pois.toLocaleString()}</td>
+                              <td className="py-2 pr-4 tabular-nums text-right">{r.extracted_pois.toLocaleString()}</td>
+                              <td className="py-2 pr-4 tabular-nums text-right">{r.sources.wikidata.toLocaleString()}</td>
+                              <td className="py-2 pr-4 tabular-nums text-right">{r.sources.osm.toLocaleString()}</td>
+                              <td className="py-2 pr-4 tabular-nums text-right">{r.sources.overture.toLocaleString()}</td>
+                              <td className="py-2 pr-4 tabular-nums text-right">{(r.sources.foursquare || 0).toLocaleString()}</td>
+                              <td className="py-2 pr-4 tabular-nums text-right">{r.neo4j_pois.toLocaleString()}</td>
                             </tr>
                           ))}
+                          {/* Totals row */}
+                          <tr className="border-t-2 border-zinc-400 bg-zinc-50 font-semibold">
+                            <td className="py-2 pr-4 text-zinc-900">TOTAL ({poiCounts.length} destinations)</td>
+                            <td className="py-2 pr-4 tabular-nums text-right">{poiCounts.reduce((a, r) => a + (r.supabase_pois || 0), 0).toLocaleString()}</td>
+                            <td className="py-2 pr-4 tabular-nums text-right">{poiCounts.reduce((a, r) => a + (r.extracted_pois || 0), 0).toLocaleString()}</td>
+                            <td className="py-2 pr-4 tabular-nums text-right">{poiCounts.reduce((a, r) => a + (r.sources?.wikidata || 0), 0).toLocaleString()}</td>
+                            <td className="py-2 pr-4 tabular-nums text-right">{poiCounts.reduce((a, r) => a + (r.sources?.osm || 0), 0).toLocaleString()}</td>
+                            <td className="py-2 pr-4 tabular-nums text-right">{poiCounts.reduce((a, r) => a + (r.sources?.overture || 0), 0).toLocaleString()}</td>
+                            <td className="py-2 pr-4 tabular-nums text-right">{poiCounts.reduce((a, r) => a + (r.sources?.foursquare || 0), 0).toLocaleString()}</td>
+                            <td className="py-2 pr-4 tabular-nums text-right">{poiCounts.reduce((a, r) => a + (r.neo4j_pois || 0), 0).toLocaleString()}</td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>

@@ -74,6 +74,38 @@ function formatSupabaseError(err: any): string {
   }
 }
 
+function sanitizeString(s: unknown): string {
+  if (typeof s !== 'string') return '';
+  // Remove null bytes (Postgres rejects) and strip lone UTF-16 surrogate code units.
+  // Note: Array.from iterates *code points* (so valid surrogate pairs remain intact).
+  return Array.from(s.replaceAll('\u0000', '')).filter((ch) => {
+    const cp = ch.codePointAt(0) ?? 0;
+    return cp < 0xd800 || cp > 0xdfff;
+  }).join('');
+}
+
+function sanitizeJson(v: any): any {
+  if (v == null) return v;
+  if (typeof v === 'string') return sanitizeString(v);
+  if (Array.isArray(v)) return v.map((x) => sanitizeJson(x));
+  if (typeof v === 'object') {
+    const out: any = {};
+    for (const [k, val] of Object.entries(v)) out[k] = sanitizeJson(val);
+    return out;
+  }
+  return v;
+}
+
+function isBadUnicodeError(err: any): boolean {
+  const msg = String(err?.message ?? err ?? '').toLowerCase();
+  return (
+    msg.includes('unsupported unicode escape sequence') ||
+    msg.includes('invalid byte sequence for encoding') ||
+    msg.includes('invalid unicode') ||
+    msg.includes('unicode escape')
+  );
+}
+
 async function withRetries<T>(
   fn: () => Promise<T>,
   opts: { label: string; maxRetries?: number; baseDelayMs?: number } = { label: 'op' }
@@ -180,15 +212,15 @@ async function ingestOvertureBatch(params: {
   // 1) Insert canonical entities (batch)
   const entityRows = candidates.map((c) => ({
     kind: 'poi' as const,
-    name: c.name,
-    normalized_name: c.name.toLowerCase(),
+    name: sanitizeString(c.name),
+    normalized_name: sanitizeString(c.name).toLowerCase(),
     destination_id: destId,
     lat: c.lat,
     lon: c.lon,
     categories: {
       overture: {
-        categories: c.props?.categories ?? null,
-        class: c.props?.class ?? null,
+        categories: sanitizeJson(c.props?.categories ?? null),
+        class: sanitizeJson(c.props?.class ?? null),
         confidence: c.props?.confidence ?? null,
       },
     },
@@ -198,19 +230,53 @@ async function ingestOvertureBatch(params: {
     risk_flags: {},
   }));
 
-  const { data: inserted, error: insertErr } = await withRetries(
-    async () =>
-      await supabaseAdmin.from('experience_entities').insert(entityRows).select('id, source_hints'),
-    { label: 'insert experience_entities batch' }
-  );
+  let inserted: any[] = [];
+  let skippedBad = 0;
+  try {
+    const res = await withRetries(
+      async () => {
+        const r = await supabaseAdmin.from('experience_entities').insert(entityRows).select('id, source_hints');
+        if (r.error) throw r.error;
+        return r.data ?? [];
+      },
+      { label: 'insert experience_entities batch' }
+    );
+    inserted = res;
+  } catch (err: any) {
+    if (!isBadUnicodeError(err)) {
+      throw new Error(`Failed to insert experience_entities batch: ${formatSupabaseError(err)}`);
+    }
 
-  if (insertErr) throw new Error(`Failed to insert experience_entities batch: ${formatSupabaseError(insertErr)}`);
+    // Slow path: isolate + skip only problematic rows (keeps ingestion moving).
+    console.log('⚠️  Batch insert failed due to bad Unicode. Falling back to row-by-row insert (skipping bad rows).');
+    for (const row of entityRows) {
+      try {
+        const one = await withRetries(
+          async () => {
+            const r = await supabaseAdmin.from('experience_entities').insert(row).select('id, source_hints').maybeSingle();
+            if (r.error) throw r.error;
+            return r.data ?? null;
+          },
+          { label: 'insert experience_entities (single row)' }
+        );
+        if (one) inserted.push(one);
+      } catch (e: any) {
+        if (isBadUnicodeError(e)) {
+          skippedBad += 1;
+          continue;
+        }
+        throw new Error(`Failed to insert experience_entities row: ${formatSupabaseError(e)}`);
+      }
+    }
+  }
 
   const idByOvertureId = new Map<string, string>();
   for (const row of inserted ?? []) {
     const oid = row?.source_hints?.overture_id;
     if (typeof oid === 'string' && row?.id) idByOvertureId.set(oid, row.id);
   }
+
+  const insertedCandidates = candidates.filter((c) => idByOvertureId.has(c.overtureId));
 
   // Destination membership (best-effort; migration may not be applied yet)
   try {
@@ -228,27 +294,61 @@ async function ingestOvertureBatch(params: {
   }
 
   // 2) Upsert source payloads (batch)
-  const sourceRows = candidates.map((c) => {
+  const sourceRows = insertedCandidates.map((c) => {
     const entityId = idByOvertureId.get(c.overtureId) ?? null;
     return {
       source: 'overture' as const,
       source_id: c.overtureId,
       entity_id: entityId,
-      normalized: { name: c.name, lat: c.lat, lon: c.lon },
-      raw: c.raw,
+      normalized: { name: sanitizeString(c.name), lat: c.lat, lon: c.lon },
+      raw: sanitizeJson(c.raw),
     };
   });
 
-  const { error: srcErr } = await withRetries(
-    async () => await supabaseAdmin.from('experience_entity_sources').upsert(sourceRows, { onConflict: 'source,source_id' }),
-    { label: 'upsert experience_entity_sources batch' }
-  );
+  try {
+    await withRetries(
+      async () => {
+        const r = await supabaseAdmin
+          .from('experience_entity_sources')
+          .upsert(sourceRows, { onConflict: 'source,source_id' });
+        if (r.error) throw r.error;
+        return true;
+      },
+      { label: 'upsert experience_entity_sources batch' }
+    );
+  } catch (err: any) {
+    if (!isBadUnicodeError(err)) {
+      throw new Error(`Failed to upsert experience_entity_sources batch: ${formatSupabaseError(err)}`);
+    }
 
-  if (srcErr) throw new Error(`Failed to upsert experience_entity_sources batch: ${formatSupabaseError(srcErr)}`);
+    console.log('⚠️  Source upsert failed due to bad Unicode. Falling back to row-by-row upsert (raw may be dropped).');
+    for (const row of sourceRows) {
+      try {
+        const r1 = await supabaseAdmin
+          .from('experience_entity_sources')
+          .upsert(row, { onConflict: 'source,source_id' });
+        if (!r1.error) continue;
+        if (!isBadUnicodeError(r1.error)) throw r1.error;
+
+        // If the raw payload is the problem, drop it and keep the pointer (idempotency + linkage).
+        const { raw: _raw, ...withoutRaw } = row as any;
+        const r2 = await supabaseAdmin
+          .from('experience_entity_sources')
+          .upsert({ ...withoutRaw, raw: null }, { onConflict: 'source,source_id' });
+        if (r2.error) throw r2.error;
+      } catch (e: any) {
+        if (isBadUnicodeError(e)) {
+          skippedBad += 1;
+          continue;
+        }
+        throw new Error(`Failed to upsert experience_entity_sources row: ${formatSupabaseError(e)}`);
+      }
+    }
+  }
 
   // Destination-specific source pointers (best-effort)
   try {
-    const destSourceRows = candidates
+    const destSourceRows = insertedCandidates
       .map((c) => ({
         destination_id: destId,
         entity_id: idByOvertureId.get(c.overtureId) ?? null,
@@ -266,7 +366,7 @@ async function ingestOvertureBatch(params: {
     // ignore
   }
 
-  return { insertedEntities: candidates.length, insertedSources: candidates.length };
+  return { insertedEntities: insertedCandidates.length, insertedSources: insertedCandidates.length, skippedBad };
 }
 
 async function main() {
@@ -322,6 +422,8 @@ async function main() {
   let insertedEntities = 0;
   let insertedSources = 0;
   let skipped = 0;
+  let skippedBad = 0;
+  let linkedExisting = 0;
 
   // Process candidates directly in batches; each batch checks existing sources for its own IDs.
   // This avoids a huge up-front "load existing" query (which can be thousands of requests on big files).
@@ -338,14 +440,44 @@ async function main() {
     // Idempotency: skip already-ingested Overture IDs in THIS batch.
     const ids = batch.map((b) => b.overtureId);
     const existingMap = await withRetries(() => loadExistingOvertureSources(ids), { label: 'load existing overture sources (batch)' });
+    const existingToLink = batch
+      .map((c) => ({ c, entityId: existingMap.get(c.overtureId)?.entity_id ?? null }))
+      .filter((x) => !!x.entityId) as Array<{ c: OvertureCandidate; entityId: string }>;
+
     const toInsert = batch.filter((c) => !existingMap.get(c.overtureId)?.entity_id);
-    const batchSkipped = batch.length - toInsert.length;
+    const batchSkipped = batch.length - toInsert.length; // already exists globally (won't be re-inserted)
     skipped += batchSkipped;
+
+    // IMPORTANT: even if an entity+source already exists globally, we still need to link it to THIS destination
+    // so destination-level dashboards can show correct source counts.
+    if (existingToLink.length) {
+      try {
+        const membershipRows = existingToLink.map((x) => ({ entity_id: x.entityId, destination_id: dest.id }));
+        await supabaseAdmin
+          .from('experience_entity_destinations')
+          .upsert(membershipRows as any, { onConflict: 'entity_id,destination_id', ignoreDuplicates: true });
+
+        const destSourceRows = existingToLink.map((x) => ({
+          destination_id: dest.id,
+          entity_id: x.entityId,
+          source: 'overture',
+          source_id: x.c.overtureId,
+        }));
+        await supabaseAdmin
+          .from('experience_entity_destination_sources')
+          .upsert(destSourceRows as any, { onConflict: 'destination_id,source,source_id', ignoreDuplicates: true });
+
+        linkedExisting += existingToLink.length;
+      } catch {
+        // best-effort only (table may not exist yet)
+      }
+    }
 
     if (toInsert.length > 0) {
       const res = await ingestOvertureBatch({ supabaseAdmin, destId: dest.id, candidates: toInsert });
       insertedEntities += res.insertedEntities;
       insertedSources += res.insertedSources;
+      skippedBad += (res as any).skippedBad ?? 0;
     }
 
     const done = i + 1;
@@ -357,7 +489,7 @@ async function main() {
   }
 
   console.log(
-    `Done for destination="${dest.name}". insertedEntities=${insertedEntities}, insertedSources=${insertedSources}, skipped=${skipped}`
+    `Done for destination="${dest.name}". insertedEntities=${insertedEntities}, insertedSources=${insertedSources}, skipped_existing=${skipped}, linked_existing=${linkedExisting}, skipped_bad=${skippedBad}`
   );
 }
 

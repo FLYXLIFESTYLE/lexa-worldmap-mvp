@@ -8,7 +8,8 @@ import { MembershipBadge } from '@/components/account/MembershipBadge';
 import { UsageProgressBar } from '@/components/account/UsageProgressBar';
 import { ConversationPreviewCard } from '@/components/account/ConversationPreviewCard';
 import { ScriptLibraryCard } from '@/components/account/ScriptLibraryCard';
-import { Crown, FileText, MessageCircle, Settings, Sparkles, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
+import { EmotionalProfileCard } from '@/components/account/EmotionalProfileCard';
+import { Crown, FileText, MessageCircle, Settings, Sparkles, ArrowLeft, ChevronDown, ChevronUp, Heart } from 'lucide-react';
 
 export default function AccountDashboard() {
   const router = useRouter();
@@ -18,10 +19,12 @@ export default function AccountDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [recentConversations, setRecentConversations] = useState<any[]>([]);
   const [recentScripts, setRecentScripts] = useState<any[]>([]);
+  const [emotionalProfile, setEmotionalProfile] = useState<any>(null);
   
   // Collapsible sections state
   const [sectionsOpen, setSectionsOpen] = useState({
     membership: true,
+    emotionalProfile: true,
     stats: true,
     conversations: true,
     scripts: true
@@ -37,12 +40,13 @@ export default function AccountDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [membershipRes, usageRes, statsRes, conversationsRes, scriptsRes] = await Promise.all([
+      const [membershipRes, usageRes, statsRes, conversationsRes, scriptsRes, emotionalRes] = await Promise.all([
         fetch('/api/user/membership'),
         fetch('/api/user/membership/usage'),
         fetch('/api/user/stats'),
         fetch('/api/user/conversations?limit=3'),
-        fetch('/api/user/scripts?limit=4')
+        fetch('/api/user/scripts?limit=4'),
+        fetch('/api/user/profile/emotional')
       ]);
 
       if (membershipRes.ok) {
@@ -68,6 +72,11 @@ export default function AccountDashboard() {
       if (scriptsRes.ok) {
         const data = await scriptsRes.json();
         setRecentScripts(data.scripts || []);
+      }
+
+      if (emotionalRes.ok) {
+        const data = await emotionalRes.json();
+        setEmotionalProfile(data);
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -192,6 +201,37 @@ export default function AccountDashboard() {
             </button>
               </div>
             </>
+          )}
+        </div>
+
+        {/* Emotional Profile */}
+        <div className="rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl">
+          <button
+            onClick={() => toggleSection('emotionalProfile')}
+            className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+          >
+            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+              <Heart className="h-5 w-5 text-lexa-gold" />
+              Emotional Profile
+            </h3>
+            {sectionsOpen.emotionalProfile ? (
+              <ChevronUp className="h-5 w-5 text-lexa-gold" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-lexa-gold" />
+            )}
+          </button>
+          
+          {sectionsOpen.emotionalProfile && (
+            <div className="p-6">
+              <EmotionalProfileCard
+                profile={emotionalProfile?.emotional_profile || {}}
+                primaryThemes={emotionalProfile?.primary_themes || []}
+                personalityArchetype={emotionalProfile?.personality_archetype}
+              />
+              <p className="mt-4 text-xs text-zinc-400 text-center">
+                Your emotional profile is built from conversations with LEXA. Chat more to help LEXA understand what you truly want.
+              </p>
+            </div>
           )}
         </div>
 

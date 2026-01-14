@@ -9,6 +9,8 @@
     { "name": "USVI", "kind": "region", "bbox": [-65.1, 17.6, -64.5, 18.4], "metadata": { "group": "mvp12" } },
     { "name": "Bahamas", "kind": "region", "bbox": [-80.0, 20.5, -72.0, 27.0], "metadata": { "group": "mvp12" } },
     { "name": "French Antilles", "kind": "region", "bbox": [-61.8, 14.4, -61.0, 16.3], "metadata": { "group": "mvp12" } },
+    { "name": "Dutch Antilles", "kind": "region", "bbox": [-70.0, 12.0, -68.0, 13.0], "metadata": { "group": "mvp12" } },
+    { "name": "Arabian Gulf (UAE)", "kind": "region", "bbox": [51.0, 22.5, 56.0, 26.0], "metadata": { "group": "mvp12" } },
 
     { "name": "Adriatic (North)", "kind": "region", "bbox": [12.0, 44.8, 15.8, 46.9], "metadata": { "group": "mvp12" } },
     { "name": "Adriatic (Central)", "kind": "region", "bbox": [12.8, 43.2, 17.8, 44.9], "metadata": { "group": "mvp12" } },
