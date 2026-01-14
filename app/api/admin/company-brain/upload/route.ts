@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import pdf from 'pdf-parse';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for large documents
@@ -59,14 +60,34 @@ async function requireAdmin() {
   return { ok: true as const, status: 200 as const, user };
 }
 
-function extractTextFromBuffer(buffer: Buffer, filename: string): string {
-  // For now, assume text files or copy/paste
-  // TODO: Add PDF/Word extraction using libraries
-  try {
-    return buffer.toString('utf-8');
-  } catch {
-    throw new Error('Failed to extract text from file');
+async function extractTextFromBuffer(buffer: Buffer, filename: string): Promise<string> {
+  const ext = filename.toLowerCase().split('.').pop();
+
+  // PDF files
+  if (ext === 'pdf') {
+    try {
+      const data = await pdf(buffer);
+      return data.text || '';
+    } catch (error) {
+      throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
+
+  // Text files (.txt, .md, etc.)
+  if (ext === 'txt' || ext === 'md') {
+    try {
+      return buffer.toString('utf-8');
+    } catch {
+      throw new Error('Failed to extract text from file');
+    }
+  }
+
+  // Word documents (.doc, .docx) - TODO: Add mammoth or similar library
+  if (ext === 'doc' || ext === 'docx') {
+    throw new Error('Word document support coming soon. Please export as PDF or text for now.');
+  }
+
+  throw new Error(`Unsupported file type: ${ext}. Please use PDF or text files.`);
 }
 
 export async function POST(req: Request) {
@@ -86,7 +107,7 @@ export async function POST(req: Request) {
     }
 
     const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const text = extractTextFromBuffer(fileBuffer, file.name);
+    const text = await extractTextFromBuffer(fileBuffer, file.name);
 
     if (!text || text.length < 100) {
       return NextResponse.json({ error: 'Document too short or empty' }, { status: 400 });
