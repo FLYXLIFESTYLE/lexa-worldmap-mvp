@@ -1,12 +1,18 @@
 /**
- * POI Quality Filters - Luxury Travel Relevance
+ * POI Quality Filters - Experience Script Value (RAG Relevance)
  *
- * Purpose: Prevent junk POIs (embassies, AC companies, utilities) from entering Captain review queue
+ * Purpose: Only import POIs that can contribute to meaningful experience scripts
  *
  * Why:
- * - Overture/OSM contain ALL places (businesses, government, infrastructure)
- * - Only ~5-10% are relevant for luxury travel experiences
- * - Captains shouldn't waste time reviewing irrelevant POIs
+ * - RAG retrieval needs POIs with semantic richness (emotions, activities, themes)
+ * - A POI without experience value is useless for script generation
+ * - Quality > Quantity: Better to have 10,000 useful POIs than 1M junk
+ *
+ * A POI is valuable if it can:
+ * - Evoke emotions (peace, connection, awe, freedom)
+ * - Support activities (sailing, dining, exploring, celebrating)
+ * - Fit themes (Mediterranean Indulgence, Cultural Immersion, Wellness Retreat)
+ * - Enhance narratives ("Why this?" — has story/context potential)
  *
  * Used by:
  * - /api/captain/pois/import-generated (manual import)
@@ -76,16 +82,75 @@ const REJECT_KEYWORDS = [
   'laundromat', 'dry cleaner', 'tailor shop',
 ];
 
-// Luxury indicators (if present, POI is likely relevant)
-const LUXURY_INDICATORS = [
+// Experience value indicators (POI can contribute to scripts)
+const EXPERIENCE_VALUE_INDICATORS = [
+  // Luxury signals
   'michelin', 'fine dining', 'gourmet', 'luxury', 'premium', 'exclusive', 'private',
   '5-star', 'five-star', 'boutique', 'designer', 'high-end', 'upscale',
   'yacht', 'villa', 'penthouse', 'suite', 'concierge',
-  'spa', 'wellness', 'golf', 'beach club', 'rooftop',
+  
+  // Emotional resonance
+  'romantic', 'intimate', 'peaceful', 'serene', 'vibrant', 'authentic', 'historic',
+  'breathtaking', 'panoramic', 'sunset', 'sunrise', 'hidden', 'secret',
+  
+  // Activity potential
+  'spa', 'wellness', 'golf', 'beach club', 'rooftop', 'terrace', 'garden',
+  'vineyard', 'wine', 'tasting', 'cooking', 'art', 'music', 'performance',
+  'sailing', 'diving', 'snorkeling', 'hiking', 'cycling',
+  
+  // Cultural/Story value
+  'heritage', 'unesco', 'ancient', 'medieval', 'archaeological', 'artisan',
+  'traditional', 'craft', 'workshop', 'atelier', 'local', 'family-run',
+  
+  // Theme alignment
+  'coastal', 'seaside', 'waterfront', 'mountain', 'countryside', 'island',
+  'mediterranean', 'adriatic', 'caribbean', 'riviera',
 ];
 
 /**
- * Check if a POI is relevant for luxury travel experiences
+ * Check if a POI has "experience value" (can contribute to RAG/scripts)
+ */
+function hasExperienceValue(entity: any, text: string): { hasValue: boolean; signals: string[] } {
+  const signals: string[] = [];
+
+  // Check for experience value indicators
+  for (const indicator of EXPERIENCE_VALUE_INDICATORS) {
+    if (text.includes(indicator)) {
+      signals.push(indicator);
+    }
+  }
+
+  // Check for rich metadata (descriptions, websites, categories)
+  if (entity?.address && String(entity.address).trim().length > 5) signals.push('has_address');
+  if (entity?.website && String(entity.website).trim().length > 5) signals.push('has_website');
+  if (entity?.phone && String(entity.phone).trim().length > 5) signals.push('has_contact');
+  if (entity?.categories && Object.keys(entity.categories).length > 0) signals.push('has_categories');
+
+  // Check for semantic richness (can be mapped to emotions/activities/themes)
+  const hasEmotionalPotential = 
+    text.includes('view') || text.includes('vista') || text.includes('scenic') ||
+    text.includes('historic') || text.includes('authentic') || text.includes('traditional') ||
+    text.includes('romantic') || text.includes('peaceful') || text.includes('vibrant');
+  if (hasEmotionalPotential) signals.push('emotional_potential');
+
+  const hasActivityPotential =
+    text.includes('cooking') || text.includes('tasting') || text.includes('workshop') ||
+    text.includes('sailing') || text.includes('diving') || text.includes('hiking') ||
+    text.includes('golf') || text.includes('tennis') || text.includes('spa');
+  if (hasActivityPotential) signals.push('activity_potential');
+
+  const hasThemeAlignment =
+    text.includes('coastal') || text.includes('mediterranean') || text.includes('island') ||
+    text.includes('cultural') || text.includes('wellness') || text.includes('culinary') ||
+    text.includes('adventure') || text.includes('heritage') || text.includes('artisan');
+  if (hasThemeAlignment) signals.push('theme_alignment');
+
+  // POI is valuable if it has at least 2 signals (not just 1 coincidental keyword)
+  return { hasValue: signals.length >= 2, signals };
+}
+
+/**
+ * Check if a POI is relevant for experience scripts (RAG-ready)
  */
 export function isExperienceRelevant(entity: any): { relevant: boolean; reason: string } {
   const name = String(entity?.name || '').trim().toLowerCase();
@@ -105,18 +170,31 @@ export function isExperienceRelevant(entity: any): { relevant: boolean; reason: 
     }
   }
 
-  // Rule 3: Reject if inferred category not in allowlist
+  // Rule 3: Check if category is experience-relevant
   const category = inferCategoryFromEntity(entity);
-  if (category === 'other' || !ALLOWED_CATEGORIES.has(category)) {
-    // Exception: if has luxury indicators, allow anyway
-    const hasLuxurySignal = LUXURY_INDICATORS.some((indicator) => text.includes(indicator));
-    if (!hasLuxurySignal) {
-      return { relevant: false, reason: `category_not_allowed:${category}` };
-    }
+  const categoryAllowed = category !== 'other' && ALLOWED_CATEGORIES.has(category);
+
+  // Rule 4: Check if POI has experience value (can contribute to scripts)
+  const valueCheck = hasExperienceValue(entity, text);
+
+  // Accept if EITHER:
+  // - Category is allowed AND has some experience value (2+ signals)
+  // - OR has strong experience value (3+ signals) even if category unclear
+  if (categoryAllowed && valueCheck.hasValue) {
+    return { relevant: true, reason: `experience_value:${valueCheck.signals.join(',')}` };
   }
 
-  // Rule 4: Accept if passed all filters
-  return { relevant: true, reason: 'experience_relevant' };
+  if (valueCheck.signals.length >= 3) {
+    return { relevant: true, reason: `high_experience_value:${valueCheck.signals.join(',')}` };
+  }
+
+  // Reject: either wrong category or insufficient experience value
+  return { 
+    relevant: false, 
+    reason: categoryAllowed 
+      ? `low_experience_value:${valueCheck.signals.length}_signals` 
+      : `category_not_allowed:${category}` 
+  };
 }
 
 /**
