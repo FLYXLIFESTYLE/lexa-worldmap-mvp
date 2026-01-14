@@ -374,6 +374,55 @@ Notes:
       return NextResponse.json({ error: 'Failed to save enrichment', details: updateError.message }, { status: 500 });
     }
 
+    // Task #8: Update freshness tracking (best-effort; migration 026 may not be deployed yet)
+    try {
+      const nextRefresh = new Date();
+      nextRefresh.setDate(nextRefresh.getDate() + 90); // Re-enrich in 90 days
+      await admin.rpc('mark_poi_enriched', { p_poi_id: id, p_refresh_days: 90 });
+    } catch {
+      // Fallback if function doesn't exist yet: direct column update
+      try {
+        const nextRefresh = new Date();
+        nextRefresh.setDate(nextRefresh.getDate() + 90);
+        await admin
+          .from('extracted_pois')
+          .update({
+            last_enriched_at: nowIso,
+            next_refresh_at: nextRefresh.toISOString(),
+            enrichment_count: (poi as any).enrichment_count ? (poi as any).enrichment_count + 1 : 1,
+          })
+          .eq('id', id);
+      } catch {
+        // ignore if columns don't exist yet
+      }
+    }
+
+    // Task #8: Log URL sources (best-effort; migration 026 may not be deployed yet)
+    try {
+      const contributedFields = Object.keys(updates).filter(
+        (k) => !['source_refs', 'citations', 'enrichment', 'updated_at', 'enhanced'].includes(k)
+      );
+      const urlSourceRows = sources.map((r) => ({
+        poi_id: id,
+        url: String(r.url || ''),
+        url_title: String(r.title || '').slice(0, 200) || null,
+        url_domain: (() => {
+          try {
+            return new URL(r.url).hostname;
+          } catch {
+            return null;
+          }
+        })(),
+        contributed_fields: contributedFields,
+        provider: 'tavily',
+        provider_metadata: { score: r.score, published_date: r.publishedDate },
+        last_checked_at: nowIso,
+      }));
+      await admin.from('poi_url_sources').upsert(urlSourceRows, { onConflict: 'poi_id,url' });
+    } catch {
+      // ignore if table doesn't exist yet
+    }
+
     return NextResponse.json({
       success: true,
       updated_fields: Object.keys(updates),

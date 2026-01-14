@@ -324,6 +324,51 @@ Notes:
         }
         if (updateErr) throw new Error(updateErr.message);
 
+        // Task #8: Update freshness tracking (best-effort)
+        try {
+          await supabaseAdmin.rpc('mark_poi_enriched', { p_poi_id: poiId, p_refresh_days: 90 });
+        } catch {
+          try {
+            const nextRefresh = new Date();
+            nextRefresh.setDate(nextRefresh.getDate() + 90);
+            await supabaseAdmin
+              .from('extracted_pois')
+              .update({
+                last_enriched_at: nowIso,
+                next_refresh_at: nextRefresh.toISOString(),
+              })
+              .eq('id', poiId);
+          } catch {
+            // ignore
+          }
+        }
+
+        // Task #8: Log URL sources (best-effort)
+        try {
+          const contributedFields = Object.keys(updates).filter(
+            (k) => !['source_refs', 'citations', 'enrichment', 'updated_at', 'enhanced'].includes(k)
+          );
+          const urlSourceRows = sources.map((r: any) => ({
+            poi_id: poiId,
+            url: String(r.url || ''),
+            url_title: String(r.title || '').slice(0, 200) || null,
+            url_domain: (() => {
+              try {
+                return new URL(r.url).hostname;
+              } catch {
+                return null;
+              }
+            })(),
+            contributed_fields: contributedFields,
+            provider: 'tavily',
+            provider_metadata: { score: r.score },
+            last_checked_at: nowIso,
+          }));
+          await supabaseAdmin.from('poi_url_sources').upsert(urlSourceRows, { onConflict: 'poi_id,url' });
+        } catch {
+          // ignore
+        }
+
         processed.push({ id: poiId, ok: true });
       } catch (e: any) {
         processed.push({ id: String(poi.id), ok: false, error: String(e?.message || e) });

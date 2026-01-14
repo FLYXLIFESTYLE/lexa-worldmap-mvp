@@ -62,3 +62,6 @@ logs/
 # data (optional - uncomment if you don't want to commit data files)
 # data_raw/
 # data_mapped/
+
+# Overture GeoJSON downloads (too large for git; regenerate with scripts/download-overture-mvp12.ps1)
+data_overture/
