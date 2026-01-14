@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { isExperienceRelevant } from '@/lib/poi-quality-filters';
 
 export const runtime = 'nodejs';
 
@@ -140,6 +141,10 @@ async function importForDestination(args: {
     .map((l) => {
       const e = entitiesById.get(String(l.entity_id));
       if (!e) return null;
+
+      // Quality gate: only import experience-relevant POIs
+      const relevanceCheck = isExperienceRelevant(e);
+      if (!relevanceCheck.relevant) return null;
 
       const src = String(l.source) as 'osm' | 'wikidata' | 'overture' | string;
       const srcId = String(l.source_id);
