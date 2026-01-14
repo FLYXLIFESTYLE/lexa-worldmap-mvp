@@ -380,9 +380,9 @@ export default function CaptainHistoryPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <button
-                          onClick={() => router.push(`/captain/upload?open=${upload.id}`)}
+                          onClick={() => setExpandedId(expandedId === upload.id ? null : upload.id)}
                           className="text-lg font-semibold text-gray-900 hover:underline text-left"
-                          title="Open extraction details"
+                          title="Show/hide extraction details"
                         >
                           {upload.filename}
                         </button>
