@@ -154,7 +154,7 @@ function hasExperienceValue(entity: any, text: string): { hasValue: boolean; sig
  */
 export function isExperienceRelevant(entity: any): { relevant: boolean; reason: string } {
   const name = String(entity?.name || '').trim().toLowerCase();
-  const tags: string[] = Array.isArray(entity?.tags) ? entity.tags.map((t) => String(t).toLowerCase()) : [];
+  const tags: string[] = Array.isArray(entity?.tags) ? entity.tags.map((t: any) => String(t).toLowerCase()) : [];
   const catJson = JSON.stringify(entity?.categories || {}).toLowerCase();
   const text = `${name} ${tags.join(' ')} ${catJson}`;
 
