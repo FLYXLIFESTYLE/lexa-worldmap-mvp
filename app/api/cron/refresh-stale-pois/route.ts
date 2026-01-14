@@ -16,7 +16,7 @@
 
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { searchPOIInfo } from '@/lib/tavily/client';
+import { searchPOIInfo } from '@/lib/integrations/tavily-client';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 
