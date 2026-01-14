@@ -361,6 +361,29 @@ pydantic==2.10.5
    - Fix: Kill process on port 3000 or 8010
    - Command: `netstat -ano | findstr :3000` then `taskkill /PID [pid] /F`
 
+4. **Node.js High Memory Usage** ⚠️ IMPORTANT
+   - **Symptom**: Task Manager shows 10-20 GB RAM usage by multiple `node.exe` processes (85-89% memory)
+   - **Cause**: Next.js dev server (`npm run dev`) keeps running in background
+   - **Why It Happens**: 
+     - Next.js with Turbopack watches ALL files and keeps them in memory
+     - Hot Module Replacement (HMR) caches components
+     - Spawns multiple worker processes
+     - Memory leaks accumulate during long sessions
+   - **Fix**: 
+     ```bash
+     # Stop all Node.js processes:
+     taskkill /F /IM node.exe
+     ```
+   - **When to Run Dev Server**:
+     - ✅ When actively coding/testing in browser
+     - ✅ When developing new features
+     - ❌ NOT when just reading code or writing docs
+   - **Memory Management**:
+     - Stop dev server when not needed (saves 10-20 GB RAM)
+     - Restart periodically to clear memory leaks
+     - Use `npm run build && npm start` for testing (uses less RAM)
+     - Check running processes: `Get-Process node | Select-Object Id, ProcessName, WorkingSet`
+
 ### Cross-Platform:
 1. **Stale Browser Sessions**
    - Symptom: Auth works but admin pages restricted

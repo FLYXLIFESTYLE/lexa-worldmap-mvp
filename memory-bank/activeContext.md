@@ -1,6 +1,30 @@
 # Active Context
 
-**Last Updated**: January 12, 2026
+**Last Updated**: January 14, 2026
+
+## 🚨 Quick Troubleshooting Guide
+
+### Node.js Using 10-20 GB RAM (85-89%)?
+**This is the LEXA dev server running in background!**
+
+**Quick Fix:**
+```bash
+taskkill /F /IM node.exe
+```
+
+**Why This Happens:**
+- `npm run dev` starts Next.js + Turbopack
+- Watches ALL files, keeps them in memory for hot reload
+- Spawns multiple worker processes
+- Can use 10-20 GB RAM (normal for dev mode)
+
+**When to Keep It Running:**
+- ✅ Actively coding and testing in browser
+- ❌ Just reading code or writing docs
+
+**Full details**: See `techContext.md` → Known Technical Issues → Node.js High Memory Usage
+
+---
 
 ## Current Focus: MVP Completion for Investor Demo
 
