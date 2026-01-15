@@ -30,7 +30,8 @@
     "bulk-enrich-100": "tsx scripts/bulk-enrich.ts 100 5000",
     "bulk-enrich-auto": "tsx scripts/bulk-enrich.ts 1000 5000 stop-when-done",
     "cleanup:junk": "tsx scripts/cleanup-junk-pois.ts",
-    "merge:candidates": "tsx scripts/generate-merge-candidates.ts"
+    "merge:candidates": "tsx scripts/generate-merge-candidates.ts",
+    "fast-enrich-mvp": "tsx scripts/fast-bulk-enrich-mvp.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
