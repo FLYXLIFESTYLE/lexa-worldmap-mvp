@@ -6,6 +6,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import List, Optional
 import uuid
+import os
 
 from app.services.company_brain_agent import (
     analyze_historical_conversation,
@@ -14,6 +15,12 @@ from app.services.company_brain_agent import (
 from app.services.supabase_auth import get_current_user
 
 router = APIRouter(prefix="/api/company-brain", tags=["Company Brain"])
+
+# Upload hardening:
+# - Keep predictable costs and avoid timeouts on huge files.
+# - Captain uploads use 25MB; company brain tends to be larger, so allow more.
+MAX_FILE_SIZE = 60 * 1024 * 1024  # 60MB
+ALLOWED_EXTENSIONS = {"pdf", "txt", "md", "docx", "doc"}
 
 
 class AnalysisResponse(BaseModel):
@@ -46,8 +53,24 @@ async def analyze_conversation(
     """
     
     try:
+        filename = (file.filename or "").strip()
+        ext = os.path.splitext(filename)[1].lower().lstrip(".")
+        if ext and ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: .{ext}. Please upload: {', '.join(sorted(ALLOWED_EXTENSIONS))}."
+            )
+
         # Read file content
         content = await file.read()
+
+        if content and len(content) > MAX_FILE_SIZE:
+            mb = round(len(content) / (1024 * 1024), 1)
+            limit_mb = round(MAX_FILE_SIZE / (1024 * 1024), 0)
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large ({mb}MB). Please upload a file under {limit_mb}MB or split it into smaller parts."
+            )
         
         # Analyze conversation
         analysis = await analyze_historical_conversation(
@@ -71,10 +94,11 @@ async def analyze_conversation(
         )
         
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to analyze conversation: {str(e)}"
-        )
+        # Convert common "old Word" error into a helpful 400 for beginners.
+        msg = str(e) if e is not None else ""
+        if ".doc" in (file.filename or "").lower() and "Unsupported Word format: .doc" in msg:
+            raise HTTPException(status_code=400, detail=msg)
+        raise HTTPException(status_code=500, detail=f"Failed to analyze conversation: {msg}")
 
 
 @router.post("/synthesize")

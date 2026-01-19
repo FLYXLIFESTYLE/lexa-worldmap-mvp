@@ -80,7 +80,11 @@ class CompanyBrainAgent:
             # process_file_auto returns a tuple (text, metadata), not a dict
             # Save to temp file first
             import tempfile
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_file:
+            # IMPORTANT:
+            # Preserve the original extension so `process_file_auto()` can route correctly.
+            # (Hardcoding ".docx" breaks PDFs and old .doc files.)
+            suffix = os.path.splitext(file_path or "")[1].lower() or ".txt"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
                 temp_file.write(file_content)
                 temp_path = temp_file.name
             

@@ -204,7 +204,8 @@ export default function CompanyBrainPage() {
             type="file"
             id="company-brain-upload"
             multiple
-            accept=".pdf,.doc,.docx,.txt,.md"
+            // Windows file picker is more reliable when we include both extensions AND MIME types.
+            accept=".pdf,application/pdf,.doc,application/msword,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain,.md,text/markdown"
             onChange={(e) => handleUpload(e.target.files)}
             className="hidden"
           />

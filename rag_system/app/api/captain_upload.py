@@ -23,6 +23,12 @@ router = APIRouter(prefix="/api/captain/upload", tags=["Upload"])
 # - Max size 25MB (prevents timeouts + keeps costs predictable)
 MAX_FILE_SIZE = 25 * 1024 * 1024
 
+# Text paste hardening:
+# Pasted content can be extremely large (e.g. whole web pages). We cap the amount
+# we send to the LLM to keep requests fast and predictable.
+# NOTE: We still store only a redacted snapshot up to `source_text_limit` below.
+MAX_PASTE_CHARS = 60_000
+
 # Note: We allow images because the Captain Portal supports OCR extraction.
 ALLOWED_MIME_TYPES = {
     "application/pdf",
@@ -316,6 +322,22 @@ async def upload_file(
         print(f"Temp path: {temp_path}")
         extracted_text, metadata = await process_file_auto(temp_path)
 
+        # Friendly guard: if this is an image and OCR didn't extract any meaningful text.
+        # Without this, the pipeline may try to "extract" from the placeholder string and create junk items.
+        if (metadata or {}).get("file_type") == "image":
+            ocr_performed = (metadata or {}).get("ocr_performed", False)
+            ocr_engine = (metadata or {}).get("ocr_engine", "none")
+            # Check if we got meaningful text (not just the placeholder)
+            if not ocr_performed or not extracted_text or len(extracted_text.strip()) < 20:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"This looks like an image upload, but {'OCR found no readable text' if ocr_performed else 'OCR is not available'}.\n"
+                        "Please upload a PDF with selectable text, or paste the text directly.\n"
+                        "Tip: Screenshots of text often don't OCR well — copy-paste the actual text instead."
+                    ),
+                )
+
         # Redact common personal data BEFORE sending to LLM
         extracted_text, pii_stats = redact_pii(extracted_text)
         # Store a safe snapshot of the source text (redacted) for Brain v2 Step 1
@@ -579,18 +601,25 @@ async def upload_text(
     - Manual POI entry
     """
     try:
-        if len(request.text) < 50:
+        raw_text = request.text or ""
+        if len(raw_text) < 50:
             raise HTTPException(
                 status_code=400,
                 detail="Text too short (minimum 50 characters)"
             )
+
+        original_len = len(raw_text)
+        truncated_for_llm = False
+        if original_len > MAX_PASTE_CHARS:
+            raw_text = raw_text[:MAX_PASTE_CHARS]
+            truncated_for_llm = True
         
         user = await get_current_user(http_request)
         user_id = user.get("id")
         user_email = (user.get("email") or "").lower()
 
         upload_id = str(uuid.uuid4())
-        text_redacted, pii_stats = redact_pii(request.text)
+        text_redacted, pii_stats = redact_pii(raw_text)
         source_text_limit = 60000
         source_text_truncated = len(text_redacted or "") > source_text_limit
         source_text_redacted = (text_redacted or "")[:source_text_limit]
@@ -611,6 +640,9 @@ async def upload_text(
                     "title": request.title,
                     "description": request.source_description,
                     "text_length": len(text_redacted),
+                    "original_text_length": original_len,
+                    "truncated_for_llm": truncated_for_llm,
+                    "max_paste_chars": MAX_PASTE_CHARS,
                     "pii_redaction": pii_stats,
                     "source_text_redacted": source_text_redacted,
                     "source_text_length": len(text_redacted or ""),
@@ -625,7 +657,9 @@ async def upload_text(
             "upload_id": upload_id,
             "filename": request.title,
             "file_type": "text",
-            "text_length": len(text_redacted)
+            "text_length": len(text_redacted),
+            "original_text_length": original_len,
+            "truncated_for_llm": truncated_for_llm,
         }
         env = (os.getenv("ENVIRONMENT") or "").lower()
         multipass_enabled = (os.getenv("LEXA_MULTIPASS") or "").strip().lower() in {"1", "true", "yes"}
@@ -695,7 +729,9 @@ async def upload_text(
             source_metadata={
                 "title": request.title,
                 "description": request.source_description,
-                "text_length": len(text_redacted)
+                "text_length": len(text_redacted),
+                "original_text_length": original_len,
+                "truncated_for_llm": truncated_for_llm,
             },
             uploaded_by=user_id
         )
@@ -724,6 +760,9 @@ async def upload_text(
                     "title": request.title,
                     "description": request.source_description,
                     "text_length": len(text_redacted),
+                    "original_text_length": original_len,
+                    "truncated_for_llm": truncated_for_llm,
+                    "max_paste_chars": MAX_PASTE_CHARS,
                     "pii_redaction": pii_stats,
                     "source_text_redacted": source_text_redacted,
                     "source_text_length": len(text_redacted or ""),
@@ -743,6 +782,11 @@ async def upload_text(
             "upload_id": upload_id,
             "filename": f"{request.title}.txt",
             "status": "completed",
+            "message": (
+                "Text processed successfully"
+                + (f" (only first {MAX_PASTE_CHARS:,} characters analyzed — please split into parts for full coverage)" if truncated_for_llm else "")
+                + (" (fallback draft POIs created — please verify/clean)" if fallback_used else "")
+            ),
             "pois_extracted": pois_count,
             "intelligence_extracted": {
                 "pois": pois_count,

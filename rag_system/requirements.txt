@@ -15,6 +15,9 @@ openpyxl==3.1.2
 # Image processing
 Pillow>=10.2.0
 
+# OCR - Tesseract wrapper (free, no API key needed)
+pytesseract>=0.3.10
+
 # AI and enrichment
 anthropic==0.18.1  # Pin to version compatible with httpcore 0.17.3
 

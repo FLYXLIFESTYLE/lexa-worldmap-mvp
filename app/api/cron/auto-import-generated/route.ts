@@ -44,6 +44,18 @@ const CRON_DEFAULTS = {
   source: 'any' as const,
 };
 
+function currentCronSlotIndex(): number {
+  // Match our cron cadence (every 30 minutes). This gives a deterministic rotating offset.
+  return Math.floor(Date.now() / (30 * 60 * 1000));
+}
+
+function rotatingOffset(total: number, limit: number): number {
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  const slot = currentCronSlotIndex();
+  // Move forward by `limit` each slot; wrap around total.
+  return ((slot * limit) % total + total) % total;
+}
+
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -101,23 +113,45 @@ async function importForDestination(args: {
   // Prefer destination-source link table if present.
   let links: Array<{ entity_id: string; source: string; source_id: string }> = [];
   try {
+    // IMPORTANT:
+    // Cron needs to paginate/rotate, otherwise it will keep upserting the same first N rows forever.
+    // We do a tiny "count-only" query first, compute a rotating offset, then fetch a range slice.
+    let countQ = supabaseAdmin
+      .from('experience_entity_destination_sources')
+      .select('entity_id', { count: 'exact', head: true })
+      .eq('destination_id', dest.id)
+      .order('entity_id', { ascending: true });
+    if (source !== 'any') countQ = countQ.eq('source', source);
+    const { count: totalLinks, error: countErr } = await countQ;
+    if (countErr) throw countErr;
+
+    const offset = rotatingOffset(Number(totalLinks || 0), limit);
     let q = supabaseAdmin
       .from('experience_entity_destination_sources')
       .select('entity_id,source,source_id')
       .eq('destination_id', dest.id)
       .order('entity_id', { ascending: true });
     if (source !== 'any') q = q.eq('source', source);
-    const { data, error } = await q.limit(limit);
+    const { data, error } = await q.range(offset, offset + limit - 1);
     if (error) throw error;
     links = (data || []) as any;
   } catch {
     // fallback: (source rows) join (entities) by destination_id
+    // Same pagination issue applies here: without rotation, cron keeps importing the same first page.
+    let countQ = supabaseAdmin
+      .from('experience_entity_sources')
+      .select('entity_id, experience_entities!inner(destination_id)', { count: 'exact', head: true })
+      .eq('experience_entities.destination_id', dest.id);
+    if (source !== 'any') countQ = countQ.eq('source', source);
+    const { count: totalLinks } = await countQ;
+
+    const offset = rotatingOffset(Number(totalLinks || 0), limit);
     let q = supabaseAdmin
       .from('experience_entity_sources')
       .select('source,source_id, entity_id, experience_entities!inner(destination_id)')
       .eq('experience_entities.destination_id', dest.id);
     if (source !== 'any') q = q.eq('source', source);
-    const { data } = await q.limit(limit);
+    const { data } = await q.range(offset, offset + limit - 1);
     links = (data || [])
       .map((r: any) => ({ entity_id: r.entity_id, source: r.source, source_id: r.source_id }))
       .filter((r: any) => !!r.entity_id && !!r.source && !!r.source_id);

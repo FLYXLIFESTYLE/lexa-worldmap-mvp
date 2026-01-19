@@ -16,9 +16,31 @@
 import './_env';
 import { supabaseAdmin } from './_supabaseAdmin';
 
-const BATCH_SIZE = 10; // Enrich 10 POIs in parallel
-const MAX_POIS = 1000; // Stop after 1000 (run multiple times if needed)
+const BATCH_SIZE = Number(process.env.BATCH_SIZE || 10); // Enrich 10 POIs in parallel
+const MAX_POIS = Number(process.env.MAX_POIS || 1000); // Stop after 1000 (run multiple times if needed)
 const AUTO_PROMOTE_THRESHOLD = 70; // Auto-promote POIs with script score >= 70
+const DESTINATION_FILTER = (process.env.DESTINATION_FILTER || '').trim(); // e.g. "French Riviera"
+
+async function assertLocalNextServerIsRunning() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2000);
+
+  try {
+    // We hit "/" because it always exists if Next is running (unlike a custom health route).
+    const res = await fetch('http://localhost:3000/', { method: 'GET', signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch {
+    throw new Error(
+      'Local API not reachable at http://localhost:3000.\n' +
+        'Start the Next.js dev server in another terminal first:\n' +
+        '  npm run dev\n' +
+        'Then re-run:\n' +
+        '  npm run fast-enrich-mvp'
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 async function enrichPOI(poiId: string): Promise<{ success: boolean; promoted: boolean; error?: string }> {
   try {
@@ -67,15 +89,23 @@ async function main() {
   console.log(`Strategy: Enrich → Score → Auto-promote (>=70)`);
   console.log(`Batch size: ${BATCH_SIZE} parallel`);
   console.log(`Max POIs: ${MAX_POIS}`);
+  if (DESTINATION_FILTER) console.log(`Destination filter: ${DESTINATION_FILTER}`);
   console.log('='.repeat(60));
   console.log('');
 
+  await assertLocalNextServerIsRunning();
+
   // Find unenriched POIs
-  const { data: pois, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('extracted_pois')
     .select('id,name,destination')
-    .eq('enhanced', false)
-    .limit(MAX_POIS);
+    .eq('enhanced', false);
+
+  if (DESTINATION_FILTER) {
+    query = query.eq('destination', DESTINATION_FILTER);
+  }
+
+  const { data: pois, error } = await query.limit(MAX_POIS);
 
   if (error) throw new Error(error.message);
   if (!pois || pois.length === 0) {

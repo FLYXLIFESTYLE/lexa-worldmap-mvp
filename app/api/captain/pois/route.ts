@@ -7,7 +7,9 @@ export const runtime = 'nodejs';
 
 const QuerySchema = z.object({
   skip: z.coerce.number().int().min(0).optional().default(0),
-  limit: z.coerce.number().int().min(1).max(1000).optional().default(50),
+  // NOTE: The Captain Browse UI needs to see more than 1000 when bulk imports happen.
+  // We'll still cap to 5000 to avoid pulling "everything" accidentally.
+  limit: z.coerce.number().int().min(1).max(5000).optional().default(1000),
   destination: z.string().min(1).optional(),
   category: z.string().min(1).optional(),
   verified: z.coerce.boolean().optional(),
@@ -77,8 +79,13 @@ export async function GET(req: Request) {
     }
 
     // Order + pagination
-    // Stable ordering: many rows can share the same created_at second during bulk imports.
-    q = q.order('created_at', { ascending: false }).order('id', { ascending: false }).range(skip, skip + limit - 1);
+    // IMPORTANT: Use updated_at first so "just enriched/edited" POIs appear immediately in the UI.
+    // Secondary ordering keeps the sort stable.
+    q = q
+      .order('updated_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(skip, skip + limit - 1);
 
     const { data, error, count } = await q;
     if (error) {

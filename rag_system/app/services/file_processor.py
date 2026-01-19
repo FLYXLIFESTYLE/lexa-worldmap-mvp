@@ -29,13 +29,20 @@ try:
 except ImportError:
     EXCEL_AVAILABLE = False
 
-# Image OCR
+# Image OCR - Google Vision (paid, high quality)
 try:
     from google.cloud import vision
     import PIL.Image
     VISION_AVAILABLE = True
 except ImportError:
     VISION_AVAILABLE = False
+
+# Image OCR - Tesseract (free, open-source)
+try:
+    import pytesseract
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
 
 
 async def process_pdf(file_path: str) -> Tuple[str, Dict]:
@@ -204,7 +211,7 @@ async def process_image(file_path: str) -> Tuple[str, Dict]:
             metadata["height"] = img.height
             metadata["format"] = img.format
         
-        # Attempt OCR with Google Vision
+        # Attempt OCR with Google Vision (paid, high quality)
         if VISION_AVAILABLE and os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
             client = vision.ImageAnnotatorClient()
             
@@ -218,14 +225,29 @@ async def process_image(file_path: str) -> Tuple[str, Dict]:
             if texts:
                 extracted_text = texts[0].description
                 metadata["ocr_performed"] = True
+                metadata["ocr_engine"] = "google_vision"
                 metadata["confidence"] = "high"  # Google Vision is generally high confidence
                 return extracted_text.strip(), metadata
         
-        # Fallback: Return basic info
+        # Fallback: Tesseract OCR (free, open-source)
+        if TESSERACT_AVAILABLE:
+            try:
+                from PIL import Image
+                img = Image.open(file_path)
+                extracted_text = pytesseract.image_to_string(img)
+                if extracted_text and extracted_text.strip():
+                    metadata["ocr_performed"] = True
+                    metadata["ocr_engine"] = "tesseract"
+                    metadata["confidence"] = "medium"  # Tesseract is good but not as accurate as Vision
+                    return extracted_text.strip(), metadata
+            except Exception as tess_err:
+                print(f"Tesseract OCR failed: {tess_err}")
+        
+        # Fallback: Return basic info (no OCR available)
         extracted_text = f"Image file: {os.path.basename(file_path)}\n"
         extracted_text += f"Dimensions: {metadata['width']}x{metadata['height']}\n"
         extracted_text += f"Format: {metadata['format']}\n"
-        extracted_text += "Note: OCR not performed (Google Vision API not configured)"
+        extracted_text += "Note: OCR not performed (no OCR engine available)"
         
         return extracted_text, metadata
         
@@ -343,7 +365,9 @@ def check_dependencies() -> Dict[str, bool]:
         "pdf": PDF_AVAILABLE,
         "word": WORD_AVAILABLE,
         "excel": EXCEL_AVAILABLE,
-        "ocr": VISION_AVAILABLE,
+        "ocr_vision": VISION_AVAILABLE,
+        "ocr_tesseract": TESSERACT_AVAILABLE,
+        "ocr": VISION_AVAILABLE or TESSERACT_AVAILABLE,
         "all": all([PDF_AVAILABLE, WORD_AVAILABLE, EXCEL_AVAILABLE])
     }
 

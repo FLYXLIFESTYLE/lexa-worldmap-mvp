@@ -1,0 +1,4 @@
+# System packages for Render
+# Tesseract OCR - free, open-source text recognition from images
+tesseract-ocr
+tesseract-ocr-eng

@@ -1,3 +1,4 @@
+import './_env';
 import { createClient } from '@supabase/supabase-js';
 
 export function createSupabaseAdmin() {
@@ -33,4 +34,12 @@ export function createSupabaseAdmin() {
   });
 }
 
+/**
+ * Convenience singleton for scripts.
+ *
+ * Many scripts do `import { supabaseAdmin } from './_supabaseAdmin'`.
+ * If we only exported `createSupabaseAdmin()`, the import would be `undefined`
+ * at runtime (tsx doesn't typecheck by default) and crash on `.from(...)`.
+ */
+export const supabaseAdmin = createSupabaseAdmin();
 

@@ -320,6 +320,10 @@ function CaptainUploadPageInner() {
       // Check for text
       if (hasText) {
         console.log('📋 Handling text paste in upload area');
+        if (hasText.length < 50) {
+          alert('Text too short. Please paste at least 50 characters.');
+          return;
+        }
         // Upload pasted text
         handlers.setLoading(true);
         try {
@@ -503,6 +507,10 @@ function CaptainUploadPageInner() {
     // Check for text
     const pastedText = clipboardData.getData('text/plain');
     if (pastedText && pastedText.trim().length > 0) {
+      if (pastedText.trim().length < 50) {
+        alert('Text too short. Please paste at least 50 characters.');
+        return;
+      }
       // Upload pasted text
       setLoading(true);
       try {
