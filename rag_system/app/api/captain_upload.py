@@ -4,10 +4,12 @@ Captain Portal - File Upload & Intelligence Extraction API
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, Request
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
 from datetime import datetime
 import os
+import re
+from urllib.parse import quote
 
 from app.services.file_processor import process_file_auto
 from app.services.multipass_extractor import run_multipass_extraction, run_fast_extraction
@@ -28,6 +30,10 @@ MAX_FILE_SIZE = 25 * 1024 * 1024
 # we send to the LLM to keep requests fast and predictable.
 # NOTE: We still store only a redacted snapshot up to `source_text_limit` below.
 MAX_PASTE_CHARS = 60_000
+
+# Supabase Storage (keep original uploads)
+CAPTAIN_UPLOADS_BUCKET = os.getenv("CAPTAIN_UPLOADS_BUCKET", "public").strip() or "public"
+CAPTAIN_UPLOADS_FOLDER = os.getenv("CAPTAIN_UPLOADS_FOLDER", "captain-uploads").strip() or "captain-uploads"
 
 # Note: We allow images because the Captain Portal supports OCR extraction.
 ALLOWED_MIME_TYPES = {
@@ -70,6 +76,73 @@ def _safe_err_msg(e: Exception) -> str:
         return repr(e)
     except Exception:
         return e.__class__.__name__
+
+
+def _safe_storage_filename(name: str) -> str:
+    """
+    Make filenames storage-safe and reasonably short.
+    """
+    base = os.path.basename(name or "").strip() or "upload"
+    base = re.sub(r"[^a-zA-Z0-9._-]+", "_", base).strip("_")
+    if not base:
+        base = "upload"
+    return base[:120]
+
+
+def _build_public_url(bucket: str, path: str) -> Optional[str]:
+    """
+    Build a public URL for a storage path (public buckets only).
+    """
+    supabase_url = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    if not supabase_url or not bucket or not path:
+        return None
+    return f"{supabase_url}/storage/v1/object/public/{bucket}/{quote(path, safe='/')}"
+
+
+def _try_upload_original_file(
+    supabase,
+    *,
+    user_id: str,
+    upload_id: str,
+    filename: str,
+    content: bytes,
+    content_type: Optional[str],
+) -> Dict[str, Optional[str]]:
+    """
+    Best-effort upload to Supabase Storage. Returns dict with path/url/error.
+    """
+    safe_name = _safe_storage_filename(filename)
+    storage_path = f"{CAPTAIN_UPLOADS_FOLDER}/{user_id}/{upload_id}/{safe_name}"
+    try:
+        supabase.storage.from_(CAPTAIN_UPLOADS_BUCKET).upload(  # type: ignore
+            storage_path,
+            content,
+            {"content-type": content_type or "application/octet-stream", "upsert": False},
+        )
+        return {
+            "bucket": CAPTAIN_UPLOADS_BUCKET,
+            "path": storage_path,
+            "url": _build_public_url(CAPTAIN_UPLOADS_BUCKET, storage_path),
+            "error": None,
+        }
+    except Exception as e:
+        return {
+            "bucket": CAPTAIN_UPLOADS_BUCKET,
+            "path": storage_path,
+            "url": None,
+            "error": _safe_err_msg(e),
+        }
+
+
+def _try_remove_original_file(supabase, *, bucket: str, path: str) -> Optional[str]:
+    """
+    Best-effort delete from Supabase Storage. Returns error string if failed.
+    """
+    try:
+        supabase.storage.from_(bucket).remove([path])  # type: ignore
+        return None
+    except Exception as e:
+        return _safe_err_msg(e)
 
 
 class UploadTextRequest(BaseModel):
@@ -317,6 +390,27 @@ async def upload_file(
         user_id = user.get("id")
         user_email = (user.get("email") or "").lower()
 
+        # Best-effort: keep the original upload in Supabase Storage
+        file_url = None
+        file_storage_meta = {
+            "bucket": CAPTAIN_UPLOADS_BUCKET,
+            "path": None,
+            "stored": False,
+        }
+        storage_result = _try_upload_original_file(
+            supabase,
+            user_id=str(user_id),
+            upload_id=upload_id,
+            filename=file.filename or "upload",
+            content=content,
+            content_type=file.content_type,
+        )
+        file_storage_meta["path"] = storage_result.get("path")
+        file_storage_meta["stored"] = storage_result.get("error") is None
+        if storage_result.get("error"):
+            file_storage_meta["error"] = storage_result.get("error")
+        file_url = storage_result.get("url")
+
         # Process file
         print(f"=== PROCESSING FILE ===")
         print(f"Temp path: {temp_path}")
@@ -374,6 +468,8 @@ async def upload_file(
                 "filename": file.filename,
                 "file_type": metadata.get("file_type", "unknown"),
                 "file_size": file_size,
+                "file_url": file_url,
+                "keep_file": True,
                 "processing_status": "processing",
                 "confidence_score": 80,  # Default 80% for uploads
                 "metadata": {
@@ -384,6 +480,7 @@ async def upload_file(
                     "source_text_redacted": source_text_redacted,
                     "source_text_length": len(extracted_text or ""),
                     "source_text_truncated": source_text_truncated,
+                    "file_storage": file_storage_meta,
                     **metadata
                 }
             }
@@ -802,7 +899,6 @@ async def upload_text(
             "counts_estimated": estimated_counts,
             "extraction_contract": extraction_contract,
             "file_size_kb": len(text_redacted.encode('utf-8')) / 1024,
-            "message": "Text processed successfully" + (" (fallback draft POIs created — please verify/clean)" if fallback_used else "")
         }
         
     except HTTPException as e:
@@ -852,7 +948,24 @@ async def get_upload_history(
         rows = (primary.data or []) + (legacy.data or [])
         # De-dup by id
         unique = {r.get("id"): r for r in rows if isinstance(r, dict) and r.get("id")}
-        uploads = list(unique.values())
+        def _with_file_url(row: dict) -> dict:
+            if not isinstance(row, dict):
+                return row
+            if row.get("file_url") or not row.get("keep_file"):
+                return row
+            meta = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+            file_storage = meta.get("file_storage") if isinstance(meta, dict) else {}
+            if isinstance(file_storage, dict) and file_storage.get("stored") is False:
+                return row
+            if isinstance(file_storage, dict) and file_storage.get("deleted_at"):
+                return row
+            bucket = (file_storage.get("bucket") or CAPTAIN_UPLOADS_BUCKET) if isinstance(file_storage, dict) else CAPTAIN_UPLOADS_BUCKET
+            path = file_storage.get("path") if isinstance(file_storage, dict) else None
+            if bucket and path:
+                row["file_url"] = _build_public_url(str(bucket), str(path))
+            return row
+
+        uploads = [_with_file_url(r) for r in list(unique.values())]
         uploads.sort(key=lambda r: r.get("uploaded_at") or r.get("created_at") or "", reverse=True)
 
         total_count = len(uploads)
@@ -895,6 +1008,19 @@ async def get_upload_detail(
     # Ownership check: current user OR legacy row matched by email
     if row.get("uploaded_by") != user_id and (row.get("uploaded_by_email") or "").lower() != user_email:
         raise HTTPException(status_code=404, detail="Upload not found")
+
+    # Ensure file_url is present if we can build it
+    if not row.get("file_url") and row.get("keep_file"):
+        meta = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+        file_storage = meta.get("file_storage") if isinstance(meta, dict) else {}
+        if isinstance(file_storage, dict) and file_storage.get("stored") is False:
+            return {"upload": row}
+        if isinstance(file_storage, dict) and file_storage.get("deleted_at"):
+            return {"upload": row}
+        bucket = (file_storage.get("bucket") or CAPTAIN_UPLOADS_BUCKET) if isinstance(file_storage, dict) else CAPTAIN_UPLOADS_BUCKET
+        path = file_storage.get("path") if isinstance(file_storage, dict) else None
+        if bucket and path:
+            row["file_url"] = _build_public_url(str(bucket), str(path))
 
     return {"upload": row}
 
@@ -958,13 +1084,40 @@ async def update_upload(
         raise HTTPException(status_code=404, detail="Upload not found")
 
     updates = {}
+    current_meta = existing.data[0].get("metadata") or {}
+    if not isinstance(current_meta, dict):
+        current_meta = {}
+    meta_changed = False
+
+    # Keep/Dump logic + storage cleanup
     if body.keep_file is not None:
         updates["keep_file"] = body.keep_file
+        file_storage = current_meta.get("file_storage") if isinstance(current_meta.get("file_storage"), dict) else {}
+        bucket = (file_storage.get("bucket") or CAPTAIN_UPLOADS_BUCKET).strip()
+        path = file_storage.get("path")
+
+        if body.keep_file is False and bucket and path:
+            delete_err = _try_remove_original_file(supabase, bucket=bucket, path=path)
+            file_storage["stored"] = False
+            file_storage["deleted_at"] = datetime.utcnow().isoformat()
+            if delete_err:
+                file_storage["delete_error"] = delete_err
+            updates["file_url"] = None
+            meta_changed = True
+        elif body.keep_file is True and bucket and path:
+            # Restore/ensure download URL if missing
+            if not existing.data[0].get("file_url"):
+                maybe_url = _build_public_url(bucket, path)
+                if maybe_url:
+                    updates["file_url"] = maybe_url
+                    file_storage["stored"] = True
+                    meta_changed = True
+
+        if file_storage:
+            current_meta["file_storage"] = file_storage
+
     if body.metadata is not None and isinstance(body.metadata, dict):
         # Merge metadata shallowly
-        current_meta = existing.data[0].get("metadata") or {}
-        if not isinstance(current_meta, dict):
-            current_meta = {}
         next_meta = {**current_meta, **body.metadata}
         # Simple edit versioning for Brain v2 Step 1 (auditability)
         try:
@@ -976,6 +1129,39 @@ async def update_upload(
         next_meta["last_edited_by"] = user_id
         next_meta["last_edited_by_email"] = user_email
         updates["metadata"] = next_meta
+        meta_changed = True
+    else:
+        next_meta = current_meta
+
+    if meta_changed and "metadata" not in updates:
+        updates["metadata"] = next_meta
+
+    # If extracted_data was edited, refresh extracted POIs (best effort)
+    extracted = None
+    should_refresh = isinstance(body.metadata, dict) and "extracted_data" in body.metadata
+    if should_refresh and isinstance(next_meta, dict):
+        extracted = next_meta.get("extracted_data")
+    if should_refresh and isinstance(extracted, dict) and extracted.get("pois") is not None:
+        try:
+            await save_intelligence_to_db(
+                supabase=supabase,
+                intelligence={"pois": extracted.get("pois") or []},
+                source_type="file_upload",
+                source_id=str(upload_id),
+                source_metadata={"filename": existing.data[0].get("filename")},
+                uploaded_by=user_id,
+            )
+        except Exception:
+            pass
+
+        # Update counts for history display
+        try:
+            pois_count = len(extracted.get("pois") or [])
+            experiences_count = len(extracted.get("experiences") or [])
+            updates["pois_extracted"] = pois_count
+            updates["experiences_extracted"] = experiences_count
+        except Exception:
+            pass
 
     if not updates:
         return {"success": True, "upload_id": str(upload_id)}

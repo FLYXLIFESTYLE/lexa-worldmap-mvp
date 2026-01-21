@@ -424,7 +424,7 @@ async def update_scrape(
         raise HTTPException(status_code=403, detail="Admin only")
 
     existing = supabase.table("scraped_urls")\
-        .select("id, metadata")\
+        .select("id, url, entered_by, metadata")\
         .eq("id", scrape_id)\
         .limit(1)\
         .execute()
@@ -432,10 +432,11 @@ async def update_scrape(
         raise HTTPException(status_code=404, detail="Scrape not found")
 
     updates = {}
+    current_meta = existing.data[0].get("metadata") or {}
+    if not isinstance(current_meta, dict):
+        current_meta = {}
+
     if body.metadata is not None and isinstance(body.metadata, dict):
-        current_meta = existing.data[0].get("metadata") or {}
-        if not isinstance(current_meta, dict):
-            current_meta = {}
         next_meta = {**current_meta, **body.metadata}
         # Simple edit versioning (auditability)
         try:
@@ -447,6 +448,34 @@ async def update_scrape(
         next_meta["last_edited_by"] = user_id
         next_meta["last_edited_by_email"] = user_email
         updates["metadata"] = next_meta
+    else:
+        next_meta = current_meta
+
+    # If extracted_data was edited, refresh extracted POIs (best effort)
+    extracted = None
+    should_refresh = isinstance(body.metadata, dict) and "extracted_data" in body.metadata
+    if should_refresh and isinstance(next_meta, dict):
+        extracted = next_meta.get("extracted_data")
+    if should_refresh and isinstance(extracted, dict) and extracted.get("pois") is not None:
+        try:
+            owner_id = existing.data[0].get("entered_by") or user_id
+            await save_intelligence_to_db(
+                supabase=supabase,
+                intelligence={"pois": extracted.get("pois") or []},
+                source_type="url_scrape",
+                source_id=str(scrape_id),
+                source_metadata={"url": existing.data[0].get("url"), "filename": existing.data[0].get("url")},
+                uploaded_by=owner_id,
+            )
+        except Exception:
+            pass
+
+        # Update counts for history display
+        try:
+            updates["pois_discovered"] = len(extracted.get("pois") or [])
+        except Exception:
+            pass
+
     if not updates:
         return {"success": True, "scrape_id": scrape_id}
 

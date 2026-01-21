@@ -503,6 +503,45 @@ export default function CaptainURLsPage() {
                       </div>
                     )}
 
+                    {/* Summary & Report */}
+                    {(() => {
+                      const meta = urlData.metadata || {};
+                      const captainSummary = meta?.captain_summary as string | undefined;
+                      const reportMarkdown = meta?.report_markdown as string | undefined;
+                      const extracted = meta?.extracted_data as any | undefined;
+
+                      if (!captainSummary && !reportMarkdown && !extracted) return null;
+
+                      const pois = extracted?.pois?.length ?? 0;
+                      const exps = extracted?.experiences?.length ?? 0;
+                      const providers = extracted?.service_providers?.length ?? 0;
+
+                      return (
+                        <div className="mt-4 bg-white rounded-lg border border-gray-200 p-4">
+                          <h4 className="font-semibold text-gray-900 mb-3">📝 Extraction Summary</h4>
+                          {(pois + exps + providers) > 0 && (
+                            <div className="text-sm text-gray-700 mb-3">
+                              POIs: <span className="font-semibold">{pois}</span> • Experiences: <span className="font-semibold">{exps}</span> • Providers: <span className="font-semibold">{providers}</span>
+                            </div>
+                          )}
+                          {captainSummary && (
+                            <div className="bg-lexa-gold/10 border border-lexa-gold/30 rounded-lg p-3 mb-3">
+                              <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans">
+                                {captainSummary}
+                              </pre>
+                            </div>
+                          )}
+                          {reportMarkdown && (
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                              <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans">
+                                {reportMarkdown}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Scraping Info */}
                     <div className="mt-4 p-3 bg-white rounded-lg border border-gray-200">
                       <p className="text-sm">

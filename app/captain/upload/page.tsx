@@ -65,6 +65,20 @@ function CaptainUploadPageInner() {
     }
     return next;
   };
+
+  const buildSummaryFallbackContract = (meta: any) => {
+    const captainSummary = meta?.captain_summary as string | undefined;
+    const reportMarkdown = meta?.report_markdown as string | undefined;
+    if (!captainSummary && !reportMarkdown) return null;
+    return {
+      final_package: {
+        metadata: {
+          captain_summary: captainSummary,
+          report_markdown: reportMarkdown,
+        },
+      },
+    };
+  };
   
   const [mode, setMode] = useState<UploadMode>('file');
   const [loading, setLoading] = useState(false);
@@ -187,11 +201,18 @@ function CaptainUploadPageInner() {
         const meta = row?.metadata || {};
         const extracted = meta?.extracted_data;
         const contract = meta?.extraction_contract;
+        const summaryFallback = buildSummaryFallbackContract(meta);
 
-        if (!extracted || !contract) {
+        if (!extracted && !contract && !summaryFallback) {
           alert('This upload has no cached extraction data yet.');
           return;
         }
+
+        const safeExtracted =
+          extracted && typeof extracted === 'object'
+            ? extracted
+            : { pois: [], experiences: [], service_providers: [] };
+        const contractFinal = contract || summaryFallback || undefined;
 
         const openedFile: UploadedFile = {
           name: row.filename,
@@ -200,10 +221,10 @@ function CaptainUploadPageInner() {
           status: row.processing_status === 'completed' ? 'done' : 'error',
           confidenceScore: row.confidence_score || 80,
           uploadId: row.id,
-          extractedData: normalizeExtractedData(extracted),
+          extractedData: normalizeExtractedData(safeExtracted),
           countsReal: contract?.final_package?.counts?.real_extracted || row.counts_real || {},
           countsEstimated: contract?.final_package?.counts?.estimated_potential || row.counts_estimated || {},
-          extractionContract: contract,
+          extractionContract: contractFinal,
           keepDecision: row.keep_file ? 'keep' : 'dump',
         };
 
@@ -227,11 +248,18 @@ function CaptainUploadPageInner() {
         const meta = row?.metadata || {};
         const extracted = meta?.extracted_data;
         const contract = meta?.extraction_contract;
+        const summaryFallback = buildSummaryFallbackContract(meta);
 
-        if (!extracted || !contract) {
+        if (!extracted && !contract && !summaryFallback) {
           alert('This scraped URL has no cached extraction yet.');
           return;
         }
+
+        const safeExtracted =
+          extracted && typeof extracted === 'object'
+            ? extracted
+            : { pois: [], experiences: [], service_providers: [] };
+        const contractFinal = contract || summaryFallback || undefined;
 
         const openedFile: UploadedFile = {
           name: row.url,
@@ -240,10 +268,10 @@ function CaptainUploadPageInner() {
           status: row.scraping_status === 'success' ? 'done' : 'error',
           confidenceScore: 80,
           uploadId: row.id,
-          extractedData: normalizeExtractedData(extracted),
+          extractedData: normalizeExtractedData(safeExtracted),
           countsReal: meta?.counts_real || {},
           countsEstimated: meta?.counts_estimated || {},
-          extractionContract: contract,
+          extractionContract: contractFinal,
           keepDecision: 'keep',
         };
 
