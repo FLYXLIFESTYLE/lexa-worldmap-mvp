@@ -147,7 +147,7 @@ export default function CaptainHistoryPage() {
     try {
       await uploadAPI.updateUpload(id, { keep_file: !currentKeep });
       setUploads(prev => prev.map(u =>
-        u.id === id ? { ...u, keep_file: !currentKeep, file_url: !currentKeep ? u.file_url : null } : u
+        u.id === id ? { ...u, keep_file: !currentKeep, file_url: !currentKeep ? u.file_url : undefined } : u
       ));
       alert(`✅ File ${!currentKeep ? 'saved' : 'marked for deletion'}!`);
       await fetchUploads(userEmail);
