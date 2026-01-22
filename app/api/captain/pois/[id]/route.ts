@@ -21,7 +21,7 @@ const PatchSchema = z
     themes: z.array(z.string().min(1)).optional(),
     enhanced: z.coerce.boolean().optional(),
     verified: z.coerce.boolean().optional(),
-    metadata: z.record(z.any()).optional(),
+    metadata: z.record(z.string(), z.any()).optional(),
   })
   .strict();
 

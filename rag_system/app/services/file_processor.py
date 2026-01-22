@@ -5,8 +5,10 @@ Handles extraction of text and metadata from various file formats
 
 import os
 import io
-from typing import Tuple, Dict
+import base64
+from typing import Tuple, Dict, Optional
 import mimetypes
+import httpx
 
 # PDF processing
 try:
@@ -190,6 +192,33 @@ async def process_excel(file_path: str) -> Tuple[str, Dict]:
         raise Exception(f"Excel processing failed: {str(e)}")
 
 
+async def _vision_text_detection(base64_image: str, api_key: str) -> Optional[str]:
+    """
+    Call Google Vision API (REST) for OCR using an API key.
+    Returns extracted text or None.
+    """
+    url = f"https://vision.googleapis.com/v1/images:annotate?key={api_key}"
+    payload = {
+        "requests": [
+            {
+                "image": {"content": base64_image},
+                "features": [{"type": "TEXT_DETECTION", "maxResults": 1}],
+            }
+        ]
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.post(url, json=payload)
+        if response.status_code >= 400:
+            raise Exception(f"Vision API error: {response.text}")
+        data = response.json()
+        text = (
+            (data.get("responses") or [{}])[0]
+            .get("fullTextAnnotation", {})
+            .get("text")
+        )
+        return text.strip() if isinstance(text, str) and text.strip() else None
+
+
 async def process_image(file_path: str) -> Tuple[str, Dict]:
     """
     Extract text from images using Google Vision API (OCR)
@@ -211,7 +240,7 @@ async def process_image(file_path: str) -> Tuple[str, Dict]:
             metadata["height"] = img.height
             metadata["format"] = img.format
         
-        # Attempt OCR with Google Vision (paid, high quality)
+        # Attempt OCR with Google Vision (service account, high quality)
         if VISION_AVAILABLE and os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
             client = vision.ImageAnnotatorClient()
             
@@ -229,6 +258,22 @@ async def process_image(file_path: str) -> Tuple[str, Dict]:
                 metadata["confidence"] = "high"  # Google Vision is generally high confidence
                 return extracted_text.strip(), metadata
         
+        # Attempt OCR with Google Vision REST API (API key)
+        api_key = os.getenv('GOOGLE_VISION_API_KEY') or os.getenv('GOOGLE_PLACES_API_KEY')
+        if api_key:
+            try:
+                with open(file_path, 'rb') as image_file:
+                    content = image_file.read()
+                base64_image = base64.b64encode(content).decode('utf-8')
+                extracted_text = await _vision_text_detection(base64_image, api_key)
+                if extracted_text:
+                    metadata["ocr_performed"] = True
+                    metadata["ocr_engine"] = "google_vision_api"
+                    metadata["confidence"] = "high"
+                    return extracted_text.strip(), metadata
+            except Exception as api_err:
+                print(f"Vision API OCR failed: {api_err}")
+
         # Fallback: Tesseract OCR (free, open-source)
         if TESSERACT_AVAILABLE:
             try:

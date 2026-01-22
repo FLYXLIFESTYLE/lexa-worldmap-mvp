@@ -30,7 +30,7 @@ const CreateSchema = z.object({
   longitude: z.coerce.number().optional(),
   confidence_score: z.coerce.number().optional(),
   luxury_score: z.coerce.number().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 function normalizeConfidence(value?: number): number {

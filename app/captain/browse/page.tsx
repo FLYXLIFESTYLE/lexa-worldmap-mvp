@@ -30,6 +30,8 @@ interface POI {
   luxury_score?: number | null;
   keywords?: string[] | null;
   themes?: string[] | null;
+  source_file?: string | null;
+  metadata?: any;
 }
 
 type NuggetType =
@@ -81,6 +83,8 @@ export default function CaptainBrowsePage() {
   const [enrichedFilter, setEnrichedFilter] = useState<'all' | 'enriched' | 'not_enriched'>('all');
   const [minLuxuryScore, setMinLuxuryScore] = useState<number>(0);
   const [tagFilter, setTagFilter] = useState<string>('');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'yacht_destination' | 'manual_entry' | 'file_upload' | 'url_scrape' | 'text_paste'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'yacht_destination' | 'manual_entry' | 'file_upload' | 'url_scrape' | 'text_paste'>('all');
 
   // Bulk selection
   const [selectedPoiIds, setSelectedPoiIds] = useState<Set<string>>(new Set());
@@ -421,6 +425,18 @@ export default function CaptainBrowsePage() {
         });
       }
     }
+
+    // Source (uploads, scrapes, manual, yacht)
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter((poi) => {
+        const meta = poi.metadata || {};
+        const sourceKind = String(meta?.source_kind || '').toLowerCase();
+        const sourceType = String(meta?.source_type || '').toLowerCase();
+        const sourceFile = String(poi.source_file || '').toLowerCase();
+        const combined = sourceKind || sourceType || sourceFile;
+        return combined === sourceFilter;
+      });
+    }
     
     // Quality
     if (qualityFilter !== 'all') {
@@ -437,7 +453,7 @@ export default function CaptainBrowsePage() {
     }
     
     setFilteredPois(filtered);
-  }, [searchQuery, enrichedFilter, minLuxuryScore, tagFilter, categoryFilter, qualityFilter, scoreFilter, pois]);
+  }, [searchQuery, enrichedFilter, minLuxuryScore, tagFilter, categoryFilter, qualityFilter, scoreFilter, sourceFilter, pois]);
 
   useEffect(() => {
     let filtered = [...nuggets];
@@ -888,7 +904,7 @@ export default function CaptainBrowsePage() {
 
               {/* Advanced filters (POIs) */}
               {section === 'pois' && (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Enriched</label>
                     <select
@@ -922,6 +938,21 @@ export default function CaptainBrowsePage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="e.g. michelin, waterfront"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Source</label>
+                    <select
+                      value={sourceFilter}
+                      onChange={(e) => setSourceFilter(e.target.value as any)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">All</option>
+                      <option value="yacht_destination">Yacht Destinations</option>
+                      <option value="manual_entry">Manual Entries</option>
+                      <option value="file_upload">File Uploads</option>
+                      <option value="url_scrape">URL Scrapes</option>
+                      <option value="text_paste">Pasted Text</option>
+                    </select>
                   </div>
                 </div>
               )}

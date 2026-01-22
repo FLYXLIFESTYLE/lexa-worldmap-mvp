@@ -22,6 +22,8 @@ interface MediaItem {
   description?: string;
   kind?: 'yacht' | 'route' | 'destination' | 'other';
   filename?: string;
+  linked_name?: string;
+  linked_type?: 'city' | 'country' | 'route';
 }
 
 export async function POST(request: NextRequest) {
@@ -79,6 +81,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid destinations provided' }, { status: 400 });
     }
 
+    const normalizeName = (value?: string) => String(value || '').trim().toLowerCase();
+
     const records = cleaned.map((dest) => {
       const category =
         dest.type === 'route' ? 'yacht_route' : dest.type === 'country' ? 'yacht_country' : 'yacht_city';
@@ -90,6 +94,16 @@ export async function POST(request: NextRequest) {
         dest.type === 'route' && dest.ports?.length
           ? `Route ports: ${dest.ports.join(', ')}`
           : null;
+      const destMedia = mediaList
+        .filter((m) => normalizeName(m.linked_name) === normalizeName(dest.name) && m.linked_type === dest.type)
+        .map((m) => ({
+          url: m.url,
+          description: m.description,
+          kind: m.kind,
+          filename: m.filename,
+          linked_name: m.linked_name,
+          linked_type: m.linked_type,
+        }));
 
       return {
         id: randomUUID(),
@@ -120,7 +134,7 @@ export async function POST(request: NextRequest) {
           source_mode: normalizedSourceMode,
           ocr_text: ocr_text || null,
           yacht: yachtMeta,
-          media: mediaList,
+          media: destMedia,
         },
         verified: false,
         enhanced: false,

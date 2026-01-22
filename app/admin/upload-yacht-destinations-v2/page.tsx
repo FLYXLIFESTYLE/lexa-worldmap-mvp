@@ -30,6 +30,8 @@ interface YachtMedia {
   description?: string;
   kind: 'yacht' | 'route' | 'destination' | 'other';
   filename?: string;
+  linkedName?: string;
+  linkedType?: 'city' | 'country' | 'route';
 }
 
 export default function UploadYachtDestinationsPage() {
@@ -130,6 +132,11 @@ export default function UploadYachtDestinationsPage() {
         if (!response.ok) {
           throw new Error(data?.details || data?.error || 'Failed to upload media');
         }
+        const defaultLink =
+          destinations.length === 1
+            ? { linkedName: destinations[0].name, linkedType: destinations[0].type }
+            : {};
+
         setYachtMedia((prev) => [
           ...prev,
           {
@@ -138,6 +145,7 @@ export default function UploadYachtDestinationsPage() {
             filename: data.filename,
             description: mediaDescription.trim() || undefined,
             kind: mediaKind,
+            ...defaultLink,
           },
         ]);
       }
@@ -151,6 +159,21 @@ export default function UploadYachtDestinationsPage() {
 
   function handleRemoveMedia(id: string) {
     setYachtMedia((prev) => prev.filter((m) => m.id !== id));
+  }
+
+  function handleMediaLink(id: string, value: string) {
+    if (!value) {
+      setYachtMedia((prev) => prev.map((m) => (m.id === id ? { ...m, linkedName: undefined, linkedType: undefined } : m)));
+      return;
+    }
+    const [linkedName, linkedType] = value.split('||');
+    setYachtMedia((prev) =>
+      prev.map((m) =>
+        m.id === id
+          ? { ...m, linkedName: linkedName || undefined, linkedType: linkedType as YachtMedia['linkedType'] }
+          : m
+      )
+    );
   }
 
   // Drag and drop handlers
@@ -300,6 +323,12 @@ export default function UploadYachtDestinationsPage() {
       return;
     }
 
+    const unlinked = yachtMedia.filter((m) => !m.linkedName || !m.linkedType);
+    if (unlinked.length > 0) {
+      alert('Please link each media item to a destination/route before creating drafts.');
+      return;
+    }
+
     if (!confirm(`Create ${destinations.length} yacht destination drafts for review?`)) {
       return;
     }
@@ -322,7 +351,14 @@ export default function UploadYachtDestinationsPage() {
         body: JSON.stringify({
           destinations: apiDestinations,
           source_mode: mode,
-          media: yachtMedia,
+          media: yachtMedia.map((m) => ({
+            url: m.url,
+            description: m.description,
+            kind: m.kind,
+            filename: m.filename,
+            linked_name: m.linkedName,
+            linked_type: m.linkedType,
+          })),
         })
       });
 
@@ -579,7 +615,7 @@ export default function UploadYachtDestinationsPage() {
             {yachtMedia.length > 0 && (
               <div className="space-y-2">
                 {yachtMedia.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between bg-zinc-950 rounded-lg p-3">
+                  <div key={item.id} className="flex flex-col md:flex-row md:items-center md:justify-between bg-zinc-950 rounded-lg p-3 gap-3">
                     <div className="min-w-0">
                       <div className="text-sm text-white truncate">
                         {item.filename || item.url}
@@ -588,12 +624,29 @@ export default function UploadYachtDestinationsPage() {
                         {item.kind} {item.description ? `• ${item.description}` : ''}
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleRemoveMedia(item.id)}
-                      className="px-3 py-1 text-xs bg-zinc-800 text-white rounded hover:bg-zinc-700"
-                    >
-                      Remove
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={item.linkedName && item.linkedType ? `${item.linkedName}||${item.linkedType}` : ''}
+                        onChange={(e) => handleMediaLink(item.id, e.target.value)}
+                        className="px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-xs text-white"
+                        disabled={destinations.length === 0}
+                      >
+                        <option value="">
+                          {destinations.length === 0 ? 'Add destinations first' : 'Link to destination'}
+                        </option>
+                        {destinations.map((d) => (
+                          <option key={`${d.id}-${d.type}`} value={`${d.name}||${d.type}`}>
+                            {d.name} • {d.type}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => handleRemoveMedia(item.id)}
+                        className="px-3 py-1 text-xs bg-zinc-800 text-white rounded hover:bg-zinc-700"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
