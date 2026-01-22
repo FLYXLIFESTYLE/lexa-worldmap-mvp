@@ -1,8 +1,8 @@
-﻿/**
+/**
  * INITIAL_QUESTIONS Stage (Experience-first concierge intake)
  *
  * Flow:
- * 1) User selects 1–3 themes (from the 12 canonical theme categories)
+ * 1) User shares intent in their own words (themes optional)
  * 2) Ask why + what they want to feel (and what to avoid)
  * 3) Ask for best recent travel memory (+ optional worst)
  * 4) Present a concierge "hook" + high-level emotional direction + signature highlights (no destination required)
@@ -48,24 +48,16 @@ export async function processInitialQuestionsStage(
     // We opportunistically capture logistics hints so LEXA doesn't ignore them later.
     const earlyDestination = extractDestinationLoose(userInput);
     const earlyCompanion = extractCompanionLoose(userInput);
+    let nextBrief = state.brief;
     if ((earlyDestination || earlyCompanion) && !state.brief.where_at) {
       const hints = [earlyCompanion].filter(Boolean).join(' ');
-      const nextBrief: Brief = setBrief({
+      nextBrief = setBrief({
         where_at: {
           destination: earlyDestination ?? null,
           regions: [],
           hints: hints || null,
         },
       });
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          brief: nextBrief,
-          briefing_progress: setProgress({ intake_step: 'THEME_SELECT', intake_questions_asked: questionsAsked }),
-        },
-        message: withAckAndRecap(userInput, nextBrief, state.travel_preferences ?? {}, themeSelectPrompt()),
-        ui: themeUi(),
-      };
     }
 
     if (userInput.trim() === '__custom_theme__') {
@@ -80,10 +72,22 @@ export async function processInitialQuestionsStage(
     }
 
     const selected = parseThemeSelection(userInput);
+    const hasSubstantiveInput = isSubstantiveInput(userInput, earlyDestination, earlyCompanion);
     if (selected.length === 0) {
+      if (hasSubstantiveInput) {
+        return {
+          nextStage: 'INITIAL_QUESTIONS',
+          updatedState: {
+            brief: nextBrief,
+            briefing_progress: setProgress({ intake_step: 'THEME_WHY', intake_questions_asked: 1 }),
+          },
+          message: withAckAndRecap(userInput, nextBrief, state.travel_preferences ?? {}, themeWhyPrompt(selected)),
+        };
+      }
       return {
         nextStage: 'INITIAL_QUESTIONS',
         updatedState: {
+          brief: nextBrief,
           briefing_progress: setProgress({ intake_step: 'THEME_SELECT', intake_questions_asked: questionsAsked }),
         },
         message: themeSelectPrompt(),
@@ -95,7 +99,7 @@ export async function processInitialQuestionsStage(
     return {
       nextStage: 'INITIAL_QUESTIONS',
       updatedState: {
-        brief: setBrief({ theme: primary, themes: selected }),
+        brief: { ...nextBrief, theme: primary, themes: selected },
         briefing_progress: setProgress({ intake_step: 'THEME_WHY', intake_questions_asked: 1 }),
       },
       message: themeWhyPrompt(selected),
@@ -531,15 +535,19 @@ export function getInitialQuestionsSystemPrompt(): string {
   // This stage is handled deterministically in code (not by Claude).
   // We keep the system prompt for future optional LLM enrichment.
   return `You are LEXA, a world-class concierge and experience designer.
-The app will ask the user to pick 1–3 of 12 themes, then ask why/feelings, then a best memory, then present a hook + highlights.
+The app welcomes open-ended requests. Themes are optional and inferred when possible.
+Ask why/feelings, then a best memory, then present a hook + highlights.
 Keep responses refined, emotionally intelligent, and concise.`;
 }
 
 function themeSelectPrompt() {
-  return `Before we talk destinations, I want to understand what you're truly craving.\n\nChoose up to three themes below - this is simply to set direction. You can refine it anytime.`;
+  return `Tell me what you're craving in your own words.\n\nIf it helps, you can also choose up to three themes below to set the emotional direction. You can refine it anytime.`;
 }
 
 function themeWhyPrompt(themes: string[]) {
+  if (!themes.length) {
+    return `Beautiful. I have your direction.\n\nOne gentle question so I can design this accurately: what do you want to feel when you’re living this trip?\n\n(If there’s something you want to avoid, tell me - it helps me protect the experience.)`;
+  }
   const t = themes.join(' + ');
   return `Beautiful. ${t}.\n\nOne gentle question so I can design this accurately: what made you choose those - and what do you want to feel when you’re living this trip?\n\n(If there’s something you want to avoid, tell me - it helps me protect the experience.)`;
 }
@@ -937,6 +945,21 @@ function buildAckLine(userInput: string): string {
   if (looksLikeYes(t)) return 'Nice.';
   if (looksLikeNo(t)) return 'Got it.';
   return 'Nice.';
+}
+
+function isSubstantiveInput(input: string, destinationHint?: string | null, companionHint?: string | null): boolean {
+  const trimmed = input.trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  const isGreetingOnly = /^(hi|hello|hey|hallo|hola|yo|sup)(\s|!|\.|$)/.test(lower);
+  if (isGreetingOnly) return false;
+
+  const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+  if (wordCount >= 4) return true;
+  if (trimmed.length >= 18) return true;
+  if (destinationHint || companionHint) return true;
+  if (seemsLikeContainsPlaceName(trimmed)) return true;
+  return false;
 }
 
 function buildRecapLine(brief: Brief, prefs: any): string {

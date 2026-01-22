@@ -122,6 +122,23 @@ export const LEXA_THEME_COPY: Record<LexaTheme, { hook: string; description: str
   },
 };
 
+const THEME_KEYWORDS: Record<LexaTheme, string[]> = {
+  'Romance & Intimacy': ['romantic', 'romance', 'intimate', 'intimacy', 'honeymoon', 'anniversary', 'partner', 'spouse', 'couple'],
+  'Adventure & Exploration': ['adventure', 'explore', 'exploration', 'expedition', 'wild', 'thrill', 'discovery'],
+  'Wellness & Transformation': ['wellness', 'retreat', 'spa', 'reset', 'healing', 'detox', 'mindful', 'yoga'],
+  'Culinary Excellence': ['culinary', 'gastronomy', 'food', 'dining', 'wine', 'tasting', 'chef'],
+  'Cultural Immersion': ['culture', 'cultural', 'heritage', 'local', 'tradition', 'history'],
+  'Pure Luxury & Indulgence': ['luxury', 'indulgence', 'opulent', 'exclusive', 'vip', 'pamper'],
+  'Nature & Wildlife': ['nature', 'wildlife', 'safari', 'outdoor', 'mountain', 'forest'],
+  'Water Sports & Marine': ['yacht', 'sailing', 'marine', 'ocean', 'sea', 'diving', 'snorkel', 'beach', 'coast', 'island'],
+  'Art & Architecture': ['art', 'architecture', 'gallery', 'design', 'atelier'],
+  'Family Luxury': ['family', 'kids', 'children', 'multi generational', 'multigenerational'],
+  'Celebration & Milestones': ['celebration', 'milestone', 'birthday', 'anniversary', 'proposal', 'engagement', 'wedding', 'graduation'],
+  'Solitude & Reflection': ['solitude', 'reflection', 'quiet', 'silence', 'solo', 'stillness'],
+  'Nightlife & Entertainment': ['nightlife', 'party', 'club', 'music', 'concert', 'late night'],
+  'Sports & Active': ['sport', 'sports', 'active', 'fitness', 'golf', 'tennis', 'ski', 'hike', 'cycling'],
+};
+
 function normalize(s: string) {
   return s
     .toLowerCase()
@@ -158,6 +175,16 @@ export function parseThemeSelection(input: string): LexaTheme[] {
       // allow matching on any significant word
       const words = tn.split(' ').filter((w) => w.length >= 4 && w !== 'and');
       const hit = words.some((w) => n.includes(w)) || n.includes(tn);
+      if (hit && !out.includes(t)) out.push(t);
+      if (out.length >= 3) break;
+    }
+  }
+
+  // 3) Keyword inference (common intent words)
+  if (out.length < 3) {
+    for (const t of LEXA_THEMES_14) {
+      const keywords = THEME_KEYWORDS[t] ?? [];
+      const hit = keywords.some((k) => n.includes(normalize(k)));
       if (hit && !out.includes(t)) out.push(t);
       if (out.length >= 3) break;
     }

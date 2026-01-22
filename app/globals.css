@@ -475,3 +475,155 @@ body {
   transition: transform 0.2s;
   z-index: 1000 !important;
 }
+
+/* ============================================================================
+   LEXA Chat Starters + Avatar + Minimal Legal Footnote
+   ============================================================================ */
+
+.lexa-suggestion-strip {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(14px);
+}
+
+.lexa-suggestion-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.lexa-suggestion-subtitle {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 1rem;
+}
+
+.lexa-suggestion-row {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.lexa-suggestion-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.lexa-suggestion-row::-webkit-scrollbar-thumb {
+  background: rgba(var(--lexa-gold), 0.6);
+}
+
+.lexa-suggestion-card {
+  flex: 0 0 auto;
+  min-width: 220px;
+  max-width: 320px;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  transition: all 0.2s ease;
+}
+
+.lexa-suggestion-card:hover {
+  border-color: rgba(var(--lexa-gold), 0.6);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px);
+}
+
+.lexa-suggestion-rail {
+  width: 280px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(16px);
+  padding: 1.25rem 1rem;
+}
+
+.lexa-suggestion-rail__inner {
+  position: sticky;
+  top: 1rem;
+}
+
+.lexa-suggestion-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lexa-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at top, rgba(255, 255, 255, 0.35), rgba(212, 175, 55, 0.12));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+.lexa-avatar__icon {
+  width: 24px;
+  height: 24px;
+}
+
+.lexa-legal-footnote {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem 0.85rem;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.55);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+}
+
+.lexa-legal-footnote__icon {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.lexa-legal-footnote__text {
+  margin: 0;
+}
+
+.lexa-legal-footnote__link {
+  margin-left: 0.35rem;
+  color: rgba(var(--lexa-gold), 0.9);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lexa-legal-footnote__link:hover {
+  color: rgba(var(--lexa-gold), 1);
+}
+
+@media (max-width: 640px) {
+  .lexa-suggestion-card {
+    min-width: 200px;
+  }
+
+  .lexa-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .lexa-avatar__icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .lexa-legal-footnote {
+    font-size: 0.62rem;
+    padding-bottom: 0.7rem;
+  }
+}
+

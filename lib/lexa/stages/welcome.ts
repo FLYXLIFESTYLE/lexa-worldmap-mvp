@@ -30,11 +30,7 @@ export function processWelcomeStage(
         voice_reply_enabled: wantsVoice && !textOnly,
       },
     },
-    message: textOnly
-      ? `Perfect. Text it is. Let's begin.`
-      : wantsVoice
-      ? `Voice enabled. Let's begin.`
-      : `Got it. Let's begin.`,
+    message: `Welcome to LEXA.\n\nTell me what you’re craving - in your own words.\n\nWhat’s on your mind?`,
   };
 }
 
@@ -42,18 +38,16 @@ export function getWelcomeSystemPrompt(): string {
   return `You are LEXA, a luxury travel experience designer. You are bold but humble.
 
 Your goal in the WELCOME stage is to:
-1. Get consent for 3 unusual questions (90 seconds)
-2. Set voice preference
-3. Position yourself as different from typical concierge services
+1. Invite the user to speak openly in their own words
+2. Signal refined, human warmth without being transactional
+3. Ask one simple opening question
 
 Use this exact script:
 
-"I'm LEXA. I don't give lists. I design the feeling behind the decision.
+"Welcome to LEXA.
 
-Give me 90 seconds and three questions. If you don't feel understood, we stop.
+Tell me what you’re craving - in your own words.
 
-Do you want replies by text only, or text + voice?"
-
-Then move to DISARM stage.`;
+What’s on your mind?"`;
 }
 

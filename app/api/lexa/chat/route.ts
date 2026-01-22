@@ -415,7 +415,7 @@ function buildIntakeFallbackSystemPrompt(state: SessionState): string {
 
   const nextAsk =
     intakeStep === 'THEME_SELECT'
-      ? `Ask them to choose 1–3 themes from this list:\n${formatThemeMenu()}`
+      ? `Invite them to describe what they want in their own words. You may optionally offer this theme list as inspiration:\n${formatThemeMenu()}`
       : intakeStep === 'THEME_WHY'
         ? `Ask: why those themes + what they want to feel (and what to avoid).`
         : intakeStep === 'MEMORY'

@@ -35,8 +35,8 @@ export default function ChatTranscript({ messages, isLoading, onQuickReply }: Ch
   const ui = lastMsg?.role === 'assistant' ? lastMsg.ui : null;
   
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6">
-      <div className="mx-auto max-w-3xl space-y-6">
+    <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+      <div className="mx-auto w-full max-w-3xl space-y-6 lg:max-w-4xl">
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
@@ -77,7 +77,8 @@ function MessageBubble({ message }: { message: Message }) {
   };
   
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} group`}>
+    <div className={`flex items-start gap-3 ${isUser ? 'justify-end' : 'justify-start'} group`}>
+      {!isUser && isAssistant ? <LexaAvatar /> : null}
       <div
         className={`max-w-[85%] rounded-2xl px-6 py-4 transition-all ${
           isUser
@@ -156,6 +157,34 @@ function MessageBubble({ message }: { message: Message }) {
           {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
+    </div>
+  );
+}
+
+function LexaAvatar() {
+  return (
+    <div className="lexa-avatar" aria-hidden="true">
+      <svg viewBox="0 0 64 64" className="lexa-avatar__icon">
+        <defs>
+          <linearGradient id="lexaLadyGlow" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.9)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0.6)" />
+          </linearGradient>
+        </defs>
+        <circle cx="32" cy="32" r="30" fill="url(#lexaLadyGlow)" opacity="0.18" />
+        <path
+          d="M18 30c0-10 7-18 14-18 9 0 14 6 14 16 0 6-3 10-7 12-1-5-6-8-10-8s-8 3-10 8c-4-2-7-6-7-10z"
+          fill="rgba(15,23,42,0.55)"
+        />
+        <circle cx="32" cy="26" r="7" fill="rgba(255,255,255,0.85)" />
+        <path
+          d="M20 47c3-7 9-10 12-10s9 3 12 10"
+          fill="none"
+          stroke="rgba(255,255,255,0.75)"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+      </svg>
     </div>
   );
 }

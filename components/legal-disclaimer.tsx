@@ -9,7 +9,7 @@ import { AlertTriangle, Shield, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 interface LegalDisclaimerProps {
-  variant?: 'footer' | 'inline' | 'modal';
+  variant?: 'footer' | 'inline' | 'modal' | 'minimal';
   showIcon?: boolean;
   className?: string;
 }
@@ -20,6 +20,24 @@ export function LegalDisclaimer({
   className = '' 
 }: LegalDisclaimerProps) {
   
+  if (variant === 'minimal') {
+    return (
+      <div className={`lexa-legal-footnote ${className}`}>
+        {showIcon ? (
+          <div className="lexa-legal-footnote__icon">
+            <Shield className="h-4 w-4" />
+          </div>
+        ) : null}
+        <p className="lexa-legal-footnote__text">
+          LEXA is a creative planning tool only, not a travel agency. Always verify and book independently.
+          <Link href="/terms" className="lexa-legal-footnote__link">
+            Full terms →
+          </Link>
+        </p>
+      </div>
+    );
+  }
+
   if (variant === 'footer') {
     return (
       <div className={`border-t border-gray-200 bg-gray-50 px-4 py-6 ${className}`}>

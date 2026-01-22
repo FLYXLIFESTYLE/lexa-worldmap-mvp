@@ -30,6 +30,21 @@ export default function ChatPage() {
   const [stage, setStage] = useState('WELCOME');
   const [userEmail, setUserEmail] = useState<string>('');
   const [showResetModal, setShowResetModal] = useState(false);
+  const starterPrompts = [
+    {
+      id: 'romantic-monaco',
+      text: 'I want to spend a romantic weekend with my spouse in Monaco.',
+    },
+    {
+      id: 'restorative-escape',
+      text: 'We need a restorative escape after a demanding year - quiet, elegant, and not touristy.',
+    },
+    {
+      id: 'culinary-signature',
+      text: 'I want a culinary-led journey with one unforgettable signature moment.',
+    },
+  ];
+  const showStarters = messages.length <= 1 && !isLoading;
   
   // Reset chat handler
   const handleResetChat = () => {
@@ -198,9 +213,9 @@ export default function ChatPage() {
       <LuxuryBackground />
       <div className="relative z-10 flex h-screen flex-col">
       {/* Luxury Header */}
-      <header className="relative border-b border-white/10 bg-black/20 backdrop-blur-xl px-6 py-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <header className="relative border-b border-white/10 bg-black/20 backdrop-blur-xl px-4 py-4 sm:px-6 sm:py-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-4">
             <div>
               <div className="flex items-start gap-3">
                 <h1 className="text-3xl font-bold tracking-tight leading-none">
@@ -238,9 +253,9 @@ export default function ChatPage() {
             </button>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:justify-end md:gap-4">
             {/* User Menu */}
-            <div className="flex items-center gap-3 pl-4 border-l border-white/10">
+            <div className="flex flex-wrap items-center gap-3 md:pl-4 md:border-l md:border-white/10">
               <button
                 onClick={() => router.push('/account')}
                 className="text-right hover:opacity-80 transition-opacity cursor-pointer"
@@ -263,12 +278,53 @@ export default function ChatPage() {
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-lexa-gold to-transparent opacity-50" />
       </header>
       
-      {/* Chat Transcript */}
-      <ChatTranscript
-        messages={messages}
-        isLoading={isLoading}
-        onQuickReply={sendMessage}
-      />
+      {/* Starter suggestions (mobile) */}
+      {showStarters ? (
+        <div className="lexa-suggestion-strip lg:hidden">
+          <p className="lexa-suggestion-title">Try a starting point</p>
+          <div className="lexa-suggestion-row">
+            {starterPrompts.map((prompt) => (
+              <button
+                key={prompt.id}
+                onClick={() => sendMessage(prompt.text)}
+                className="lexa-suggestion-card"
+              >
+                {prompt.text}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col">
+          {/* Chat Transcript */}
+          <ChatTranscript
+            messages={messages}
+            isLoading={isLoading}
+            onQuickReply={sendMessage}
+          />
+        </div>
+        
+        {/* Starter suggestions (desktop rail) */}
+        <aside className={`hidden lg:flex lexa-suggestion-rail ${showStarters ? '' : 'opacity-0 pointer-events-none'}`}>
+          <div className="lexa-suggestion-rail__inner">
+            <p className="lexa-suggestion-title">Not sure how to start?</p>
+            <p className="lexa-suggestion-subtitle">Tap any idea to send it as your first message.</p>
+            <div className="lexa-suggestion-column">
+              {starterPrompts.map((prompt) => (
+                <button
+                  key={prompt.id}
+                  onClick={() => sendMessage(prompt.text)}
+                  className="lexa-suggestion-card"
+                >
+                  {prompt.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </div>
       
       {/* Input */}
       <ChatInput
@@ -321,7 +377,7 @@ export default function ChatPage() {
       )}
       
       {/* Legal Disclaimer Footer */}
-      <LegalDisclaimer variant="footer" className="relative z-10" />
+      <LegalDisclaimer variant="minimal" className="relative z-10" showIcon={false} />
       </div>
     </div>
   );
