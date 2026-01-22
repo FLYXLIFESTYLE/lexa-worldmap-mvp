@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
@@ -16,7 +17,37 @@ const QuerySchema = z.object({
   enhanced: z.coerce.boolean().optional(),
   promoted: z.coerce.boolean().optional(),
   search: z.string().min(1).optional(),
+  source_kind: z.string().min(1).optional(),
 });
+
+const CreateSchema = z.object({
+  name: z.string().min(1),
+  destination: z.string().min(1),
+  category: z.string().min(1),
+  description: z.string().min(1).optional(),
+  address: z.string().optional(),
+  latitude: z.coerce.number().optional(),
+  longitude: z.coerce.number().optional(),
+  confidence_score: z.coerce.number().optional(),
+  luxury_score: z.coerce.number().optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
+function normalizeConfidence(value?: number): number {
+  if (value == null || Number.isNaN(value)) return 80;
+  const n = Number(value);
+  if (Number.isNaN(n)) return 80;
+  if (n <= 1) return Math.max(0, Math.min(100, Math.round(n * 100)));
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function normalizeLuxury(value?: number): number | null {
+  if (value == null || Number.isNaN(value)) return null;
+  const n = Number(value);
+  if (Number.isNaN(n)) return null;
+  if (n <= 1) return Math.max(0, Math.min(10, Math.round(n * 10)));
+  return Math.max(0, Math.min(10, Math.round(n)));
+}
 
 async function requireCaptainOrAdmin() {
   const supabase = await createClient();
@@ -53,12 +84,13 @@ export async function GET(req: Request) {
       enhanced: url.searchParams.get('enhanced') ?? undefined,
       promoted: url.searchParams.get('promoted') ?? undefined,
       search: url.searchParams.get('search') ?? undefined,
+      source_kind: url.searchParams.get('source_kind') ?? undefined,
     });
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid query', details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { skip, limit, destination, category, verified, enhanced, promoted, search } = parsed.data;
+    const { skip, limit, destination, category, verified, enhanced, promoted, search, source_kind } = parsed.data;
     const userId = auth.user!.id;
 
     // Base query + count
@@ -76,6 +108,9 @@ export async function GET(req: Request) {
     if (search) {
       const s = search.replace(/,/g, ' '); // avoid breaking the OR expression
       q = q.or(`name.ilike.%${s}%,description.ilike.%${s}%,destination.ilike.%${s}%`);
+    }
+    if (source_kind) {
+      q = q.filter('metadata->>source_kind', 'eq', source_kind);
     }
 
     // Order + pagination
@@ -98,6 +133,77 @@ export async function GET(req: Request) {
       skip,
       limit,
     });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const auth = await requireCaptainOrAdmin();
+    if (!auth.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: auth.status });
+
+    const body = await req.json().catch(() => ({}));
+    const parsed = CreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid payload', details: parsed.error.flatten() }, { status: 400 });
+    }
+
+    const userId = auth.user!.id;
+    const now = new Date().toISOString();
+    const payload = parsed.data;
+
+    const id = randomUUID();
+    const metadata = {
+      ...(payload.metadata || {}),
+      source_kind: payload.metadata?.source_kind || 'manual_entry',
+    };
+
+    const record = {
+      id,
+      created_by: userId,
+      name: payload.name.trim(),
+      destination: payload.destination.trim(),
+      category: payload.category.trim(),
+      description: payload.description?.trim() || null,
+      address: payload.address?.trim() || null,
+      latitude: payload.latitude ?? null,
+      longitude: payload.longitude ?? null,
+      confidence_score: normalizeConfidence(payload.confidence_score),
+      luxury_score: normalizeLuxury(payload.luxury_score),
+      source_file: 'manual_entry',
+      source_refs: [
+        {
+          source_type: 'manual',
+          source_id: id,
+          source_url: null,
+          captured_at: now,
+          external_ids: {},
+          license: null,
+        },
+      ],
+      metadata,
+      verified: false,
+      enhanced: false,
+      promoted_to_main: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from('extracted_pois')
+      .insert(record)
+      .select('*')
+      .maybeSingle();
+
+    if (error || !data) {
+      return NextResponse.json({ error: 'Failed to create POI draft', details: error?.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, poi: data });
   } catch (error) {
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },

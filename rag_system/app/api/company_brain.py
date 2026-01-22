@@ -7,12 +7,17 @@ from pydantic import BaseModel
 from typing import List, Optional
 import uuid
 import os
+import json
+import re
+from datetime import datetime
+from urllib.parse import quote
 
 from app.services.company_brain_agent import (
     analyze_historical_conversation,
     synthesize_company_brain
 )
 from app.services.supabase_auth import get_current_user
+from app.services.supabase_client import get_supabase
 
 router = APIRouter(prefix="/api/company-brain", tags=["Company Brain"])
 
@@ -21,6 +26,145 @@ router = APIRouter(prefix="/api/company-brain", tags=["Company Brain"])
 # - Captain uploads use 25MB; company brain tends to be larger, so allow more.
 MAX_FILE_SIZE = 60 * 1024 * 1024  # 60MB
 ALLOWED_EXTENSIONS = {"pdf", "txt", "md", "docx", "doc"}
+
+# Supabase Storage (keep original uploads)
+COMPANY_BRAIN_BUCKET = os.getenv("COMPANY_BRAIN_BUCKET", "public").strip() or "public"
+COMPANY_BRAIN_FOLDER = os.getenv("COMPANY_BRAIN_FOLDER", "company-brain-uploads").strip() or "company-brain-uploads"
+
+
+def _safe_storage_filename(name: str) -> str:
+    base = os.path.basename(name or "").strip() or "upload"
+    base = re.sub(r"[^a-zA-Z0-9._-]+", "_", base).strip("_")
+    return (base or "upload")[:120]
+
+
+def _build_public_url(bucket: str, path: str) -> Optional[str]:
+    supabase_url = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    if not supabase_url or not bucket or not path:
+        return None
+    return f"{supabase_url}/storage/v1/object/public/{bucket}/{quote(path, safe='/')}"
+
+
+def _try_upload_original_file(
+    supabase,
+    *,
+    user_id: str,
+    upload_id: str,
+    filename: str,
+    content: bytes,
+    content_type: Optional[str],
+) -> dict:
+    safe_name = _safe_storage_filename(filename)
+    storage_path = f"{COMPANY_BRAIN_FOLDER}/{user_id}/{upload_id}/{safe_name}"
+    try:
+        supabase.storage.from_(COMPANY_BRAIN_BUCKET).upload(  # type: ignore
+            storage_path,
+            content,
+            {"content-type": content_type or "application/octet-stream", "upsert": False},
+        )
+        return {
+            "bucket": COMPANY_BRAIN_BUCKET,
+            "path": storage_path,
+            "url": _build_public_url(COMPANY_BRAIN_BUCKET, storage_path),
+            "stored": True,
+            "error": None,
+        }
+    except Exception as e:
+        return {
+            "bucket": COMPANY_BRAIN_BUCKET,
+            "path": storage_path,
+            "url": None,
+            "stored": False,
+            "error": str(e),
+        }
+
+
+def _clamp_confidence(value: Optional[float]) -> float:
+    try:
+        v = float(value) if value is not None else 0.8
+    except Exception:
+        v = 0.8
+    if v > 1:
+        v = v / 100.0
+    return max(0.0, min(1.0, v))
+
+
+def _safe_text(value: Optional[str], limit: int = 5000) -> str:
+    text = (value or "").strip()
+    if len(text) > limit:
+        text = text[:limit]
+    return text
+
+
+def _build_company_brain_sections(analysis: dict, upload_id: str, conversation_date: Optional[str]) -> List[dict]:
+    sections: List[dict] = []
+
+    def add_section(section_type: str, title: str, content: str, tags: Optional[List[str]] = None, confidence: Optional[float] = None):
+        title = _safe_text(title or "Untitled", 200)
+        content = _safe_text(content or "")
+        if not content:
+            return
+        sections.append({
+            "upload_id": upload_id,
+            "section_type": section_type,
+            "title": title,
+            "content": content,
+            "tags": tags or [],
+            "date_context": conversation_date,
+            "status": "needs_review",
+            "confidence": _clamp_confidence(confidence),
+            "created_at": datetime.utcnow().isoformat(),
+        })
+
+    for script in (analysis.get("script_examples") or []):
+        if not isinstance(script, dict):
+            continue
+        title = script.get("script_title") or "Script Example"
+        content = "\n".join([
+            f"Theme: {script.get('theme') or 'n/a'}",
+            f"Destination: {script.get('destination') or 'n/a'}",
+            f"Emotional arc: {script.get('emotional_arc') or 'n/a'}",
+            f"Signature moments: {', '.join(script.get('signature_moments') or []) or 'n/a'}",
+            f"Narrative style: {script.get('narrative_style') or 'n/a'}",
+            f"What makes it special: {script.get('what_makes_it_special') or 'n/a'}",
+        ])
+        tags = [t for t in [script.get("theme"), script.get("destination")] if t]
+        add_section("script_example", title, content, tags)
+
+    for feature in (analysis.get("features_worth_discussing") or []):
+        if not isinstance(feature, dict):
+            continue
+        title = feature.get("feature_idea") or feature.get("idea") or "Feature Idea"
+        content = "\n".join([
+            f"Why valuable: {feature.get('why_valuable') or feature.get('value') or 'n/a'}",
+            f"Effort: {feature.get('effort') or 'n/a'}",
+            f"Priority: {feature.get('priority') or 'n/a'}",
+        ])
+        add_section("feature_idea", title, content)
+
+    for principle in (analysis.get("design_philosophy") or []):
+        if not isinstance(principle, dict):
+            continue
+        title = principle.get("principle") or principle.get("title") or "Design Principle"
+        content = principle.get("rationale") or principle.get("description") or json.dumps(principle)
+        add_section("design_principle", title, content)
+
+    for insight in (analysis.get("training_insights") or []):
+        if not isinstance(insight, dict):
+            continue
+        title = insight.get("title") or "Training Insight"
+        content = insight.get("insight") or insight.get("content") or json.dumps(insight)
+        add_section("client_insight", title, content)
+
+    company_dna = analysis.get("company_dna")
+    if isinstance(company_dna, dict) and company_dna:
+        add_section("design_principle", "Company DNA", json.dumps(company_dna, indent=2))
+
+    if not sections:
+        summary = analysis.get("summary") or "Conversation summary"
+        add_section("conversation_example", "Conversation Summary", summary)
+
+    return sections
 
 
 class AnalysisResponse(BaseModel):
@@ -83,6 +227,45 @@ async def analyze_conversation(
         from app.services.company_brain_agent import get_company_brain_agent
         agent = get_company_brain_agent()
         insight_id = await agent.save_company_brain_insights(analysis)
+
+        # Best-effort: store original file + sections for review history
+        try:
+            supabase = get_supabase()
+            user_id = current_user.get("id")
+            upload_id = str(uuid.uuid4())
+            storage_meta = _try_upload_original_file(
+                supabase,
+                user_id=str(user_id),
+                upload_id=upload_id,
+                filename=filename or "company-brain-upload",
+                content=content,
+                content_type=file.content_type,
+            )
+
+            sections = _build_company_brain_sections(analysis, upload_id, conversation_date)
+
+            upload_record = {
+                "id": upload_id,
+                "user_id": user_id,
+                "filename": filename or "company-brain-upload",
+                "file_size": len(content or b""),
+                "document_type": "historic_chat",
+                "extraction_summary": analysis.get("summary", ""),
+                "total_sections": len(sections),
+                "metadata": {
+                    "analysis_id": insight_id,
+                    "knowledge_category": analysis.get("knowledge_category"),
+                    "conversation_date": conversation_date,
+                    "file_storage": storage_meta,
+                },
+                "created_at": datetime.utcnow().isoformat(),
+            }
+            supabase.table("company_brain_uploads").insert(upload_record).execute()
+
+            if sections:
+                supabase.table("company_brain_sections").insert(sections).execute()
+        except Exception:
+            pass
         
         return AnalysisResponse(
             success=True,

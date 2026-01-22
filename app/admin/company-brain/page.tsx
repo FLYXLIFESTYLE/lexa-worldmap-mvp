@@ -33,9 +33,11 @@ export default function CompanyBrainPage() {
   const [selectedAnalysis, setSelectedAnalysis] = useState<any>(null);
   const [synthesizing, setSynthesizing] = useState(false);
   const [companyBrain, setCompanyBrain] = useState<any>(null);
+  const [uploads, setUploads] = useState<any[]>([]);
 
   useEffect(() => {
     loadInsights();
+    loadUploads();
   }, []);
 
   const loadInsights = async () => {
@@ -55,6 +57,16 @@ export default function CompanyBrainPage() {
       }
     } catch (error) {
       console.error('Error loading insights:', error);
+    }
+  };
+
+  const loadUploads = async () => {
+    try {
+      const res = await fetch('/api/admin/company-brain/uploads');
+      const data = await res.json();
+      setUploads(data.uploads || []);
+    } catch (error) {
+      console.error('Error loading uploads:', error);
     }
   };
 
@@ -124,6 +136,7 @@ export default function CompanyBrainPage() {
 
     setUploading(false);
     loadInsights();
+    loadUploads();
   };
 
   const synthesizeAll = async () => {
@@ -175,7 +188,7 @@ export default function CompanyBrainPage() {
       mission={[
         { label: 'YOUR MISSION', text: 'Mine historical ChatGPT conversations for experience scripts, feature ideas, and company philosophy.' },
         { label: 'PURPOSE', text: 'Build Company Brain knowledge base to train AIlessia and guide strategic decisions.' },
-        { label: 'NO STORAGE', text: 'Documents are NOT stored (already on company server). Only insights extracted.' },
+        { label: 'SECURE STORAGE', text: 'Original documents are stored securely for review and auditability.' },
       ]}
       quickTips={[
         'Upload exported ChatGPT conversations as Word documents.',
@@ -275,6 +288,54 @@ export default function CompanyBrainPage() {
           </div>
         )}
       </div>
+
+      {/* Upload History */}
+      {uploads.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-semibold text-gray-900">
+              📂 Upload History ({uploads.length})
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            {uploads.map((u) => (
+              <div key={u.id} className="flex items-start justify-between bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="min-w-0">
+                  <div className="font-semibold text-gray-900 truncate">{u.filename}</div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    {(u.file_size ? (u.file_size / 1024 / 1024).toFixed(1) : '0')} MB • {new Date(u.created_at).toLocaleString()}
+                  </div>
+                  {u.extraction_summary && (
+                    <div className="text-sm text-gray-700 mt-2">
+                      Summary: {u.extraction_summary}
+                    </div>
+                  )}
+                  <div className="text-xs text-gray-600 mt-1">
+                    Sections: {u.total_sections || 0}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {u.file_url && (
+                    <button
+                      onClick={() => window.open(u.file_url, '_blank')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+                    >
+                      Download
+                    </button>
+                  )}
+                  <button
+                    onClick={() => router.push(`/admin/company-brain/review?upload_id=${u.id}`)}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
+                  >
+                    Review Sections
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Analyses List */}
       {analyses.length > 0 && (

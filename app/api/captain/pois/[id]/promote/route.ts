@@ -166,6 +166,151 @@ export async function POST(
       );
     }
 
+    const meta = asJsonObject((poi as any).metadata) || {};
+    const sourceKind = String(meta?.source_kind || '').toLowerCase();
+
+    if (sourceKind === 'yacht_destination') {
+      const name = String(poi.name || '').trim();
+      if (!name) {
+        return NextResponse.json({ error: 'Missing destination name' }, { status: 400 });
+      }
+
+      const category = String(poi.category || '').toLowerCase();
+      const yachtMeta = asJsonObject(meta?.yacht) || {};
+      const yachtTypeRaw = String(yachtMeta?.type || meta?.yacht_type || '').toLowerCase();
+      const yachtType =
+        yachtTypeRaw || (category.includes('route') ? 'route' : category.includes('country') ? 'country' : 'city');
+      const ports = asStringArray(yachtMeta?.ports || (meta as any)?.ports || []);
+
+      const driver = getNeo4jDriver();
+      const session = driver.session();
+      const now = new Date().toISOString();
+      const contributorName =
+        (profile?.display_name || profile?.full_name || user.email || '').toString();
+      let neo4jRef = '';
+
+      try {
+        if (yachtType === 'route') {
+          if (!ports.length) {
+            return NextResponse.json(
+              { error: 'Route requires ports before promotion' },
+              { status: 400 }
+            );
+          }
+
+          await session.run(
+            `
+            MERGE (r:yacht_route {name: $name})
+            SET
+              r.source = 'yacht_destination',
+              r.source_id = $source_id,
+              r.port_count = $port_count,
+              r.updated_at = datetime($now),
+              r.created_at = coalesce(r.created_at, datetime($now)),
+              r.created_by = coalesce(r.created_by, $created_by)
+            `,
+            {
+              name,
+              source_id: poi.id,
+              port_count: ports.length,
+              now,
+              created_by: contributorName || null,
+            }
+          );
+
+          for (let i = 0; i < ports.length; i += 1) {
+            const portName = ports[i];
+            await session.run(
+              `
+              MERGE (p:destination {name: $port_name, type: 'city'})
+              ON CREATE SET
+                p.created_at = datetime($now),
+                p.source = 'yacht_destination',
+                p.source_id = $source_id,
+                p.yacht_port = true,
+                p.luxury_destination = true
+              ON MATCH SET
+                p.yacht_port = true
+
+              WITH p
+              MATCH (r:yacht_route {name: $route_name})
+              MERGE (r)-[rel:INCLUDES_PORT {order: $order}]->(p)
+              ON CREATE SET rel.created_at = datetime($now)
+              `,
+              {
+                port_name: portName,
+                route_name: name,
+                order: i + 1,
+                now,
+                source_id: poi.id,
+              }
+            );
+          }
+
+          neo4jRef = `yacht_route:${name}`;
+        } else {
+          const destType = yachtType === 'country' ? 'country' : 'city';
+          await session.run(
+            `
+            MERGE (d:destination {name: $name, type: $type})
+            SET
+              d.source = 'yacht_destination',
+              d.source_id = $source_id,
+              d.updated_at = datetime($now),
+              d.created_at = coalesce(d.created_at, datetime($now)),
+              d.yacht_port = $is_port,
+              d.yacht_destination = $is_destination,
+              d.luxury_destination = true
+            `,
+            {
+              name,
+              type: destType,
+              source_id: poi.id,
+              now,
+              is_port: destType === 'city',
+              is_destination: destType === 'country',
+            }
+          );
+          neo4jRef = `destination:${destType}:${name}`;
+        }
+      } finally {
+        await session.close();
+      }
+
+      const currentMeta =
+        poi.metadata && typeof poi.metadata === 'object' ? poi.metadata : {};
+      const nextMeta = {
+        ...currentMeta,
+        promoted_to_neo4j: true,
+        neo4j_ref: neo4jRef,
+        promoted_at: now,
+        promoted_by: user.id,
+        promoted_by_email: (user.email || '').toLowerCase(),
+      };
+
+      const { error: updateError } = await admin
+        .from('extracted_pois')
+        .update({
+          promoted_to_main: true,
+          metadata: nextMeta,
+          updated_at: now,
+        })
+        .eq('id', id);
+
+      if (updateError) {
+        return NextResponse.json(
+          { error: 'Promoted in Neo4j, but failed to update Postgres', details: updateError.message },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        ref: neo4jRef,
+        message: 'Yacht destination promoted to official knowledge (Neo4j).',
+      });
+    }
+
     // Create/Upsert into Neo4j as canonical POI
     const poi_uid = `extracted:${poi.id}`;
     const now = new Date().toISOString();

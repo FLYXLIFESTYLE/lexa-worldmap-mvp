@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AdminNav from '@/components/admin/admin-nav';
 import PortalShell from '@/components/portal/portal-shell';
 
@@ -25,18 +26,25 @@ type Section = {
 };
 
 export default function CompanyBrainReviewPage() {
+  const searchParams = useSearchParams();
+  const uploadId = searchParams.get('upload_id');
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'needs_review' | 'approved' | 'rejected'>('needs_review');
 
   useEffect(() => {
     loadSections();
-  }, [filter]);
+  }, [filter, uploadId]);
 
   const loadSections = async () => {
     setLoading(true);
     try {
-      const url = filter === 'all' ? '/api/admin/company-brain/sections' : `/api/admin/company-brain/sections?status=${filter}`;
+      const params = new URLSearchParams();
+      if (filter !== 'all') params.set('status', filter);
+      if (uploadId) params.set('upload_id', uploadId);
+      const url = params.toString()
+        ? `/api/admin/company-brain/sections?${params.toString()}`
+        : '/api/admin/company-brain/sections';
       const res = await fetch(url);
       const data = await res.json();
       setSections(data.sections || []);

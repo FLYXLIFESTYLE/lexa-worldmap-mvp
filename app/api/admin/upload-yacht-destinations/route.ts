@@ -4,25 +4,57 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/neo4j/client';
+import { randomUUID } from 'crypto';
+import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/client';
 
 export const runtime = 'nodejs';
 
 interface Destination {
   name: string;
   type: 'city' | 'country' | 'route';
-  country?: string;
-  region?: string;
   ports?: string[];
-  exists: boolean;
+  exists?: boolean;
+}
+
+interface MediaItem {
+  url: string;
+  description?: string;
+  kind?: 'yacht' | 'route' | 'destination' | 'other';
+  filename?: string;
 }
 
 export async function POST(request: NextRequest) {
-  const session = getSession();
-
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase
+      .from('captain_profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!profile || !['admin', 'captain'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await request.json();
-    const { destinations } = body as { destinations: Destination[] };
+    const {
+      destinations,
+      source_mode,
+      media,
+      ocr_text,
+    } = body as {
+      destinations: Destination[];
+      source_mode?: 'text' | 'screenshot';
+      media?: MediaItem[];
+      ocr_text?: string;
+    };
 
     if (!destinations || !Array.isArray(destinations) || destinations.length === 0) {
       return NextResponse.json(
@@ -31,153 +63,94 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const results = {
-      total: destinations.length,
-      created: 0,
-      existing: 0,
-      routes: 0,
-      details: [] as any[]
-    };
+    const now = new Date().toISOString();
+    const batchId = randomUUID();
+    const mediaList = Array.isArray(media) ? media.filter((m) => !!m?.url) : [];
+    const normalizedSourceMode = source_mode === 'screenshot' ? 'screenshot' : 'text';
 
-    // Process cities/ports
-    const cities = destinations.filter(d => d.type === 'city');
-    for (const city of cities) {
-      const result = await session.run(`
-        MERGE (d:destination {name: $name, type: 'city'})
-        ON CREATE SET 
-          d.created_at = datetime(),
-          d.source = 'yacht_destinations',
-          d.yacht_port = true,
-          d.luxury_destination = true
-        ON MATCH SET
-          d.yacht_port = true,
-          d.luxury_destination = true
-        RETURN d, 
-               CASE WHEN d.created_at = datetime() THEN 'created' ELSE 'existing' END as status
-      `, { name: city.name });
+    const cleaned = destinations
+      .map((dest) => ({
+        ...dest,
+        name: String(dest.name || '').trim(),
+      }))
+      .filter((dest) => dest.name.length > 0);
 
-      const status = result.records[0]?.get('status');
-      if (status === 'created') {
-        results.created++;
-      } else {
-        results.existing++;
-      }
-
-      results.details.push({
-        name: city.name,
-        type: 'city',
-        status
-      });
+    if (!cleaned.length) {
+      return NextResponse.json({ error: 'No valid destinations provided' }, { status: 400 });
     }
 
-    // Process countries
-    const countries = destinations.filter(d => d.type === 'country');
-    for (const country of countries) {
-      const result = await session.run(`
-        MERGE (c:destination {name: $name, type: 'country'})
-        ON CREATE SET 
-          c.created_at = datetime(),
-          c.source = 'yacht_destinations',
-          c.yacht_destination = true,
-          c.luxury_destination = true
-        ON MATCH SET
-          c.yacht_destination = true,
-          c.luxury_destination = true
-        RETURN c,
-               CASE WHEN c.created_at = datetime() THEN 'created' ELSE 'existing' END as status
-      `, { name: country.name });
+    const records = cleaned.map((dest) => {
+      const category =
+        dest.type === 'route' ? 'yacht_route' : dest.type === 'country' ? 'yacht_country' : 'yacht_city';
+      const yachtMeta = {
+        type: dest.type,
+        ports: dest.type === 'route' ? (dest.ports || []).filter(Boolean) : [],
+      };
+      const description =
+        dest.type === 'route' && dest.ports?.length
+          ? `Route ports: ${dest.ports.join(', ')}`
+          : null;
 
-      const status = result.records[0]?.get('status');
-      if (status === 'created') {
-        results.created++;
-      } else {
-        results.existing++;
-      }
+      return {
+        id: randomUUID(),
+        created_by: user.id,
+        name: dest.name,
+        destination: dest.name,
+        category,
+        description,
+        address: null,
+        latitude: null,
+        longitude: null,
+        confidence_score: 80,
+        luxury_score: null,
+        source_file: 'yacht_destination',
+        source_refs: [
+          {
+            source_type: 'yacht_destination',
+            source_id: batchId,
+            source_url: null,
+            captured_at: now,
+            external_ids: {},
+            license: null,
+          },
+        ],
+        metadata: {
+          source_kind: 'yacht_destination',
+          batch_id: batchId,
+          source_mode: normalizedSourceMode,
+          ocr_text: ocr_text || null,
+          yacht: yachtMeta,
+          media: mediaList,
+        },
+        verified: false,
+        enhanced: false,
+        promoted_to_main: false,
+        created_at: now,
+        updated_at: now,
+      };
+    });
 
-      results.details.push({
-        name: country.name,
-        type: 'country',
-        status
-      });
+    const { data, error } = await supabaseAdmin
+      .from('extracted_pois')
+      .insert(records)
+      .select('id');
+
+    if (error) {
+      return NextResponse.json(
+        { error: 'Failed to store destinations', details: error.message },
+        { status: 500 }
+      );
     }
-
-    // Process routes
-    const routes = destinations.filter(d => d.type === 'route');
-    for (const route of routes) {
-      if (!route.ports || route.ports.length === 0) continue;
-
-      // Create route node
-      const routeResult = await session.run(`
-        MERGE (r:yacht_route {name: $name})
-        ON CREATE SET 
-          r.created_at = datetime(),
-          r.source = 'yacht_destinations',
-          r.port_count = $portCount
-        RETURN r,
-               CASE WHEN r.created_at = datetime() THEN 'created' ELSE 'existing' END as status
-      `, { 
-        name: route.name,
-        portCount: route.ports.length
-      });
-
-      const routeStatus = routeResult.records[0]?.get('status');
-      if (routeStatus === 'created') {
-        results.routes++;
-      }
-
-      // Link ports to route
-      for (let i = 0; i < route.ports.length; i++) {
-        const portName = route.ports[i];
-        
-        await session.run(`
-          MERGE (p:destination {name: $portName, type: 'city'})
-          ON CREATE SET 
-            p.created_at = datetime(),
-            p.source = 'yacht_destinations',
-            p.yacht_port = true,
-            p.luxury_destination = true
-          ON MATCH SET
-            p.yacht_port = true
-          
-          WITH p
-          MATCH (r:yacht_route {name: $routeName})
-          MERGE (r)-[rel:INCLUDES_PORT {order: $order}]->(p)
-          ON CREATE SET rel.created_at = datetime()
-        `, {
-          portName,
-          routeName: route.name,
-          order: i + 1
-        });
-      }
-
-      results.details.push({
-        name: route.name,
-        type: 'route',
-        status: routeStatus,
-        ports: route.ports
-      });
-    }
-
-    // Update statistics
-    const statsResult = await session.run(`
-      MATCH (d:destination)
-      WHERE d.yacht_port = true OR d.yacht_destination = true
-      RETURN count(d) as total_yacht_destinations
-    `);
-
-    const totalYachtDestinations = statsResult.records[0]?.get('total_yacht_destinations')?.toNumber() || 0;
 
     return NextResponse.json({
       success: true,
-      message: `Successfully processed ${results.total} destinations`,
+      message: `Created ${records.length} yacht destination drafts`,
       summary: {
-        total: results.total,
-        created: results.created,
-        existing: results.existing,
-        routes: results.routes
+        total: records.length,
+        created: data?.length || 0,
+        batch_id: batchId,
       },
-      total_yacht_destinations: totalYachtDestinations,
-      details: results.details
+      ids: (data || []).map((row: any) => row.id),
     });
 
   } catch (error: any) {
@@ -189,69 +162,59 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
-  } finally {
-    await session.close();
   }
 }
 
 export async function GET(request: NextRequest) {
-  const session = getSession();
-
   try {
-    // Get all yacht destinations
-    const result = await session.run(`
-      MATCH (d:destination)
-      WHERE d.yacht_port = true OR d.yacht_destination = true
-      RETURN d.name as name,
-             d.type as type,
-             d.yacht_port as is_port,
-             d.yacht_destination as is_destination,
-             d.created_at as created_at
-      ORDER BY d.name
-    `);
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    const destinations = result.records.map(record => ({
-      name: record.get('name'),
-      type: record.get('type'),
-      is_port: record.get('is_port'),
-      is_destination: record.get('is_destination'),
-      created_at: record.get('created_at')
-    }));
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    // Get all routes
-    const routesResult = await session.run(`
-      MATCH (r:yacht_route)-[rel:INCLUDES_PORT]->(p:destination)
-      RETURN r.name as route_name,
-             collect(p.name) as ports,
-             r.created_at as created_at
-      ORDER BY r.name
-    `);
+    const { data: profile } = await supabase
+      .from('captain_profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-    const routes = routesResult.records.map(record => ({
-      name: record.get('route_name'),
-      ports: record.get('ports'),
-      created_at: record.get('created_at')
-    }));
+    if (!profile || !['admin', 'captain'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const url = new URL(request.url);
+    const limit = Math.min(Number(url.searchParams.get('limit') || '200'), 500);
+
+    const { data, error } = await supabaseAdmin
+      .from('extracted_pois')
+      .select('*')
+      .filter('metadata->>source_kind', 'eq', 'yacht_destination')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      return NextResponse.json(
+        { error: 'Failed to fetch yacht destinations', details: error.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      destinations,
-      routes,
-      total_destinations: destinations.length,
-      total_routes: routes.length
+      destinations: data || [],
+      total_destinations: data?.length || 0,
     });
-
   } catch (error: any) {
     console.error('Error fetching yacht destinations:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to fetch yacht destinations',
-        details: error.message 
+        details: error.message,
       },
       { status: 500 }
     );
-  } finally {
-    await session.close();
   }
 }
 

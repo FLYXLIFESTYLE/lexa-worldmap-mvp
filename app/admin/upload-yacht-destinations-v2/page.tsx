@@ -5,7 +5,7 @@
  * 2. Text paste (existing)
  * 3. Editable data grid
  * 4. Approval workflow
- * 5. Auto POI collection trigger
+ * 5. Drafts for review & promotion
  */
 
 'use client';
@@ -23,6 +23,14 @@ interface EditableDestination {
 }
 
 type UploadMode = 'text' | 'screenshot';
+
+interface YachtMedia {
+  id: string;
+  url: string;
+  description?: string;
+  kind: 'yacht' | 'route' | 'destination' | 'other';
+  filename?: string;
+}
 
 export default function UploadYachtDestinationsPage() {
   const [mode, setMode] = useState<UploadMode>('screenshot');
@@ -42,6 +50,10 @@ export default function UploadYachtDestinationsPage() {
   const [approved, setApproved] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [yachtMedia, setYachtMedia] = useState<YachtMedia[]>([]);
+  const [mediaKind, setMediaKind] = useState<YachtMedia['kind']>('yacht');
+  const [mediaDescription, setMediaDescription] = useState('');
+  const [mediaUploading, setMediaUploading] = useState(false);
 
   // Screenshot upload and OCR
   async function handleScreenshotUpload(files: FileList | null) {
@@ -100,6 +112,45 @@ export default function UploadYachtDestinationsPage() {
     } finally {
       setExtracting(false);
     }
+  }
+
+  // Optional media uploads (yacht photos, route screenshots)
+  async function handleMediaUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setMediaUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch('/api/knowledge/upload-attachment', {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.details || data?.error || 'Failed to upload media');
+        }
+        setYachtMedia((prev) => [
+          ...prev,
+          {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            url: data.url,
+            filename: data.filename,
+            description: mediaDescription.trim() || undefined,
+            kind: mediaKind,
+          },
+        ]);
+      }
+      setMediaDescription('');
+    } catch (error: any) {
+      alert(`❌ Media upload failed: ${error.message}`);
+    } finally {
+      setMediaUploading(false);
+    }
+  }
+
+  function handleRemoveMedia(id: string) {
+    setYachtMedia((prev) => prev.filter((m) => m.id !== id));
   }
 
   // Drag and drop handlers
@@ -242,14 +293,14 @@ export default function UploadYachtDestinationsPage() {
     setApproved(true);
   }
 
-  // Upload to database
+  // Create drafts in Supabase
   async function handleUpload() {
     if (!approved) {
       alert('Please approve the data first!');
       return;
     }
 
-    if (!confirm(`Upload ${destinations.length} destinations and start POI collection?`)) {
+    if (!confirm(`Create ${destinations.length} yacht destination drafts for review?`)) {
       return;
     }
 
@@ -268,7 +319,11 @@ export default function UploadYachtDestinationsPage() {
       const response = await fetch('/api/admin/upload-yacht-destinations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ destinations: apiDestinations })
+        body: JSON.stringify({
+          destinations: apiDestinations,
+          source_mode: mode,
+          media: yachtMedia,
+        })
       });
 
       const data = await response.json();
@@ -281,9 +336,9 @@ export default function UploadYachtDestinationsPage() {
         setCitiesText('');
         setCountriesText('');
         setRoutesText('');
+        setYachtMedia([]);
         
-        // TODO: Trigger POI collection
-        alert(`✅ Uploaded successfully! POI collection will start automatically.`);
+        alert(`✅ Drafts created! Review in Captain Browse to verify/promote.`);
       }
     } catch (error: any) {
       setUploadResult({
@@ -310,7 +365,7 @@ export default function UploadYachtDestinationsPage() {
               ⛵ Upload Yacht Destinations
             </h1>
             <p className="text-zinc-400">
-              Upload screenshots or paste text → Edit → Approve → Auto POI Collection
+              Upload screenshots or paste text → Edit → Approve → Review & Promote
             </p>
           </div>
 
@@ -481,6 +536,70 @@ export default function UploadYachtDestinationsPage() {
             </div>
           )}
 
+          {/* Optional Media Uploads */}
+          <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800 rounded-xl p-6 mb-8">
+            <h2 className="text-2xl font-semibold text-lexa-gold mb-3">
+              🖼️ Yacht & Route Media (Optional)
+            </h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              Upload yacht photos or destination visuals for later use. For text extraction (OCR),
+              use the screenshot upload above. The same description applies to all files selected
+              in one upload.
+            </p>
+            <div className="flex flex-col md:flex-row gap-3 mb-4">
+              <select
+                value={mediaKind}
+                onChange={(e) => setMediaKind(e.target.value as YachtMedia['kind'])}
+                className="px-4 py-3 bg-zinc-950 border border-zinc-700 rounded-lg text-white"
+              >
+                <option value="yacht">Yacht Photo</option>
+                <option value="route">Route Screenshot</option>
+                <option value="destination">Destination Image</option>
+                <option value="other">Other</option>
+              </select>
+              <input
+                type="text"
+                value={mediaDescription}
+                onChange={(e) => setMediaDescription(e.target.value)}
+                placeholder="Short description (optional)"
+                className="flex-1 px-4 py-3 bg-zinc-950 border border-zinc-700 rounded-lg text-white"
+              />
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => handleMediaUpload(e.target.files)}
+                disabled={mediaUploading}
+                className="text-sm text-zinc-300"
+              />
+            </div>
+            {mediaUploading && (
+              <div className="text-sm text-lexa-gold">Uploading media...</div>
+            )}
+            {yachtMedia.length > 0 && (
+              <div className="space-y-2">
+                {yachtMedia.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between bg-zinc-950 rounded-lg p-3">
+                    <div className="min-w-0">
+                      <div className="text-sm text-white truncate">
+                        {item.filename || item.url}
+                      </div>
+                      <div className="text-xs text-zinc-400">
+                        {item.kind} {item.description ? `• ${item.description}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveMedia(item.id)}
+                      className="px-3 py-1 text-xs bg-zinc-800 text-white rounded hover:bg-zinc-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Editable Data Grid */}
           {destinations.length > 0 && (
             <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800 rounded-xl p-6 mb-8">
@@ -572,14 +691,14 @@ export default function UploadYachtDestinationsPage() {
                     onClick={handleApprove}
                     className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl font-bold text-lg hover:from-green-700 hover:to-green-800 transition-all"
                   >
-                    ✅ Approve Data for Upload
+                    ✅ Approve Drafts
                   </button>
                 </div>
               ) : (
                 <div className="mt-6 pt-6 border-t border-zinc-800">
                   <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 mb-4">
                     <p className="text-green-400 font-semibold">
-                      ✅ Data approved! Ready to upload to database.
+                      ✅ Data approved! Ready to create drafts for review.
                     </p>
                   </div>
                   <button
@@ -587,7 +706,7 @@ export default function UploadYachtDestinationsPage() {
                     disabled={loading}
                     className="w-full px-6 py-4 bg-lexa-gold text-zinc-900 rounded-xl font-bold text-lg hover:bg-yellow-600 transition-all disabled:opacity-50"
                   >
-                    {loading ? '⏳ Uploading...' : '⬆️ Upload to Database & Start POI Collection'}
+                    {loading ? '⏳ Uploading...' : '⬆️ Create Drafts for Review'}
                   </button>
                 </div>
               )}
@@ -600,15 +719,17 @@ export default function UploadYachtDestinationsPage() {
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-3xl">{uploadResult.success ? '✅' : '⚠️'}</span>
                 <h2 className={`text-xl font-semibold ${uploadResult.success ? 'text-green-400' : 'text-red-400'}`}>
-                  {uploadResult.success ? 'Upload Complete!' : 'Upload Error'}
+                  {uploadResult.success ? 'Drafts Created!' : 'Upload Error'}
                 </h2>
               </div>
 
               {uploadResult.summary && (
                 <div className="space-y-2 text-sm text-zinc-300">
+                  <p>• Total: <span className="text-green-400 font-semibold">{uploadResult.summary.total}</span></p>
                   <p>• Created: <span className="text-green-400 font-semibold">{uploadResult.summary.created}</span></p>
-                  <p>• Already existed: <span className="text-yellow-400 font-semibold">{uploadResult.summary.existing}</span></p>
-                  <p>• Routes: <span className="text-purple-400 font-semibold">{uploadResult.summary.routes}</span></p>
+                  {uploadResult.summary.batch_id && (
+                    <p>• Batch ID: <span className="text-zinc-200 font-mono">{uploadResult.summary.batch_id}</span></p>
+                  )}
                 </div>
               )}
             </div>

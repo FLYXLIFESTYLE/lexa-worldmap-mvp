@@ -12,12 +12,16 @@ const PatchSchema = z
     city: z.string().min(1).optional(),
     category: z.string().min(1).optional(),
     description: z.string().optional(),
+    address: z.string().optional(),
+    latitude: z.coerce.number().optional(),
+    longitude: z.coerce.number().optional(),
     confidence_score: z.coerce.number().int().min(0).max(100).optional(),
     luxury_score: z.coerce.number().int().min(0).max(10).optional(),
     keywords: z.array(z.string().min(1)).optional(),
     themes: z.array(z.string().min(1)).optional(),
     enhanced: z.coerce.boolean().optional(),
     verified: z.coerce.boolean().optional(),
+    metadata: z.record(z.any()).optional(),
   })
   .strict();
 
@@ -41,6 +45,34 @@ async function requireCaptainOrAdmin() {
   return { ok: true as const, status: 200 as const, user, isAdmin };
 }
 
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const auth = await requireCaptainOrAdmin();
+    if (!auth.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: auth.status });
+
+    const { id } = await params;
+    const userId = auth.user!.id;
+
+    let q = supabaseAdmin.from('extracted_pois').select('*').eq('id', id);
+    if (!auth.isAdmin) q = q.eq('created_by', userId);
+
+    const { data, error } = await q.maybeSingle();
+    if (error) {
+      return NextResponse.json({ error: 'Failed to fetch POI', details: error.message }, { status: 500 });
+    }
+    if (!data) {
+      return NextResponse.json({ error: 'POI not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ poi: data });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = await requireCaptainOrAdmin();
@@ -57,10 +89,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const nowIso = new Date().toISOString();
 
     const patch = parsed.data;
+    const { metadata: metadataPatch, ...restPatch } = patch;
     const updates: Record<string, any> = {
-      ...patch,
+      ...restPatch,
       updated_at: nowIso,
     };
+
+    if (metadataPatch) {
+      let metaQuery = supabaseAdmin.from('extracted_pois').select('metadata').eq('id', id);
+      if (!auth.isAdmin) metaQuery = metaQuery.eq('created_by', userId);
+      const { data: metaRow, error: metaError } = await metaQuery.maybeSingle();
+      if (metaError) {
+        return NextResponse.json({ error: 'Failed to load metadata', details: metaError.message }, { status: 500 });
+      }
+      if (!metaRow) {
+        return NextResponse.json({ error: 'POI not found' }, { status: 404 });
+      }
+      const currentMeta =
+        metaRow.metadata && typeof metaRow.metadata === 'object' && !Array.isArray(metaRow.metadata)
+          ? metaRow.metadata
+          : {};
+      updates.metadata = { ...currentMeta, ...metadataPatch };
+    }
 
     // When verified is set, also stamp metadata.
     if (patch.verified === true) {

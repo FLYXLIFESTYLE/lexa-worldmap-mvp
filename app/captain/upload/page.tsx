@@ -684,9 +684,9 @@ function CaptainUploadPageInner() {
   const fetchManualRecent = async () => {
     if (!isAdmin) return;
     try {
-      const res = await fetch('/api/knowledge/poi/manual?limit=50');
+      const res = await fetch('/api/captain/pois?limit=50&source_kind=manual_entry');
       const data = await res.json();
-      if (data?.success) setManualRecent(data.pois || []);
+      if (data?.pois) setManualRecent(data.pois || []);
     } catch {
       // ignore
     }
@@ -732,29 +732,35 @@ function CaptainUploadPageInner() {
     return () => clearTimeout(t);
   }, [poiName]);
 
-  const loadPoiForEdit = async (poi_uid: string) => {
-    const res = await fetch(`/api/knowledge/poi/${encodeURIComponent(poi_uid)}`);
+  const loadPoiForEdit = async (poiId: string) => {
+    const res = await fetch(`/api/captain/pois/${encodeURIComponent(poiId)}`);
     const data = await res.json();
     const poi = data?.poi;
     if (!poi) {
       alert('Failed to load POI details.');
       return;
     }
-    setManualPoiUid(poi.poi_uid);
+    const meta = poi.metadata || {};
+    const manualMeta = meta?.manual || {};
+    const attachments = manualMeta?.attachments || {};
+    const photoUrls = Array.isArray(attachments.photos) ? attachments.photos : [];
+    const docUrls = Array.isArray(attachments.docs) ? attachments.docs : [];
+
+    setManualPoiUid(poi.id);
     setPoiName(poi.name || '');
-    setPoiType(poi.type || 'restaurant');
-    setPoiLocationLabel(poi.destination_name || '');
-    setPoiLocationScope((poi.location_scope || 'city') as any);
-    setPoiWebsiteUrl(poi.website_url || '');
+    setPoiType(poi.category || 'restaurant');
+    setPoiLocationLabel(poi.destination || '');
+    setPoiLocationScope((manualMeta.location_scope || 'city') as any);
+    setPoiWebsiteUrl(manualMeta.website_url || '');
     setPoiAddress(poi.address || '');
     setPoiDescription(poi.description || '');
-    setPoiLat(String(poi.lat ?? ''));
-    setPoiLon(String(poi.lon ?? ''));
-    setPoiCoordinateMode((poi.coordinate_mode || 'land') as any);
-    setManualConfidencePct(Math.round(((poi.confidence_score ?? 0.8) as number) * 100));
-    setManualExtraText(poi.extra_text || '');
-    const photos = (poi.photo_urls || []).map((u: string) => ({ name: 'photo', url: u, kind: 'photo' as const }));
-    const docs = (poi.attachment_urls || []).map((u: string) => ({ name: 'attachment', url: u, kind: 'doc' as const }));
+    setPoiLat(String(poi.latitude ?? ''));
+    setPoiLon(String(poi.longitude ?? ''));
+    setPoiCoordinateMode((manualMeta.coordinate_mode || 'land') as any);
+    setManualConfidencePct(typeof poi.confidence_score === 'number' ? Math.round(poi.confidence_score) : 80);
+    setManualExtraText(manualMeta.extra_text || '');
+    const photos = photoUrls.map((u: string) => ({ name: 'photo', url: u, kind: 'photo' as const }));
+    const docs = docUrls.map((u: string) => ({ name: 'attachment', url: u, kind: 'doc' as const }));
     setManualAttachments([...(photos || []), ...(docs || [])]);
     setModePersist('manual');
   };
@@ -817,36 +823,44 @@ function CaptainUploadPageInner() {
       return;
     }
 
-    // If duplicate detected, offer to open it instead.
+    // If duplicate detected, confirm draft creation.
     if (!manualPoiUid && manualDuplicate) {
-      const open = confirm(`A POI named "${manualDuplicate.name}" already exists. Open it instead of creating a duplicate?`);
-      if (open) {
-        await loadPoiForEdit(manualDuplicate.poi_uid);
-        return;
-      }
+      const proceed = confirm(
+        `A POI named "${manualDuplicate.name}" already exists in the main database. Create a draft anyway?`
+      );
+      if (!proceed) return;
     }
+
+    const manualMeta = {
+      website_url: poiWebsiteUrl.trim() || undefined,
+      location_scope: poiLocationScope,
+      coordinate_mode: poiCoordinateMode,
+      extra_text: manualExtraText.trim() || undefined,
+      attachments: {
+        photos: manualAttachments.filter(a => a.kind === 'photo').map(a => a.url),
+        docs: manualAttachments.filter(a => a.kind === 'doc').map(a => a.url),
+      },
+    };
 
     const payload: any = {
       name: poiName.trim(),
-      type: poiType,
-      destination_name: poiLocationLabel.trim(),
-      lat,
-      lon,
-      website_url: poiWebsiteUrl.trim() || undefined,
+      destination: poiLocationLabel.trim(),
+      category: poiType,
+      latitude: lat,
+      longitude: lon,
       address: poiAddress.trim() || undefined,
-      location_scope: poiLocationScope,
-      coordinate_mode: poiCoordinateMode,
       description: poiDescription.trim(),
-      confidence_score: Math.max(0, Math.min(1, manualConfidencePct / 100)),
-      extra_text: manualExtraText.trim() || undefined,
-      photo_urls: manualAttachments.filter(a => a.kind === 'photo').map(a => a.url),
-      attachment_urls: manualAttachments.filter(a => a.kind === 'doc').map(a => a.url),
+      confidence_score: Math.max(0, Math.min(100, manualConfidencePct)),
+      metadata: {
+        source_kind: 'manual_entry',
+        manual: manualMeta,
+      },
     };
 
     setLoading(true);
     try {
       if (manualPoiUid) {
-        const res = await fetch(`/api/knowledge/poi/${encodeURIComponent(manualPoiUid)}`, {
+        const res = await fetch(`/api/captain/pois/${encodeURIComponent(manualPoiUid)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -855,14 +869,14 @@ function CaptainUploadPageInner() {
         if (!res.ok) throw new Error(data?.details || data?.error || 'Failed to update POI');
         alert('✅ POI updated.');
       } else {
-        const res = await fetch('/api/knowledge/poi/create', {
+        const res = await fetch('/api/captain/pois', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.details || data?.error || 'Failed to create POI');
-        alert('✅ POI created.');
+        alert('✅ POI draft created. Please review in Captain Browse.');
       }
       await fetchManualRecent();
       resetManualForm();
@@ -1004,7 +1018,7 @@ function CaptainUploadPageInner() {
       return;
     }
 
-    if (!confirm(`Upload ${yachtDestinations.length} destinations and start POI collection?`)) {
+    if (!confirm(`Create ${yachtDestinations.length} yacht destination drafts for review?`)) {
       return;
     }
 
@@ -1021,7 +1035,10 @@ function CaptainUploadPageInner() {
       const response = await fetch('/api/admin/upload-yacht-destinations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ destinations: apiDestinations })
+        body: JSON.stringify({
+          destinations: apiDestinations,
+          source_mode: yachtMode === 'screenshot' ? 'screenshot' : 'text',
+        })
       });
 
       const data = await response.json();
@@ -1032,7 +1049,7 @@ function CaptainUploadPageInner() {
         setCitiesText('');
         setCountriesText('');
         setRoutesText('');
-        alert(`✅ Uploaded successfully! POI collection will start automatically.`);
+        alert(`✅ Drafts created! Review in Captain Browse to verify/promote.`);
       }
     } catch (error: any) {
       alert('❌ Upload failed');
@@ -1420,10 +1437,10 @@ function CaptainUploadPageInner() {
                             </div>
                           </div>
                           <button
-                            onClick={() => loadPoiForEdit(r.poi_uid)}
+                            onClick={() => router.push('/admin/knowledge/editor')}
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
                           >
-                            Open to Edit
+                            Open Knowledge Editor
                           </button>
                         </div>
                       ))}
@@ -1456,10 +1473,10 @@ function CaptainUploadPageInner() {
                         </div>
                       </div>
                       <button
-                        onClick={() => loadPoiForEdit(manualDuplicate.poi_uid)}
+                        onClick={() => router.push('/admin/knowledge/editor')}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
                       >
-                        Open Existing
+                        Open Knowledge Editor
                       </button>
                     </div>
                   )}
@@ -1684,15 +1701,15 @@ function CaptainUploadPageInner() {
                   ) : (
                     <div className="space-y-2">
                       {manualRecent.map((p) => (
-                        <div key={p.poi_uid} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <div key={p.id} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
                           <div className="min-w-0">
                             <div className="font-semibold text-gray-900 truncate">{p.name}</div>
                             <div className="text-xs text-gray-600">
-                              {p.type || 'poi'} • {p.destination_name || '—'} • Confidence {(typeof p.confidence_score === 'number' ? Math.round(p.confidence_score * 100) : 0)}%
+                              {p.category || 'poi'} • {p.destination || '—'} • Confidence {(typeof p.confidence_score === 'number' ? Math.round(p.confidence_score) : 0)}%
                             </div>
                           </div>
                           <button
-                            onClick={() => loadPoiForEdit(p.poi_uid)}
+                            onClick={() => loadPoiForEdit(p.id)}
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
                           >
                             Open
@@ -1713,7 +1730,7 @@ function CaptainUploadPageInner() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">⛵ Yacht Destinations Upload</h2>
               <p className="text-gray-600 mb-6">
-                Upload screenshots or paste text of yacht destinations → Edit → Approve → Auto POI Collection
+                Upload screenshots or paste text of yacht destinations → Edit → Approve → Review & Promote
               </p>
 
               {/* Yacht Mode Selector */}
@@ -1905,7 +1922,7 @@ function CaptainUploadPageInner() {
                     onClick={() => setYachtApproved(true)}
                     className="w-full px-6 py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 transition-all"
                   >
-                    ✅ Approve Data for Upload
+                    ✅ Approve Drafts
                   </button>
                 ) : (
                   <div className="space-y-4">
@@ -1919,7 +1936,7 @@ function CaptainUploadPageInner() {
                       disabled={loading}
                       className="w-full px-6 py-4 bg-lexa-gold text-zinc-900 rounded-xl font-bold text-lg hover:bg-yellow-600 transition-all disabled:opacity-50"
                     >
-                      {loading ? '⏳ Uploading...' : '⬆️ Upload to Database & Start POI Collection'}
+                      {loading ? '⏳ Uploading...' : '⬆️ Create Drafts for Review'}
                     </button>
                   </div>
                 )}
