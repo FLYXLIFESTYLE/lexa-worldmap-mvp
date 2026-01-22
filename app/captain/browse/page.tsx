@@ -84,7 +84,6 @@ export default function CaptainBrowsePage() {
   const [minLuxuryScore, setMinLuxuryScore] = useState<number>(0);
   const [tagFilter, setTagFilter] = useState<string>('');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'yacht_destination' | 'manual_entry' | 'file_upload' | 'url_scrape' | 'text_paste'>('all');
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'yacht_destination' | 'manual_entry' | 'file_upload' | 'url_scrape' | 'text_paste'>('all');
 
   // Bulk selection
   const [selectedPoiIds, setSelectedPoiIds] = useState<Set<string>>(new Set());
