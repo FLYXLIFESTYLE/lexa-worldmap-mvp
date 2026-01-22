@@ -317,15 +317,14 @@ export default function ChatPage() {
                       key={meta.id}
                       onClick={() => sendMessage(theme)}
                       className="lexa-theme-card group"
-                      title={copy.description}
                     >
                       <div className="lexa-theme-card__icon">
                         {Icon ? <Icon className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                       </div>
-                      <div className="lexa-theme-card__label">{theme}</div>
-                      <div className="lexa-theme-card__hover-desc">
-                        <p className="text-xs italic text-lexa-gold/90">{copy.hook}</p>
-                        <p className="text-xs text-white/80 mt-1">{copy.description}</p>
+                      <div className="lexa-theme-card__content">
+                        <div className="lexa-theme-card__label">{theme}</div>
+                        <p className="lexa-theme-card__hook">{copy.hook}</p>
+                        <p className="lexa-theme-card__description">{copy.description}</p>
                       </div>
                     </button>
                   );
@@ -361,15 +360,14 @@ export default function ChatPage() {
                       key={meta.id}
                       onClick={() => sendMessage(theme)}
                       className="lexa-theme-card group"
-                      title={copy.description}
                     >
                       <div className="lexa-theme-card__icon">
                         {Icon ? <Icon className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                       </div>
-                      <div className="lexa-theme-card__label">{theme}</div>
-                      <div className="lexa-theme-card__hover-desc">
-                        <p className="text-xs italic text-lexa-gold/90">{copy.hook}</p>
-                        <p className="text-xs text-white/80 mt-1">{copy.description}</p>
+                      <div className="lexa-theme-card__content">
+                        <div className="lexa-theme-card__label">{theme}</div>
+                        <p className="lexa-theme-card__hook">{copy.hook}</p>
+                        <p className="lexa-theme-card__description">{copy.description}</p>
                       </div>
                     </button>
                   );
