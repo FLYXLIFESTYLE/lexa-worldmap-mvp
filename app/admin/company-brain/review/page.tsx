@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * Company Brain Section Review
  *
@@ -8,7 +6,9 @@
  * Only approved sections go into Script Engine retrieval
  */
 
-import { useState, useEffect } from 'react';
+'use client';
+
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import AdminNav from '@/components/admin/admin-nav';
 import PortalShell from '@/components/portal/portal-shell';
@@ -25,7 +25,7 @@ type Section = {
   upload: { filename: string; created_at: string };
 };
 
-export default function CompanyBrainReviewPage() {
+function CompanyBrainReviewContent() {
   const searchParams = useSearchParams();
   const uploadId = searchParams.get('upload_id');
   const [sections, setSections] = useState<Section[]>([]);
@@ -256,5 +256,19 @@ export default function CompanyBrainReviewPage() {
         </div>
       )}
     </PortalShell>
+  );
+}
+
+export default function CompanyBrainReviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-gray-600">
+          Loading review...
+        </div>
+      }
+    >
+      <CompanyBrainReviewContent />
+    </Suspense>
   );
 }
