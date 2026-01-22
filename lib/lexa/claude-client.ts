@@ -5,6 +5,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { SessionState, ExtractedSignals } from './types';
+import { LEXA_COMMUNICATION_GUIDELINES } from './communication-guidelines';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -129,12 +130,14 @@ What draws you most - the atmosphere and architecture, the cultural experiences,
 **Your mandate for this interaction:**
 ${stagePrompt}
 
+${LEXA_COMMUNICATION_GUIDELINES}
+
 **Communication principles:**
 - **Tone**: Refined, professional, quietly confident - like a knowledgeable friend
-- **Length**: Be as helpful as needed! Don't artificially restrict yourself. Give ideas, paint pictures, then ask.
-- **Pace**: One elegant question at a time at the END of your response; never rush
+- **Length**: Be as helpful as needed. Give ideas, paint pictures, then ask.
+- **Pace**: One elegant question at a time at the END of your response
 - **Depth**: Listen for emotional truth beneath surface statements
-- **Style**: Avoid generic luxury clichés; be precise, be real, BE HELPFUL
+- **Style**: Avoid generic luxury clichés; be precise, be real, be helpful
 - **Language**: Use "you" not "we"; be direct without being casual
 
 **Forbidden:**
@@ -142,7 +145,7 @@ ${stagePrompt}
 - Overly casual language or emojis
 - Multiple questions in one response
 - Spray-gun recommendations (be selective!)
-- Being unhelpful by ONLY asking questions without offering ANY ideas`;
+- Being unhelpful by ONLY asking questions without offering ideas`;
 
   return basePersonality;
 }

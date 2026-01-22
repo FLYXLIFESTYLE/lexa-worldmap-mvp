@@ -14,6 +14,10 @@ Each agent section below contains:
 4. **Quality Metrics**
 5. **Integration Points**
 
+**Communication & Behaviour:**  
+Source of truth is `docs/LEXA_COMMUNICATION_GUIDELINES.md`.  
+All prompts should comply with that document.
+
 ---
 
 # AGENT 1: LEXA CHAT AGENT
