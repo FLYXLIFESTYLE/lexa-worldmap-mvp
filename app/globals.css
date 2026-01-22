@@ -627,3 +627,129 @@ body {
   }
 }
 
+/* ============================================================================
+   LEXA Theme Category Rails (Left/Right Sidebars)
+   ============================================================================ */
+
+.lexa-theme-rail {
+  width: 240px;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(16px);
+  padding: 1rem;
+  overflow-y: auto;
+  transition: opacity 0.3s ease;
+}
+
+.lexa-theme-rail--left {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lexa-theme-rail--right {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lexa-theme-rail__inner {
+  position: sticky;
+  top: 1rem;
+}
+
+.lexa-theme-rail__title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.lexa-theme-rail__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lexa-theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.lexa-theme-card:hover {
+  border-color: rgba(var(--lexa-gold), 0.5);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  transform: translateX(0) scale(1.02);
+}
+
+.lexa-theme-rail--left .lexa-theme-card:hover {
+  transform: translateX(4px) scale(1.02);
+}
+
+.lexa-theme-rail--right .lexa-theme-card:hover {
+  transform: translateX(-4px) scale(1.02);
+}
+
+.lexa-theme-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(var(--lexa-gold), 0.15);
+  border: 1px solid rgba(var(--lexa-gold), 0.25);
+  color: rgba(var(--lexa-gold), 1);
+  transition: all 0.2s ease;
+}
+
+.lexa-theme-card:hover .lexa-theme-card__icon {
+  background: rgba(var(--lexa-gold), 0.25);
+  border-color: rgba(var(--lexa-gold), 0.5);
+}
+
+.lexa-theme-card__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.lexa-theme-card__hover-desc {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: 0.5rem;
+  width: 220px;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: rgba(16, 24, 48, 0.95);
+  border: 1px solid rgba(var(--lexa-gold), 0.4);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  backdrop-filter: blur(20px);
+}
+
+.lexa-theme-rail--right .lexa-theme-card__hover-desc {
+  left: auto;
+  right: 100%;
+  margin-left: 0;
+  margin-right: 0.5rem;
+}
+
+.lexa-theme-card:hover .lexa-theme-card__hover-desc {
+  display: block;
+}
+

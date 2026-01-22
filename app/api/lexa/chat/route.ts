@@ -66,6 +66,38 @@ export async function POST(request: NextRequest) {
 
     const isSyntheticStart = userMessage.trim() === '__start__';
     
+    // 3. Load user metadata for personalization
+    let userName: string | null = null;
+    let userEmail: string | null = null;
+    
+    if (user?.email) {
+      userEmail = user.email;
+      // Extract first name from email (before @) as fallback
+      userName = user.email.split('@')[0];
+      
+      // Try to get actual name from user metadata or profile
+      try {
+        const { data: profile } = await supabaseAdmin
+          .from('lexa_user_profiles')
+          .select('full_name, first_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (profile?.first_name) {
+          userName = profile.first_name;
+        } else if (profile?.full_name) {
+          userName = profile.full_name.split(' ')[0];
+        }
+        
+        // Also check user_metadata from auth
+        if (user.user_metadata?.full_name && !profile?.full_name) {
+          userName = user.user_metadata.full_name.split(' ')[0];
+        }
+      } catch {
+        // Fallback already set from email
+      }
+    }
+    
     // 4. Load or create session
     let session: any;
     let sessionState: SessionState;
@@ -152,51 +184,43 @@ export async function POST(request: NextRequest) {
         updatedState.stage = 'SCRIPT_DRAFT';
       }
     } else if (sessionState.stage === 'WELCOME' || sessionState.stage === 'INITIAL_QUESTIONS') {
-      // Hybrid onboarding/intake:
-      // - Deterministic state machine for reliability and consistent structure
-      // - Claude fallback for unexpected user questions so it still feels "smart like ChatGPT"
+      // New approach: ALWAYS use Claude for warm, helpful responses
+      // State machine handles state transitions, Claude handles conversation quality
+      
+      // 1. Get state transition logic (for state updates and UI)
       const transition = await transitionStage(sessionState, isSyntheticStart ? '' : userMessage);
-
-      assistantMessage = transition.message;
       ui = transition.ui ?? null;
       updatedState = {
         ...updatedState,
         ...transition.updatedState,
         stage: transition.nextStage,
       };
-
-      const likelyStuck =
-        sessionState.stage === 'INITIAL_QUESTIONS' &&
-        transition.nextStage === 'INITIAL_QUESTIONS';
-
-      if (likelyStuck && looksLikeUserQuestion(userMessage)) {
-        const systemPrompt = buildIntakeFallbackSystemPrompt(sessionState);
-        const claudeResponse = await generateResponseWithRetry({
-          sessionState,
-          userMessage,
-          systemPrompt,
-        });
-        assistantMessage = claudeResponse.assistantMessage;
-        // Keep state unchanged; next user message will be parsed deterministically.
-
-        // Log "uncertainty" event for learning (best-effort; safe if migration not applied yet)
-        try {
-          await supabaseAdmin.from('lexa_interaction_events').insert({
-            user_id: userId,
-            session_id: session.id,
-            event_type: 'uncertain_fallback_claude',
-            payload: {
-              stage: sessionState.stage,
-              intake_step: sessionState.briefing_progress?.intake_step ?? null,
-              logistics_step: sessionState.briefing_progress?.logistics_step ?? null,
-              user_message_id: userMessageId,
-              reason: 'user_question_during_intake',
-            },
-          });
-        } catch (e) {
-          console.warn('lexa_interaction_events insert skipped/failed:', e);
+      
+      // 2. Generate warm, helpful response via Claude with full guidelines
+      let systemPrompt = getSystemPromptForStage(sessionState);
+      
+      // Add user personalization context
+      if (userName && sessionState.stage === 'WELCOME') {
+        systemPrompt = `${systemPrompt}\n\n**User context:**\n- First name: ${userName}\n- Email: ${userEmail || 'unknown'}\n\nUse their first name naturally in your welcome message to create warmth and personalization.`;
+      }
+      
+      // Add guidance based on current intake step
+      if (sessionState.stage === 'INITIAL_QUESTIONS') {
+        const intakeStep = sessionState.briefing_progress?.intake_step;
+        const guidanceNote = buildIntakeGuidanceNote(sessionState, intakeStep);
+        if (guidanceNote) {
+          systemPrompt = `${systemPrompt}\n\n${guidanceNote}`;
         }
       }
+      
+      const claudeResponse = await generateResponseWithRetry({
+        sessionState,
+        userMessage: isSyntheticStart ? 'Hello' : userMessage,
+        systemPrompt,
+      });
+      
+      assistantMessage = claudeResponse.assistantMessage;
+      
     } else {
       // Use Claude for conversational stages
       let systemPrompt = getSystemPromptForStage(sessionState);
@@ -406,56 +430,80 @@ function looksLikeUserQuestion(text: string): boolean {
   return false;
 }
 
-function buildIntakeFallbackSystemPrompt(state: SessionState): string {
-  const intakeStep = state.briefing_progress.intake_step ?? 'THEME_SELECT';
-  const logisticsStep = state.briefing_progress.logistics_step ?? 'DURATION';
+function buildIntakeGuidanceNote(state: SessionState, intakeStep?: string): string {
+  const step = intakeStep ?? state.briefing_progress?.intake_step ?? 'THEME_SELECT';
+  const logisticsStep = state.briefing_progress?.logistics_step ?? 'DURATION';
+  const selectedThemes = state.brief?.themes?.length ? state.brief.themes : state.brief?.theme ? [state.brief.theme] : [];
+  
+  let guidance = '';
+  
+  if (step === 'THEME_SELECT') {
+    guidance = `**Current goal:** The user just started. They may describe what they want in their own words, or they may select from theme categories visible in the UI.
 
-  const selectedThemes =
-    state.brief?.themes?.length ? state.brief.themes : state.brief?.theme ? [state.brief.theme] : [];
+**Your job:**
+1) Welcome them warmly (use their name if provided)
+2) Reflect what they said if they gave input, or invite them to share what's on their mind
+3) Optionally mention the theme cards visible in the UI as inspiration (don't force it)
+4) Ask ONE warm question to understand their emotional goal
 
-  const nextAsk =
-    intakeStep === 'THEME_SELECT'
-      ? `Invite them to describe what they want in their own words. You may optionally offer this theme list as inspiration:\n${formatThemeMenu()}`
-      : intakeStep === 'THEME_WHY'
-        ? `Ask: why those themes + what they want to feel (and what to avoid).`
-        : intakeStep === 'MEMORY'
-          ? `Ask: the best moment from their last great holiday (optional: worst).`
-          : intakeStep === 'HOOK_CONFIRM'
-            ? `Ask: does the direction feel right? (yes/no)`
-            : // LOGISTICS
-              logisticsStep === 'DURATION'
-              ? `Ask: how many days (give examples).`
-              : logisticsStep === 'WEEKEND_PATTERN'
-                ? `Ask: for a weekend, do they mean Friday–Sunday or Saturday–Sunday?`
-              : logisticsStep === 'STRUCTURE'
-                ? `Ask: curated vs balanced vs free (and reassure they can come back).`
-                : logisticsStep === 'WHEN'
-                  ? `Ask: when (month is enough) and why timing matters.`
-                  : logisticsStep === 'WHERE'
-                    ? `Ask: destination in mind or should LEXA suggest.`
-                    : logisticsStep === 'BUDGET'
-                      ? `Ask: budget range (ballpark is fine).`
-                      : logisticsStep === 'ALTERNATIVES'
-                        ? `Ask: consent for bad-weather alternatives; recommend yes softly.`
-                        : `Ask one concise next question.`;
-
-  const themeContext = selectedThemes.length ? `Current themes: ${selectedThemes.join(' · ')}` : '';
-
-  return `You are LEXA, a world-class concierge and experience designer.
-
-The user is in the structured intake flow, but they asked an unexpected question. Your job:
-1) Answer their question briefly and clearly (1–3 sentences).
-2) Then smoothly guide them back to the intake with ONE next question.
-
-Constraints:
-- Be warm, refined, and confident.
-- No interrogation tone.
-- Keep it short (under ~90 words).
-- Do not mention "system prompts" or "state machines".
+Remember: BE HELPFUL! If they mentioned a destination or desire, reflect it back and offer a few initial ideas before asking your question.`;
+  } else if (step === 'THEME_WHY') {
+    const themeContext = selectedThemes.length ? `They chose: ${selectedThemes.join(' + ')}` : 'They described their own theme/desire';
+    guidance = `**Current goal:** Understand WHY they want this experience and what they want to FEEL.
 
 ${themeContext}
 
-Next step you must guide toward:
-${nextAsk}`;
+**Your job:**
+1) Acknowledge their theme/desire warmly
+2) Offer 2-3 initial ideas of what this could look like (destinations, moments, or experiences)
+3) Then ask: what do they want to feel, and what do they want to avoid?
+
+Be warm and helpful, not interrogative!`;
+  } else if (step === 'MEMORY') {
+    guidance = `**Current goal:** Understand their past peak experiences to design better.
+
+**Your job:**
+1) Thank them for sharing their feelings/desires
+2) Offer 1-2 ideas of signature moments that could deliver those feelings
+3) Then gently ask: what was the best moment from their last great holiday, and what made it work?
+
+Optional: mention they can also share what ruined a trip, so you can design around it.`;
+  } else if (step === 'HOOK_CONFIRM') {
+    const hook = state.micro_wow?.hook || 'your experience direction';
+    const highlights = state.script?.signature_moments || [];
+    guidance = `**Current goal:** Present the emotional direction you'd design for them and get confirmation.
+
+Your hook: "${hook}"
+Signature highlights: ${highlights.length ? highlights.join('; ') : 'None yet'}
+
+**Your job:**
+1) Present the hook and 3-5 signature highlights in an inspiring way
+2) Ask if this feels like the right emotional direction (yes/no)
+
+Make it feel like a proposal, not a quiz!`;
+  } else if (step === 'LOGISTICS') {
+    const whatWeKnow = [];
+    if (state.brief?.duration?.days) whatWeKnow.push(`${state.brief.duration.days} days`);
+    if (state.brief?.when_at?.timeframe) whatWeKnow.push(state.brief.when_at.timeframe);
+    if (state.brief?.where_at?.destination) whatWeKnow.push(state.brief.where_at.destination);
+    
+    guidance = `**Current goal:** Gather practical details (duration, timing, destination) to make the experience real.
+
+What we know so far: ${whatWeKnow.length ? whatWeKnow.join(', ') : 'Nothing yet'}
+
+**Your job:**
+1) Acknowledge the emotional direction you've established
+2) Offer initial destination suggestions based on their themes/desires (2-3 options with brief why)
+3) Then ask about practical details: How many days? When? Any destinations in mind?
+
+You can ask about multiple logistics in ONE question if it flows naturally - but still offer ideas first!`;
+  }
+  
+  return guidance || '';
+}
+
+function buildIntakeFallbackSystemPrompt(state: SessionState): string {
+  // Deprecated - keeping for backwards compatibility
+  return buildIntakeGuidanceNote(state) || 'Be helpful and warm. Offer ideas before asking questions.';
 }
 

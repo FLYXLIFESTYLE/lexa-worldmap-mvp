@@ -12,6 +12,8 @@ import ChatInput from '@/components/chat/chat-input';
 import LuxuryBackground from '@/components/luxury-background';
 import { LegalDisclaimer } from '@/components/legal-disclaimer';
 import type { LexaUiPayload } from '@/lib/lexa/types';
+import { LEXA_THEMES_14, LEXA_THEME_UI, LEXA_THEME_COPY } from '@/lib/lexa/themes';
+import { Heart, Mountain, Sparkles, Utensils, Landmark, Crown, Leaf, Waves, Palette, Users, PartyPopper, Moon, Music, Trophy } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -19,6 +21,27 @@ interface Message {
   content: string;
   created_at: string;
   ui?: LexaUiPayload | null;
+}
+
+// Helper to map icon names to components
+function getThemeIcon(iconName: string) {
+  const icons: Record<string, any> = {
+    Heart,
+    Mountain,
+    Sparkles,
+    Utensils,
+    Landmark,
+    Crown,
+    Leaf,
+    Waves,
+    Palette,
+    Users,
+    PartyPopper,
+    Moon,
+    Music,
+    Trophy,
+  };
+  return icons[iconName] || Sparkles;
 }
 
 export default function ChatPage() {
@@ -278,52 +301,83 @@ export default function ChatPage() {
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-lexa-gold to-transparent opacity-50" />
       </header>
       
-      {/* Starter suggestions (mobile) */}
-      {showStarters ? (
-        <div className="lexa-suggestion-strip lg:hidden">
-          <p className="lexa-suggestion-title">Try a starting point</p>
-          <div className="lexa-suggestion-row">
-            {starterPrompts.map((prompt) => (
-              <button
-                key={prompt.id}
-                onClick={() => sendMessage(prompt.text)}
-                className="lexa-suggestion-card"
-              >
-                {prompt.text}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      
       <div className="flex flex-1 overflow-hidden">
+        {/* Theme Category Cards (Left Rail - Desktop only) */}
+        {showStarters && (
+          <aside className="hidden xl:flex lexa-theme-rail lexa-theme-rail--left">
+            <div className="lexa-theme-rail__inner">
+              <p className="lexa-theme-rail__title">Explore Themes</p>
+              <div className="lexa-theme-rail__grid">
+                {LEXA_THEMES_14.slice(0, 7).map((theme) => {
+                  const meta = LEXA_THEME_UI[theme];
+                  const copy = LEXA_THEME_COPY[theme];
+                  const Icon = getThemeIcon(meta.icon);
+                  return (
+                    <button
+                      key={meta.id}
+                      onClick={() => sendMessage(theme)}
+                      className="lexa-theme-card group"
+                      title={copy.description}
+                    >
+                      <div className="lexa-theme-card__icon">
+                        {Icon ? <Icon className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                      </div>
+                      <div className="lexa-theme-card__label">{theme}</div>
+                      <div className="lexa-theme-card__hover-desc">
+                        <p className="text-xs italic text-lexa-gold/90">{copy.hook}</p>
+                        <p className="text-xs text-white/80 mt-1">{copy.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </aside>
+        )}
+        
         <div className="flex flex-1 flex-col">
-          {/* Chat Transcript */}
+          {/* Chat Transcript with starter prompts embedded */}
           <ChatTranscript
             messages={messages}
             isLoading={isLoading}
             onQuickReply={sendMessage}
+            starterPrompts={starterPrompts}
+            showStarters={showStarters}
           />
         </div>
         
-        {/* Starter suggestions (desktop rail) */}
-        <aside className={`hidden lg:flex lexa-suggestion-rail ${showStarters ? '' : 'opacity-0 pointer-events-none'}`}>
-          <div className="lexa-suggestion-rail__inner">
-            <p className="lexa-suggestion-title">Not sure how to start?</p>
-            <p className="lexa-suggestion-subtitle">Tap any idea to send it as your first message.</p>
-            <div className="lexa-suggestion-column">
-              {starterPrompts.map((prompt) => (
-                <button
-                  key={prompt.id}
-                  onClick={() => sendMessage(prompt.text)}
-                  className="lexa-suggestion-card"
-                >
-                  {prompt.text}
-                </button>
-              ))}
+        {/* Theme Category Cards (Right Rail - Desktop only) */}
+        {showStarters && (
+          <aside className="hidden xl:flex lexa-theme-rail lexa-theme-rail--right">
+            <div className="lexa-theme-rail__inner">
+              <p className="lexa-theme-rail__title">More Themes</p>
+              <div className="lexa-theme-rail__grid">
+                {LEXA_THEMES_14.slice(7).map((theme) => {
+                  const meta = LEXA_THEME_UI[theme];
+                  const copy = LEXA_THEME_COPY[theme];
+                  const Icon = getThemeIcon(meta.icon);
+                  return (
+                    <button
+                      key={meta.id}
+                      onClick={() => sendMessage(theme)}
+                      className="lexa-theme-card group"
+                      title={copy.description}
+                    >
+                      <div className="lexa-theme-card__icon">
+                        {Icon ? <Icon className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                      </div>
+                      <div className="lexa-theme-card__label">{theme}</div>
+                      <div className="lexa-theme-card__hover-desc">
+                        <p className="text-xs italic text-lexa-gold/90">{copy.hook}</p>
+                        <p className="text-xs text-white/80 mt-1">{copy.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
       </div>
       
       {/* Input */}

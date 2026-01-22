@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import QuickReplyPanel from './quick-reply-panel';
 import type { LexaUiPayload } from '@/lib/lexa/types';
 import { ThumbsDown, ThumbsUp } from 'lucide-react';
@@ -17,13 +17,26 @@ interface Message {
   ui?: LexaUiPayload | null;
 }
 
+interface StarterPrompt {
+  id: string;
+  text: string;
+}
+
 interface ChatTranscriptProps {
   messages: Message[];
   isLoading: boolean;
   onQuickReply?: (value: string) => void;
+  starterPrompts?: StarterPrompt[];
+  showStarters?: boolean;
 }
 
-export default function ChatTranscript({ messages, isLoading, onQuickReply }: ChatTranscriptProps) {
+export default function ChatTranscript({ 
+  messages, 
+  isLoading, 
+  onQuickReply,
+  starterPrompts,
+  showStarters 
+}: ChatTranscriptProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   
   // Auto-scroll to bottom
@@ -33,12 +46,33 @@ export default function ChatTranscript({ messages, isLoading, onQuickReply }: Ch
 
   const lastMsg = messages[messages.length - 1];
   const ui = lastMsg?.role === 'assistant' ? lastMsg.ui : null;
+  const isFirstMessage = messages.length === 1 && messages[0]?.role === 'assistant';
   
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
       <div className="mx-auto w-full max-w-3xl space-y-6 lg:max-w-4xl">
-        {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+        {messages.map((message, index) => (
+          <div key={message.id}>
+            <MessageBubble message={message} />
+            
+            {/* Show starter prompts below the first welcome message */}
+            {index === 0 && isFirstMessage && showStarters && starterPrompts && starterPrompts.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs text-zinc-400 text-center">Or try one of these to get started:</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {starterPrompts.map((prompt) => (
+                    <button
+                      key={prompt.id}
+                      onClick={() => onQuickReply?.(prompt.text)}
+                      className="text-left px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-zinc-200 text-sm transition-all hover:bg-white/10 hover:border-lexa-gold/30 hover:shadow-md"
+                    >
+                      {prompt.text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         ))}
         
         {isLoading && (
@@ -80,7 +114,7 @@ function MessageBubble({ message }: { message: Message }) {
     <div className={`flex items-start gap-3 ${isUser ? 'justify-end' : 'justify-start'} group`}>
       {!isUser && isAssistant ? <LexaAvatar /> : null}
       <div
-        className={`max-w-[85%] rounded-2xl px-6 py-4 transition-all ${
+        className={`max-w-[85%] rounded-2xl px-4 py-3 sm:px-6 sm:py-4 transition-all ${
           isUser
             ? 'bg-gradient-to-br from-lexa-gold/90 to-yellow-600/90 text-zinc-900 shadow-lg shadow-black/20'
             : isSystem
@@ -188,4 +222,3 @@ function LexaAvatar() {
     </div>
   );
 }
-
