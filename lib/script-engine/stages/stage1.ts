@@ -35,6 +35,11 @@ export async function generateStage1(input: {
   guest_keywords?: string[];
   custom_name?: string;
   season?: string;
+  emotional_profile?: {
+    desired_feelings?: string[];
+    avoid_fears?: string[];
+    activity_interests?: string[];
+  };
 }): Promise<Stage1Output> {
   // 1. Fetch all arc data from Neo4j
   const arcData = await fetchArcData(input.arc_code);
@@ -44,8 +49,13 @@ export async function generateStage1(input: {
 
   const { arc, phases, archetypes, rituals } = arcData;
 
-  // 2. Fetch signature POIs for the region
-  const pois = await fetchSignaturePOIs(input.region, undefined, 10);
+  // 2. Fetch signature POIs — now uses emotional profile for better matching
+  const pois = await fetchSignaturePOIs(
+    input.region,
+    undefined,
+    10,
+    input.emotional_profile
+  );
 
   // 3. Generate each section
   const experience_name = input.custom_name || arc.name;

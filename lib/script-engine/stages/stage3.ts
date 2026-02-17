@@ -25,6 +25,7 @@ export async function generateStage3(input: {
   guest_names?: string[];
   start_date?: string;
   vessel?: string;
+  guest_preferences?: Record<string, unknown>;
 }): Promise<Stage3Output> {
   const arcData = await fetchArcData(input.arc_code);
   if (!arcData) {
@@ -112,11 +113,11 @@ export async function generateStage3(input: {
     booking_reference: input.booking_reference || `LEXA-${Date.now()}`,
     guests: (input.guest_names || ["Guest"]).map((name) => ({
       name,
-      preferences: "TBC via profiling questionnaire",
-      dietary: "TBC",
-      wellness_focus: "TBC",
-      mobility: "No restrictions noted",
-      communication: "TBC",
+      preferences: ((input.guest_preferences?.activity_interests as string[]) || []).join(", ") || "TBC via profiling questionnaire",
+      dietary: ((input.guest_preferences?.dietary_restrictions as string[]) || []).join(", ") || "TBC",
+      wellness_focus: ((input.guest_preferences?.wellness_focus as string[]) || []).join(", ") || "TBC",
+      mobility: (input.guest_preferences?.mobility_notes as string) || "No restrictions noted",
+      communication: (input.guest_preferences?.greeting_style as string) || "TBC",
     })),
     dates: { start: startDate, end: endDate },
     duration_days: input.duration,
@@ -127,19 +128,25 @@ export async function generateStage3(input: {
     daily_logistics: dailyLogistics,
     booking_status: bookingStatus,
     transfers: generateTransferSchedule(input.duration, startDate),
-    dietary: (input.guest_names || ["Guest"]).map((name) => ({
-      guest_name: name,
-      allergies: [],
-      restrictions: [],
-      preferences: [],
-      avoid: [],
-    })),
-    wellness: (input.guest_names || ["Guest"]).map((name) => ({
-      guest_name: name,
-      iv_protocol: [],
-      treatment_preferences: "TBC via profiling",
-      sleep_support: "TBC via profiling",
-    })),
+    dietary: (input.guest_names || ["Guest"]).map((name) => {
+      const gp = input.guest_preferences || {};
+      return {
+        guest_name: name,
+        allergies: (gp.allergies as string[]) || [],
+        restrictions: (gp.dietary_restrictions as string[]) || [],
+        preferences: (gp.food_preferences as string[]) || [],
+        avoid: (gp.food_dislikes as string[]) || [],
+      };
+    }),
+    wellness: (input.guest_names || ["Guest"]).map((name) => {
+      const gp = input.guest_preferences || {};
+      return {
+        guest_name: name,
+        iv_protocol: [],
+        treatment_preferences: ((gp.wellness_focus as string[]) || []).join(", ") || "TBC via profiling",
+        sleep_support: ((gp.sleep_aids as string[]) || []).join(", ") || "TBC via profiling",
+      };
+    }),
     emergency_contacts: [
       { type: "Vessel Emergency", phone: "Captain TBC" },
       { type: "LEXA Operations", phone: "+44 XXX XXX XXXX" },

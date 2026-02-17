@@ -89,6 +89,7 @@ export async function PUT(request: NextRequest) {
     
     if (body.full_name !== undefined) updateData.full_name = body.full_name;
     if (body.first_name !== undefined) updateData.first_name = body.first_name;
+    if (body.guest_preferences !== undefined) updateData.guest_preferences = body.guest_preferences;
     if (body.primary_themes !== undefined) updateData.primary_themes = body.primary_themes;
     if (body.personality_archetype !== undefined) updateData.personality_archetype = body.personality_archetype;
     if (body.budget_preferences !== undefined) updateData.budget_preferences = body.budget_preferences;

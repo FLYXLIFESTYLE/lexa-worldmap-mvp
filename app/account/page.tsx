@@ -109,11 +109,18 @@ export default function AccountDashboard() {
               <span className="text-sm">Back to Home</span>
             </Link>
             <button
+              onClick={() => router.push('/account/preferences')}
+              className="px-4 py-2 rounded-full border border-lexa-gold/30 bg-lexa-gold/10 text-lexa-gold hover:bg-lexa-gold/20 transition-all backdrop-blur-sm flex items-center gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              Guest Preferences
+            </button>
+            <button
               onClick={() => router.push('/account/profile')}
               className="px-4 py-2 rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/10 hover:border-lexa-gold/30 transition-all backdrop-blur-sm flex items-center gap-2"
             >
               <Settings className="h-4 w-4" />
-              Edit Profile & Preferences
+              Edit Profile
             </button>
           </div>
           

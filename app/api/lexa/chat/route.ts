@@ -154,6 +154,26 @@ export async function POST(request: NextRequest) {
       sessionState = newState;
     }
     
+    // 4b. Load stored emotional profile + guest preferences (for RAG grounding)
+    let storedEmotionalProfile: Record<string, unknown> = {};
+    let storedGuestPreferences: Record<string, unknown> = {};
+    try {
+      const { data: profileData } = await supabaseAdmin
+        .from('lexa_user_profiles')
+        .select('emotional_profile, guest_preferences')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (profileData?.emotional_profile) {
+        storedEmotionalProfile = profileData.emotional_profile as Record<string, unknown>;
+      }
+      if (profileData?.guest_preferences) {
+        storedGuestPreferences = profileData.guest_preferences as Record<string, unknown>;
+      }
+    } catch {
+      // Non-blocking -- continue without profile data
+    }
+
     // 5. Insert user message (skip for synthetic start)
     let userMessageId: string | null = null;
     if (!isSyntheticStart) {
@@ -216,6 +236,11 @@ export async function POST(request: NextRequest) {
               region,
               duration,
               guest_keywords: rawDesire.split(/\s+/).filter((w: string) => w.length > 3),
+              emotional_profile: {
+                desired_feelings: (storedEmotionalProfile.desired_feelings as string[]) || [],
+                avoid_fears: (storedEmotionalProfile.avoid_fears as string[]) || [],
+                activity_interests: (storedGuestPreferences.activity_interests as string[]) || [],
+              },
             });
 
             // Store in state for the system prompt to use
@@ -301,6 +326,9 @@ export async function POST(request: NextRequest) {
           systemPrompt = `${systemPrompt}\n\n**User context:**\n- First name: ${userName}\n- Email: ${userEmail || 'unknown'}\n\nUse their first name naturally in your welcome message.`;
         }
         
+        // Inject stored emotional profile + preferences into Claude's context
+        systemPrompt += buildProfileContext(storedEmotionalProfile, storedGuestPreferences);
+        
         // Add the user's actual words to the prompt so Claude reflects them back
         if (sessionState.stage === 'INITIAL_QUESTIONS' && !isSyntheticStart) {
           const briefContext = [];
@@ -308,7 +336,7 @@ export async function POST(request: NextRequest) {
           if (sessionState.brief?.where_at?.destination) briefContext.push(`Destination: ${sessionState.brief.where_at.destination}`);
           if (sessionState.brief?.duration?.days) briefContext.push(`Duration: ${sessionState.brief.duration.days} days`);
           
-          systemPrompt += `\n\n**What the user has told us so far:**\n${briefContext.join('\n') || 'First message from user'}\n\n**CRITICAL:** Your response MUST acknowledge and reflect back what the user just said. Do NOT ignore their input. If they said "adrenaline + yacht dinner", talk about adrenaline and yacht dinners specifically.`;
+          systemPrompt += `\n\n**What the user has told us so far:**\n${briefContext.join('\n') || 'First message from user'}\n\n**CRITICAL:** Your response MUST acknowledge and reflect back what the user just said. Do NOT ignore their input.`;
         }
         
         const claudeResponse = await generateResponseWithRetry({
@@ -331,7 +359,7 @@ export async function POST(request: NextRequest) {
     } else {
       // REFINE, HANDOFF, FOLLOWUP, etc.
       let systemPrompt = getSystemPromptForStage(sessionState);
-      const grounding = await buildGroundedPoiContext(sessionState);
+      const grounding = await buildGroundedPoiContext(sessionState, storedEmotionalProfile, storedGuestPreferences);
       if (grounding) systemPrompt = `${systemPrompt}\n\n${grounding}`;
       
       const claudeResponse = await generateResponseWithRetry({
@@ -551,25 +579,30 @@ function getSystemPromptForStage(state: SessionState): string {
   }
 }
 
-async function buildGroundedPoiContext(state: SessionState): Promise<string | null> {
-  // Step 3 (Brain v2): Grounded retrieval to avoid hallucinated venue names.
-  // Only run when we have a destination; keep results small to avoid token bloat.
+async function buildGroundedPoiContext(
+  state: SessionState,
+  emotionalProfile?: Record<string, unknown>,
+  guestPrefs?: Record<string, unknown>
+): Promise<string | null> {
   const destination = (state.brief?.where_at?.destination || '').trim();
   if (!destination) return null;
 
   try {
-    const selectedThemes =
+    // Combine themes from session + guest preferences for richer grounding
+    const sessionThemes =
       state.brief?.themes?.length ? state.brief.themes : state.brief?.theme ? [state.brief.theme] : [];
+    const prefThemes = (guestPrefs?.activity_interests as string[]) || [];
+    const selectedThemes = [...new Set([...sessionThemes, ...prefThemes])];
 
     const res = await retrieveBrainCandidatesV2({
       destination,
-      themes: selectedThemes,
-      limit: 8,
+      themes: selectedThemes.length > 0 ? selectedThemes : undefined,
+      limit: 12,
       includeDrafts: true,
     });
 
     const header = [
-      '## Grounded Knowledge (Neo4j first, drafts as fallback)',
+      '## Grounded Knowledge (Real POIs from Neo4j)',
       `Destination: ${res.canonicalDestination || res.destination}`,
       res.canonicalDestination && res.canonicalDestination !== res.destination
         ? `Matched from: ${res.destination}`
@@ -600,9 +633,56 @@ async function buildGroundedPoiContext(state: SessionState): Promise<string | nu
 
     return [header, ...lines].join('\n');
   } catch {
-    // If Neo4j retrieval fails, don't block chat — just omit grounding.
     return null;
   }
+}
+
+/**
+ * Build a short context block from the stored emotional profile + guest preferences.
+ * Injected into Claude's system prompt so LEXA knows the user's history.
+ */
+function buildProfileContext(
+  emotionalProfile: Record<string, unknown>,
+  guestPreferences: Record<string, unknown>
+): string {
+  const parts: string[] = [];
+
+  // Emotional profile
+  const feelings = emotionalProfile.desired_feelings as string[] | undefined;
+  const fears = emotionalProfile.avoid_fears as string[] | undefined;
+  const personality = emotionalProfile.personality_signals as string[] | undefined;
+  const companion = emotionalProfile.companion_type as string | undefined;
+  const arcCode = emotionalProfile.matched_arc_code as string | undefined;
+
+  if (feelings?.length || fears?.length || personality?.length) {
+    parts.push('\n## What LEXA knows about this user (from previous conversations):');
+    if (feelings?.length) parts.push(`- They desire: ${feelings.join(', ')}`);
+    if (fears?.length) parts.push(`- They want to avoid: ${fears.join(', ')}`);
+    if (personality?.length) parts.push(`- Personality: ${personality.join(', ')}`);
+    if (companion) parts.push(`- Travels: ${companion}`);
+    if (arcCode) parts.push(`- Matched arc: ${arcCode}`);
+  }
+
+  // Guest preferences
+  const dietary = guestPreferences.dietary_restrictions as string[] | undefined;
+  const allergies = guestPreferences.allergies as string[] | undefined;
+  const wellnessFocus = guestPreferences.wellness_focus as string[] | undefined;
+  const activityInterests = guestPreferences.activity_interests as string[] | undefined;
+  const pace = guestPreferences.pace_preference as string | undefined;
+
+  const prefParts: string[] = [];
+  if (dietary?.length && !dietary.includes('No restrictions')) prefParts.push(`Dietary: ${dietary.join(', ')}`);
+  if (allergies?.length && !allergies.includes('None')) prefParts.push(`Allergies: ${allergies.join(', ')}`);
+  if (wellnessFocus?.length) prefParts.push(`Wellness: ${wellnessFocus.join(', ')}`);
+  if (activityInterests?.length) prefParts.push(`Interests: ${activityInterests.join(', ')}`);
+  if (pace) prefParts.push(`Pace: ${pace}`);
+
+  if (prefParts.length) {
+    parts.push('\n## Guest preferences (use these to personalise):');
+    prefParts.forEach(p => parts.push(`- ${p}`));
+  }
+
+  return parts.length > 0 ? '\n' + parts.join('\n') : '';
 }
 
 function looksLikeUserQuestion(text: string): boolean {

@@ -22,6 +22,8 @@ export async function generateStage4(input: {
   guest_names: string[];
   start_date: string;
   end_date: string;
+  guest_preferences?: Record<string, unknown>;
+  emotional_profile?: Record<string, unknown>;
 }): Promise<Stage4Output> {
   const arcData = await fetchArcData(input.arc_code);
   if (!arcData) {
@@ -35,7 +37,7 @@ export async function generateStage4(input: {
   const guestProfile = buildGuestProfile(primaryArchetype, arc, input.stage2);
 
   // Build daily briefings from Stage 2 days
-  const dailyBriefings = buildDailyBriefings(input.stage2, phases);
+  const dailyBriefings = buildDailyBriefings(input.stage2, phases, input.guest_preferences);
 
   // Format rituals
   const formattedRituals = rituals.map((r) => ({
@@ -188,7 +190,8 @@ function buildGuestProfile(
 
 function buildDailyBriefings(
   stage2: Stage2Output,
-  phases: { name: string; emotional_core: string; description: string }[]
+  phases: { name: string; emotional_core: string; description: string }[],
+  guestPrefs?: Record<string, unknown>
 ): Stage4Output["daily_briefings"] {
   return stage2.days.map((day) => {
     const phase = phases.find((p) => p.name === day.phase);
@@ -218,10 +221,10 @@ function buildDailyBriefings(
         notes: exp.poi_name ? `At ${exp.poi_name}` : undefined,
       })),
       environment: {
-        music: "Ambient, minimal, no lyrics",
+        music: ((guestPrefs?.music_taste as string[]) || []).join(", ") || "Ambient, minimal, no lyrics",
         lighting: "Warm, dim where possible",
-        scent: "Signature scent maintained",
-        temperature: "Comfortable, slightly cool",
+        scent: ((guestPrefs?.scent_preferences as string[]) || []).join(", ") || "Signature scent maintained",
+        temperature: (guestPrefs?.temperature_preference as string) || "Comfortable, slightly cool",
       },
     };
   });

@@ -330,13 +330,18 @@ export async function fetchAllArchetypes(): Promise<GuestArchetype[]> {
 // ============================================================================
 
 /**
- * Fetch signature POIs for a region, optionally filtered by themes.
- * Returns top luxury POIs sorted by luxury_score.
+ * Fetch signature POIs for a region, filtered by themes AND emotional profile.
+ * Uses theme matching, emotional tag matching, and luxury score for ranking.
  */
 export async function fetchSignaturePOIs(
   region: string,
   themes?: string[],
-  limit: number = 10
+  limit: number = 10,
+  emotionalProfile?: {
+    desired_feelings?: string[];
+    avoid_fears?: string[];
+    activity_interests?: string[];
+  }
 ): Promise<
   {
     name: string;
@@ -349,20 +354,38 @@ export async function fetchSignaturePOIs(
 > {
   const session = getSession();
   try {
+    // Merge themes from explicit param + activity_interests from profile
+    const allThemes = [...new Set([
+      ...(themes || []),
+      ...(emotionalProfile?.activity_interests || []),
+    ])];
+
+    // Build query with optional emotional tag matching
+    const hasEmotions = emotionalProfile?.desired_feelings && emotionalProfile.desired_feelings.length > 0;
+
     const query = `
       MATCH (p:poi)-[:LOCATED_IN]->(d:destination)
       WHERE toLower(d.name) CONTAINS toLower($region)
         AND p.luxury_score IS NOT NULL
         AND p.luxury_score >= 7
       ${
-        themes && themes.length > 0
+        allThemes.length > 0
           ? `OPTIONAL MATCH (p)-[:HAS_THEME]->(t:theme_category)
-             WHERE t.name IN $themes
-             WITH p, d, count(t) AS theme_matches
-             ORDER BY theme_matches DESC, p.luxury_score DESC`
-          : `WITH p, d
-             ORDER BY p.luxury_score DESC`
+             WHERE t.name IN $themes`
+          : ''
       }
+      ${
+        hasEmotions
+          ? `OPTIONAL MATCH (p)-[er:EVOKES]->(e:Emotion)
+             WHERE e.name IN $emotions
+             OPTIONAL MATCH (p)-[er2:EVOKES_EMOTION]->(et:EmotionalTag)
+             WHERE et.name IN $emotions`
+          : ''
+      }
+      WITH p, d
+        ${allThemes.length > 0 ? ', count(DISTINCT t) AS theme_matches' : ', 0 AS theme_matches'}
+        ${hasEmotions ? ', count(DISTINCT e) + count(DISTINCT et) AS emotion_matches' : ', 0 AS emotion_matches'}
+      ORDER BY (emotion_matches * 3 + theme_matches * 2 + p.luxury_score) DESC
       RETURN p.name AS name,
              p.category AS category,
              p.luxury_score AS luxury_score,
@@ -373,7 +396,8 @@ export async function fetchSignaturePOIs(
     `;
 
     const params: Record<string, unknown> = { region, limit };
-    if (themes && themes.length > 0) params.themes = themes;
+    if (allThemes.length > 0) params.themes = allThemes;
+    if (hasEmotions) params.emotions = emotionalProfile!.desired_feelings;
 
     const result = await session.run(query, params);
     return result.records.map((r) => ({
