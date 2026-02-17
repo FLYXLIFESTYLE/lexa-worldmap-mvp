@@ -103,15 +103,25 @@ async function runMigration() {
     console.log(`Skipped (already exist): ${skipped}`);
     console.log(`Failed: ${failed}`);
 
-    // Verify
-    const verifySession = driver.session();
-    const counts = await Promise.all([
-      verifySession.run('MATCH (ea:experience_arc) RETURN count(ea) AS c'),
-      verifySession.run('MATCH (ga:guest_archetype) RETURN count(ga) AS c'),
-      verifySession.run('MATCH (ap:arc_phase) RETURN count(ap) AS c'),
-      verifySession.run('MATCH (jt:journey_type) RETURN count(jt) AS c'),
-      verifySession.run('MATCH (rt:ritual_template) RETURN count(rt) AS c'),
-    ]);
+    // Verify (each query in its own session to avoid transaction conflicts)
+    const runCount = async (query: string) => {
+      const s = driver.session();
+      try {
+        const r = await s.run(query);
+        return r;
+      } finally {
+        await s.close();
+      }
+    };
+
+    const counts = [
+      await runCount('MATCH (ea:experience_arc) RETURN count(ea) AS c'),
+      await runCount('MATCH (ga:guest_archetype) RETURN count(ga) AS c'),
+      await runCount('MATCH (ap:arc_phase) RETURN count(ap) AS c'),
+      await runCount('MATCH (jt:journey_type) RETURN count(jt) AS c'),
+      await runCount('MATCH (rt:ritual_template) RETURN count(rt) AS c'),
+    ];
+    const verifySession = { close: async () => {} };
 
     const toNum = (r: any) => {
       const val = r.records[0].get('c');

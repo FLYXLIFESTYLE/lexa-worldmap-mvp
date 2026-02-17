@@ -1,12 +1,10 @@
 /**
- * INITIAL_QUESTIONS Stage — Streamlined 3-message flow
+ * INITIAL_QUESTIONS Stage — Fast path to script
  *
- * NEW FLOW (3 messages to script):
- * 1. User shares what they want (any format — "adrenaline + yacht dinner", themes, free text)
- * 2. LEXA acknowledges + asks 1-2 clarifying questions (region, duration, who's joining)
- * 3. User answers → LEXA generates Stage 1 script immediately via Script Engine
- *
- * The old 12-step flow is replaced. We ask the minimum, then generate and refine.
+ * RULE: Generate a script as fast as possible.
+ * - If user gives destination + duration in message 1 → generate script immediately
+ * - If user gives partial info → ask ONE short question, then generate
+ * - NEVER ask more than 2 questions total before generating
  */
 
 import { SessionState, StageTransitionResult, Brief } from '../types';
@@ -25,7 +23,6 @@ export async function processInitialQuestionsStage(
     ...patch,
   });
 
-  // User can type "restart" any time
   if (userInput.trim().toLowerCase() === 'restart') {
     return {
       nextStage: 'INITIAL_QUESTIONS',
@@ -41,48 +38,50 @@ export async function processInitialQuestionsStage(
   }
 
   // ========================================================================
-  // STEP 1: User shares initial desire (THEME_SELECT)
-  // Capture EVERYTHING from their first message, then ask clarifiers
+  // STEP 1: THEME_SELECT — User's first substantive message
   // ========================================================================
   if (intakeStep === 'THEME_SELECT') {
-    // Parse theme card selections
     const selected = parseThemeSelection(userInput);
-    
-    // Extract all hints from free text
     const destination = extractDestinationLoose(userInput);
     const companion = extractCompanionLoose(userInput);
     const days = extractDaysLoose(userInput);
     const month = extractMonthLoose(userInput);
 
-    // Build brief from everything the user gave us
     const nextBrief: Brief = { ...state.brief };
-    
+
     if (selected.length > 0) {
       nextBrief.theme = selected[0];
       nextBrief.themes = selected;
     }
-    
     if (destination) {
       nextBrief.where_at = { destination, regions: [], hints: companion || null };
     } else if (companion) {
       nextBrief.where_at = { ...(nextBrief.where_at || { destination: null, regions: [] }), hints: companion };
     }
-    
     if (days) {
       nextBrief.duration = { days, flexibility: 'flexible' };
     }
-    
     if (month) {
       nextBrief.when_at = { timeframe: month, dates: null, flexibility: 'flexible_by_days' };
     }
 
-    // Store the user's raw text for the Script Engine arc matcher
+    // If user also mentioned a destination via Claude extraction
+    if (!nextBrief.where_at?.destination && seemsLikeContainsPlaceName(userInput)) {
+      try {
+        const extracted = await extractBriefField({ userMessage: userInput, fieldName: 'where', currentState: state });
+        const value = extracted.fieldValue as Record<string, unknown>;
+        const dest = typeof value === 'string' ? value :
+          value && typeof value === 'object' && typeof value.destination === 'string' ? value.destination : null;
+        if (dest) {
+          nextBrief.where_at = { destination: String(dest), regions: [], hints: nextBrief.where_at?.hints || null };
+        }
+      } catch { /* ignore */ }
+    }
+
     const rawUserDesire = userInput.trim();
-    
-    const isSubstantive = rawUserDesire.length > 10 || selected.length > 0 || destination;
+    const isSubstantive = rawUserDesire.length > 10 || selected.length > 0 || !!destination;
 
     if (!isSubstantive) {
-      // Empty or greeting-only input — show themes
       return {
         nextStage: 'INITIAL_QUESTIONS',
         updatedState: {
@@ -94,8 +93,44 @@ export async function processInitialQuestionsStage(
       };
     }
 
-    // Substantive input received — move to CLARIFY
-    // Store the raw desire for arc matching later
+    // KEY DECISION: Do we have enough to generate a script RIGHT NOW?
+    const hasWhere = !!nextBrief.where_at?.destination;
+    const hasDuration = !!nextBrief.duration?.days;
+
+    // If we have destination + duration → go straight to SCRIPT_DRAFT
+    if (hasWhere && hasDuration) {
+      return {
+        nextStage: 'SCRIPT_DRAFT',
+        updatedState: {
+          brief: nextBrief,
+          briefing_progress: setProgress({
+            intake_step: 'DONE',
+            intake_questions_asked: 1,
+            raw_user_desire: rawUserDesire,
+          }),
+        },
+        message: 'I have everything I need. Designing your experience now...',
+      };
+    }
+
+    // If we have destination but no duration → default to 7 days and generate
+    if (hasWhere && !hasDuration) {
+      nextBrief.duration = { days: 7, flexibility: 'flexible' };
+      return {
+        nextStage: 'SCRIPT_DRAFT',
+        updatedState: {
+          brief: nextBrief,
+          briefing_progress: setProgress({
+            intake_step: 'DONE',
+            intake_questions_asked: 1,
+            raw_user_desire: rawUserDesire,
+          }),
+        },
+        message: 'Designing your experience now...',
+      };
+    }
+
+    // No destination → ask ONE question: where?
     return {
       nextStage: 'INITIAL_QUESTIONS',
       updatedState: {
@@ -106,120 +141,83 @@ export async function processInitialQuestionsStage(
           raw_user_desire: rawUserDesire,
         }),
       },
-      message: buildClarifyMessage(nextBrief, rawUserDesire),
-      ui: buildClarifyButtons(nextBrief),
+      message: 'Where are you thinking? Or I can suggest the perfect fit.',
+      ui: {
+        quickReplies: [
+          { id: 'fr', label: 'French Riviera', value: 'French Riviera', kind: 'other' as const, accent: 'gold' as const },
+          { id: 'monaco', label: 'Monaco', value: 'Monaco', kind: 'other' as const, accent: 'navy' as const },
+          { id: 'car', label: 'Caribbean', value: 'Caribbean', kind: 'other' as const, accent: 'sky' as const },
+          { id: 'suggest', label: 'Surprise me', value: 'Surprise me', kind: 'other' as const, accent: 'amber' as const },
+        ],
+      },
     };
   }
 
   // ========================================================================
-  // STEP 2: Ask what's missing (CLARIFY)
-  // User already told us what they want. Ask for missing pieces only.
+  // STEP 2: CLARIFY — We asked one question, now use the answer + generate
   // ========================================================================
   if (intakeStep === 'CLARIFY') {
-    // Parse the clarifying answers
     const destination = extractDestinationLoose(userInput);
     const days = extractDaysLoose(userInput);
-    const month = extractMonthLoose(userInput);
-    const companion = extractCompanionLoose(userInput);
-    const density = extractPlanningDensityLoose(userInput);
 
     const nextBrief: Brief = { ...state.brief };
 
-    if (destination && !nextBrief.where_at?.destination) {
+    if (destination) {
       nextBrief.where_at = { destination, regions: [], hints: nextBrief.where_at?.hints || null };
     }
-    if (days && !nextBrief.duration?.days) {
+    if (days) {
       nextBrief.duration = { days, flexibility: 'flexible' };
     }
-    if (month && !nextBrief.when_at?.timeframe) {
-      nextBrief.when_at = { timeframe: month, dates: null, flexibility: 'flexible_by_days' };
-    }
-    if (companion && !nextBrief.where_at?.hints) {
-      if (!nextBrief.where_at) nextBrief.where_at = { destination: null, regions: [], hints: companion };
-      else nextBrief.where_at.hints = companion;
-    }
 
-    // Use Claude to extract destination if our heuristic missed it
+    // Claude extraction fallback for destination
     if (!nextBrief.where_at?.destination && seemsLikeContainsPlaceName(userInput)) {
       try {
-        const extracted = await extractBriefField({
-          userMessage: userInput,
-          fieldName: 'where',
-          currentState: state,
-        });
+        const extracted = await extractBriefField({ userMessage: userInput, fieldName: 'where', currentState: state });
         const value = extracted.fieldValue as Record<string, unknown>;
         const dest = typeof value === 'string' ? value :
           value && typeof value === 'object' && typeof value.destination === 'string' ? value.destination : null;
         if (dest) {
-          nextBrief.where_at = {
-            destination: String(dest),
-            regions: Array.isArray(value?.regions) ? value.regions.map(String) : [],
-            hints: nextBrief.where_at?.hints || null,
-          };
+          nextBrief.where_at = { destination: String(dest), regions: [], hints: nextBrief.where_at?.hints || null };
         }
       } catch { /* ignore */ }
     }
 
-    // Check what we still need
-    const hasDuration = !!nextBrief.duration?.days;
-    const hasWhere = !!nextBrief.where_at?.destination;
-
-    // If we still don't have duration AND destination, ask once more
-    if (!hasDuration && !hasWhere) {
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          brief: nextBrief,
-          briefing_progress: setProgress({
-            intake_step: 'CLARIFY',
-            intake_questions_asked: 2,
-          }),
-        },
-        message: `Got it. Two quick things so I can design this properly:\n\n1. **Where** are you thinking? (Or I can suggest the perfect fit)\n2. **How long** — a weekend, a week, or longer?`,
-        ui: {
-          quickReplies: [
-            { id: 'fr', label: 'French Riviera', value: 'French Riviera, 7 days', kind: 'other' as const, accent: 'gold' as const },
-            { id: 'med', label: 'Mediterranean', value: 'Mediterranean, 8 days', kind: 'other' as const, accent: 'navy' as const },
-            { id: 'car', label: 'Caribbean', value: 'Caribbean, 7 days', kind: 'other' as const, accent: 'sky' as const },
-            { id: 'suggest', label: 'Surprise me', value: 'Suggest the best fit, 7 days', kind: 'other' as const, accent: 'amber' as const },
-          ],
-        },
-      };
+    // "Surprise me" → default to French Riviera
+    if (!nextBrief.where_at?.destination) {
+      const lower = userInput.toLowerCase();
+      if (lower.includes('surprise') || lower.includes('suggest') || lower.includes('you choose') || lower.includes('anywhere')) {
+        nextBrief.where_at = { destination: 'French Riviera', regions: [], hints: null };
+      }
     }
 
-    // Default duration if missing (don't ask again — just default to 7 days)
-    if (!hasDuration) {
+    // Default duration if still missing
+    if (!nextBrief.duration?.days) {
       nextBrief.duration = { days: 7, flexibility: 'flexible' };
     }
 
-    // Default region if missing
-    if (!hasWhere) {
-      nextBrief.where_at = { destination: 'French Riviera', regions: [], hints: nextBrief.where_at?.hints || null };
+    // Default destination if still missing (don't ask again — just pick)
+    if (!nextBrief.where_at?.destination) {
+      nextBrief.where_at = { destination: 'French Riviera', regions: [], hints: null };
     }
 
-    // Store travel preferences
-    const nextPrefs = { ...(state.travel_preferences ?? {}) };
-    if (density) nextPrefs.planning_density = density;
+    const rawDesire = state.briefing_progress.raw_user_desire || userInput;
 
-    // We have enough — go directly to SCRIPT_DRAFT
-    const rawDesire = (state.briefing_progress as Record<string, unknown>).raw_user_desire as string || userInput;
-
+    // Go to SCRIPT_DRAFT — no more questions
     return {
       nextStage: 'SCRIPT_DRAFT',
       updatedState: {
         brief: nextBrief,
-        travel_preferences: nextPrefs,
         briefing_progress: setProgress({
           intake_step: 'DONE',
-          intake_questions_asked: (state.briefing_progress.intake_questions_asked || 0) + 1,
+          intake_questions_asked: 2,
           raw_user_desire: rawDesire,
         }),
       },
-      message: `Perfect. I have everything I need. Let me design your experience...`,
+      message: 'Designing your experience now...',
     };
   }
 
-  // Fallback — restart
+  // Fallback
   return {
     nextStage: 'INITIAL_QUESTIONS',
     updatedState: {
@@ -231,108 +229,43 @@ export async function processInitialQuestionsStage(
 }
 
 // ============================================================================
-// SYSTEM PROMPT
+// SYSTEM PROMPT — Strict brevity rules
 // ============================================================================
 
 export function getInitialQuestionsSystemPrompt(): string {
-  return `You are LEXA, a world-class luxury yacht experience designer. You are warm, insightful, and genuinely helpful.
+  return `You are LEXA, a luxury experience designer. Be CONCISE.
 
-**Your Core Promise:** Understand what the user REALLY wants and design an experience that transforms them.
+STRICT RULES:
+1. Maximum 60 words per response. No exceptions.
+2. Acknowledge what the user said in ONE sentence.
+3. Ask maximum ONE question. Never two.
+4. Do NOT list suggestions, destinations, or ideas. Save that for the script.
+5. Do NOT write paragraphs. Keep it conversational — like a text message, not an email.
+6. If the user gave destination + duration + what they want, say "Let me design this for you" and STOP.
 
-**CRITICAL RULES:**
-1. ALWAYS reflect back what the user said. If they said "adrenaline + yacht dinner", your response MUST reference adrenaline and yacht dinners specifically.
-2. NEVER give generic destination suggestions that ignore what they told you. If they want adrenaline, suggest adrenaline experiences. If they want romance, suggest romance.
-3. Offer 2-3 SPECIFIC ideas that match what they described before asking any question.
-4. Ask maximum 1-2 clarifying questions per message (where? how long?). Do NOT interrogate.
-5. Be concise. Maximum 150 words per response.
-6. If the user gave enough info (what they want + region + duration), skip questions and say "Let me design this for you."
+BAD response (too long):
+"Monaco is a beautiful choice for romance – there's something intoxicating about that blend of Mediterranean glamour... [300 words] ...What draws you most to Monaco?"
 
-**What you should ask (ONLY if not already provided):**
-- Where are you thinking? (offer 2-3 region suggestions that match their vibe)
-- How long? (suggest a duration that fits)
+GOOD response (concise):
+"Monaco for a romantic weekend — love that. Let me design this for you."
 
-**What you should NEVER ask:**
-- Budget (we figure that out later)
-- Best/worst travel memories (wastes time)
-- "What do you want to feel?" (they already told you)
-- Planning density / structure preferences
-- Weather alternatives
-
-**Remember:** You are a concierge, not a form. 3 messages maximum before delivering a script.`;
+You are a concierge at a yacht club. You speak in short, confident sentences. Not essays.`;
 }
 
 // ============================================================================
-// PROMPT HELPERS
+// HELPERS
 // ============================================================================
 
 function themeSelectPrompt() {
-  return `Tell me what you're craving — in your own words, or tap a theme below.\n\nBe specific: "adrenaline experiences with a dinner on a yacht" works better than "something nice."`;
+  return `Tell me what you're craving — in your own words, or tap a theme below.`;
 }
-
-function buildClarifyMessage(brief: Brief, rawDesire: string): string {
-  const parts: string[] = [];
-  
-  const hasDuration = !!brief.duration?.days;
-  const hasWhere = !!brief.where_at?.destination;
-  
-  if (hasDuration && hasWhere) {
-    return `Love it. I have everything I need — let me design this for you.`;
-  }
-  
-  if (!hasWhere && !hasDuration) {
-    parts.push('Two quick things so I can make this real:');
-    parts.push('1. **Where** are you thinking? (Or I can suggest the perfect fit)');
-    parts.push('2. **How long** — a weekend, a week, or longer?');
-  } else if (!hasWhere) {
-    parts.push('Where are you thinking? I can suggest the perfect region for this.');
-  } else if (!hasDuration) {
-    parts.push('How long do you have? A weekend, a week, or more?');
-  }
-  
-  return parts.join('\n');
-}
-
-function buildClarifyButtons(brief: Brief): StageTransitionResult['ui'] {
-  const hasWhere = !!brief.where_at?.destination;
-  const hasDuration = !!brief.duration?.days;
-
-  if (hasWhere && hasDuration) return undefined;
-
-  if (!hasDuration) {
-    return {
-      quickReplies: [
-        { id: 'wknd', label: 'Weekend', value: 'Weekend', kind: 'duration' as const, accent: 'navy' as const },
-        { id: 'wk', label: '7 days', value: '7 days', kind: 'duration' as const, accent: 'gold' as const },
-        { id: 'ten', label: '10 days', value: '10 days', kind: 'duration' as const, accent: 'amber' as const },
-        { id: 'two', label: '2 weeks', value: '14 days', kind: 'duration' as const, accent: 'emerald' as const },
-      ],
-    };
-  }
-
-  return {
-    quickReplies: [
-      { id: 'fr', label: 'French Riviera', value: 'French Riviera', kind: 'other' as const, accent: 'gold' as const },
-      { id: 'med', label: 'Mediterranean', value: 'Mediterranean', kind: 'other' as const, accent: 'navy' as const },
-      { id: 'car', label: 'Caribbean', value: 'Caribbean', kind: 'other' as const, accent: 'sky' as const },
-      { id: 'suggest', label: 'Surprise me', value: 'Suggest the best fit', kind: 'other' as const, accent: 'amber' as const },
-    ],
-  };
-}
-
-// ============================================================================
-// EXTRACTION HELPERS
-// ============================================================================
 
 function extractMonthLoose(input: string): string | null {
   const s = input.toLowerCase();
-  const months = [
-    'january', 'february', 'march', 'april', 'may', 'june',
-    'july', 'august', 'september', 'october', 'november', 'december',
-  ];
+  const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
   for (const m of months) {
     if (s.includes(m)) return m[0].toUpperCase() + m.slice(1);
   }
-  // Seasons
   if (s.includes('spring')) return 'Spring';
   if (s.includes('summer')) return 'Summer';
   if (s.includes('autumn') || s.includes('fall')) return 'Autumn';
@@ -343,6 +276,9 @@ function extractMonthLoose(input: string): string | null {
 function extractDaysLoose(input: string): number | null {
   const lower = input.toLowerCase();
   if (/\bweekend\b/.test(lower)) return 3;
+  if (/\blong weekend\b/.test(lower)) return 4;
+  if (/\b(a|one) week\b/.test(lower)) return 7;
+  if (/\btwo weeks\b/.test(lower)) return 14;
   const m = input.match(/\b(\d{1,2})\s*(day|days|nights?)\b/i);
   if (!m) return null;
   const n = Number(m[1]);
@@ -350,43 +286,36 @@ function extractDaysLoose(input: string): number | null {
 }
 
 function extractDestinationLoose(input: string): string | null {
-  const raw = input.trim();
-  if (!raw) return null;
-  const lower = raw.toLowerCase();
-  const known = [
-    'vienna', 'monaco', 'french riviera', 'amalfi', 'adriatic',
-    'caribbean', 'bahamas', 'dubai', 'greece', 'italy', 'croatia',
-    'mediterranean', 'maldives', 'thailand', 'ibiza', 'mallorca',
-    'mykonos', 'santorini', 'st tropez', 'capri', 'sardinia',
-    'corsica', 'sicily', 'bvi', 'usvi', 'antigua',
+  const lower = input.toLowerCase();
+  const known: [string, string][] = [
+    ['monaco', 'Monaco'], ['french riviera', 'French Riviera'], ['amalfi', 'Amalfi Coast'],
+    ['adriatic', 'Adriatic'], ['caribbean', 'Caribbean'], ['bahamas', 'Bahamas'],
+    ['dubai', 'Dubai'], ['greece', 'Greece'], ['italy', 'Italy'], ['croatia', 'Croatia'],
+    ['mediterranean', 'Mediterranean'], ['maldives', 'Maldives'], ['thailand', 'Thailand'],
+    ['ibiza', 'Ibiza'], ['mallorca', 'Mallorca'], ['mykonos', 'Mykonos'],
+    ['santorini', 'Santorini'], ['st tropez', 'St Tropez'], ['capri', 'Capri'],
+    ['sardinia', 'Sardinia'], ['corsica', 'Corsica'], ['sicily', 'Sicily'],
+    ['bvi', 'BVI'], ['usvi', 'USVI'], ['antigua', 'Antigua'], ['vienna', 'Vienna'],
+    ['balearics', 'Balearics'], ['cyclades', 'Cyclades'],
   ];
-  for (const k of known) {
-    if (lower.includes(k)) return k.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+  for (const [key, label] of known) {
+    if (lower.includes(key)) return label;
   }
-  // Heuristic: extract after "to/in/at"
-  const m = raw.match(/\b(?:to|in|at|around|near)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/);
+  const m = input.match(/\b(?:to|in|at|around|near)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/);
   if (m?.[1]) return m[1];
   return null;
 }
 
 function extractCompanionLoose(input: string): string | null {
   const s = input.toLowerCase();
-  if (s.includes('my wife')) return 'your wife';
+  if (s.includes('my wife') || s.includes('my spouse')) return 'your wife';
   if (s.includes('my husband')) return 'your husband';
   if (s.includes('my partner')) return 'your partner';
   if (s.includes('my girlfriend')) return 'your girlfriend';
   if (s.includes('my boyfriend')) return 'your boyfriend';
   if (s.includes('my family')) return 'your family';
   if (s.includes('my friends')) return 'your friends';
-  if (s.includes('couple')) return 'as a couple';
-  return null;
-}
-
-function extractPlanningDensityLoose(input: string): 'curated' | 'balanced' | 'free' | null {
-  const s = input.toLowerCase();
-  if (s.includes('curated') || s.includes('planned') || s.includes('structured')) return 'curated';
-  if (s.includes('balanced') || s.includes('mix')) return 'balanced';
-  if (s.includes('free') || s.includes('flexible') || s.includes('spontan')) return 'free';
+  if (s.includes('couple') || s.includes('romantic')) return 'as a couple';
   return null;
 }
 
@@ -394,7 +323,7 @@ function seemsLikeContainsPlaceName(input: string): boolean {
   const raw = input.trim();
   if (!raw) return false;
   if (/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(raw)) return false;
-  if (/\b(spring|summer|autumn|fall|winter)\b/i.test(raw)) return false;
+  if (/\b(spring|summer|autumn|fall|winter|weekend)\b/i.test(raw)) return false;
   return /\b[A-Z][a-z]{2,}\b/.test(raw);
 }
 
@@ -402,23 +331,12 @@ function themeUi(): StageTransitionResult['ui'] {
   return {
     quickReplies: [
       ...LEXA_THEMES_12.map((t) => ({
-        id: LEXA_THEME_UI[t].id,
-        label: t,
-        value: t,
-        kind: 'theme' as const,
-        icon: LEXA_THEME_UI[t].icon,
-        accent: LEXA_THEME_UI[t].accent,
-        hook: LEXA_THEME_COPY[t].hook,
+        id: LEXA_THEME_UI[t].id, label: t, value: t,
+        kind: 'theme' as const, icon: LEXA_THEME_UI[t].icon,
+        accent: LEXA_THEME_UI[t].accent, hook: LEXA_THEME_COPY[t].hook,
         description: LEXA_THEME_COPY[t].description,
       })),
-      {
-        id: 'custom_theme',
-        label: 'Describe your own theme',
-        value: '__custom_theme__',
-        kind: 'other' as const,
-        icon: 'Sparkles',
-        accent: 'gold' as const,
-      },
+      { id: 'custom_theme', label: 'Describe your own', value: '__custom_theme__', kind: 'other' as const, icon: 'Sparkles', accent: 'gold' as const },
     ],
     multiSelect: { enabled: true, max: 3, submitLabel: 'Continue' },
   };

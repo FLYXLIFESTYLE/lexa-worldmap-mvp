@@ -620,37 +620,14 @@ function buildIntakeGuidanceNote(state: SessionState, intakeStep?: string): stri
   const step = intakeStep ?? state.briefing_progress?.intake_step ?? 'THEME_SELECT';
 
   if (step === 'THEME_SELECT') {
-    return `**Current goal:** The user just started. They may describe what they want in their own words.
-
-**Your job:**
-1) Welcome them warmly (use their name if provided)
-2) If they gave input, REFLECT IT BACK SPECIFICALLY — do NOT give generic suggestions
-3) Ask at most 1-2 things: Where? How long?
-4) Maximum 150 words
-
-CRITICAL: If the user says "adrenaline + yacht dinner", your entire response must be about adrenaline experiences and yacht dinners. Do NOT suggest generic destinations or unrelated experiences.`;
+    return `STRICT: Maximum 30 words. Acknowledge what the user said in one sentence. If they didn't say anything yet, ask what they're craving. Do NOT list suggestions or destinations. Do NOT write paragraphs.`;
   }
 
   if (step === 'CLARIFY') {
-    const whatWeKnow = [];
-    if (state.brief?.theme) whatWeKnow.push(`Desire: ${state.brief.theme}`);
-    if (state.brief?.where_at?.destination) whatWeKnow.push(`Destination: ${state.brief.where_at.destination}`);
-    if (state.brief?.duration?.days) whatWeKnow.push(`Duration: ${state.brief.duration.days} days`);
-
-    return `**Current goal:** Get the 1-2 missing details to generate a script.
-
-What we know: ${whatWeKnow.join(', ') || 'Their desire (see user message)'}
-
-**Your job:**
-1) Acknowledge what they want — be SPECIFIC to their words
-2) Offer 2-3 ideas that MATCH what they described
-3) Ask ONLY for what's missing (where? how long?)
-4) Maximum 120 words
-
-Do NOT ask about budget, memories, feelings, structure, or alternatives. Just where and how long.`;
+    return `STRICT: Maximum 30 words. Ask ONE thing: where do they want to go? Nothing else. No suggestions, no lists, no paragraphs.`;
   }
   
-  return '';
+  return 'STRICT: Maximum 30 words. Be concise.';
 }
 
 function buildIntakeFallbackSystemPrompt(state: SessionState): string {
