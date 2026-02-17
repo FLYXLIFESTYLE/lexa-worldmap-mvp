@@ -11,7 +11,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles, Download, Share2, Calendar, MapPin, Heart, Anchor, User } from 'lucide-react';
@@ -19,6 +19,21 @@ import { LegalDisclaimer } from '@/components/legal-disclaimer';
 import type { Stage1Output } from '@/lib/script-engine/types';
 
 export default function ScriptPreviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-lexa-navy via-zinc-900 to-black flex items-center justify-center">
+        <div className="text-center">
+          <Sparkles className="w-16 h-16 text-lexa-gold mx-auto mb-4 animate-pulse" />
+          <p className="text-xl text-white">Loading your experience...</p>
+        </div>
+      </div>
+    }>
+      <ScriptPreviewContent />
+    </Suspense>
+  );
+}
+
+function ScriptPreviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();

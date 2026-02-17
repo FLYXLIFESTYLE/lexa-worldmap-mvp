@@ -5,15 +5,20 @@
  * guest_archetype, journey_type, and ritual_template nodes.
  *
  * Usage:
- *   npx ts-node scripts/run-script-engine-migration.ts
+ *   npx tsx scripts/run-script-engine-migration.ts
  *
  * Requires: NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD in .env
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 import neo4j from 'neo4j-driver';
+
+// ESM-compatible __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -27,47 +32,65 @@ if (!NEO4J_URI || !NEO4J_USER || !NEO4J_PASSWORD) {
 }
 
 async function runMigration() {
+  console.log('Connecting to Neo4j...');
+  console.log(`  URI: ${NEO4J_URI}`);
+
   const driver = neo4j.driver(NEO4J_URI!, neo4j.auth.basic(NEO4J_USER!, NEO4J_PASSWORD!));
 
   try {
     await driver.verifyConnectivity();
-    console.log('Connected to Neo4j');
+    console.log('Connected to Neo4j\n');
 
     const migrationPath = path.resolve(__dirname, '../neo4j/migrations/001-script-engine-schema.cypher');
     const cypher = fs.readFileSync(migrationPath, 'utf-8');
 
-    // Split into individual statements (separated by semicolons at end of line)
-    // Filter out comments and empty lines
+    // Split into individual statements by semicolons followed by newlines
     const statements = cypher
       .split(/;\s*\n/)
       .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('//'));
+      .filter(s => {
+        if (!s) return false;
+        // Skip blocks that are only comments
+        const nonCommentLines = s.split('\n').filter(line => !line.trim().startsWith('//') && line.trim().length > 0);
+        return nonCommentLines.length > 0;
+      });
 
-    console.log(`Found ${statements.length} Cypher statements to execute`);
+    console.log(`Found ${statements.length} Cypher statements to execute\n`);
 
     const session = driver.session();
     let success = 0;
+    let skipped = 0;
     let failed = 0;
 
     for (let i = 0; i < statements.length; i++) {
       const stmt = statements[i];
-      // Skip pure comment blocks
-      if (stmt.split('\n').every(line => line.trim().startsWith('//'))) continue;
+
+      // Remove comment lines from the statement before running
+      const cleanStmt = stmt
+        .split('\n')
+        .filter(line => !line.trim().startsWith('//'))
+        .join('\n')
+        .trim();
+
+      if (!cleanStmt) {
+        skipped++;
+        continue;
+      }
 
       try {
-        await session.run(stmt);
+        await session.run(cleanStmt);
         success++;
-        // Print progress every 10 statements
         if (success % 10 === 0) {
-          console.log(`  Progress: ${success}/${statements.length} executed`);
+          console.log(`  Progress: ${success} executed, ${i + 1}/${statements.length} processed`);
         }
       } catch (err: any) {
-        // Constraints/indexes may already exist — that's fine
-        if (err.message?.includes('already exists') || err.message?.includes('EquivalentSchemaRuleAlreadyExists')) {
-          success++;
+        const msg = err.message || '';
+        // Constraints/indexes may already exist
+        if (msg.includes('already exists') || msg.includes('EquivalentSchemaRuleAlreadyExists')) {
+          skipped++;
         } else {
-          console.error(`  Statement ${i + 1} FAILED:`, err.message);
-          console.error(`  Statement preview: ${stmt.slice(0, 100)}...`);
+          console.error(`  FAILED statement ${i + 1}: ${msg}`);
+          console.error(`  Preview: ${cleanStmt.slice(0, 120)}...`);
           failed++;
         }
       }
@@ -77,24 +100,39 @@ async function runMigration() {
 
     console.log('\n--- Migration Complete ---');
     console.log(`Successful: ${success}`);
+    console.log(`Skipped (already exist): ${skipped}`);
     console.log(`Failed: ${failed}`);
 
-    // Verify the data was created
+    // Verify
     const verifySession = driver.session();
-    const arcCount = await verifySession.run('MATCH (ea:experience_arc) RETURN count(ea) AS count');
-    const archetypeCount = await verifySession.run('MATCH (ga:guest_archetype) RETURN count(ga) AS count');
-    const phaseCount = await verifySession.run('MATCH (ap:arc_phase) RETURN count(ap) AS count');
-    const jtCount = await verifySession.run('MATCH (jt:journey_type) RETURN count(jt) AS count');
-    const ritualCount = await verifySession.run('MATCH (rt:ritual_template) RETURN count(rt) AS count');
+    const counts = await Promise.all([
+      verifySession.run('MATCH (ea:experience_arc) RETURN count(ea) AS c'),
+      verifySession.run('MATCH (ga:guest_archetype) RETURN count(ga) AS c'),
+      verifySession.run('MATCH (ap:arc_phase) RETURN count(ap) AS c'),
+      verifySession.run('MATCH (jt:journey_type) RETURN count(jt) AS c'),
+      verifySession.run('MATCH (rt:ritual_template) RETURN count(rt) AS c'),
+    ]);
+
+    const toNum = (r: any) => {
+      const val = r.records[0].get('c');
+      return typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
+    };
 
     console.log('\n--- Verification ---');
-    console.log(`Experience Arcs: ${arcCount.records[0].get('count').toNumber()}`);
-    console.log(`Guest Archetypes: ${archetypeCount.records[0].get('count').toNumber()}`);
-    console.log(`Arc Phases: ${phaseCount.records[0].get('count').toNumber()}`);
-    console.log(`Journey Types: ${jtCount.records[0].get('count').toNumber()}`);
-    console.log(`Ritual Templates: ${ritualCount.records[0].get('count').toNumber()}`);
+    console.log(`Experience Arcs:    ${toNum(counts[0])} (expected 7)`);
+    console.log(`Guest Archetypes:   ${toNum(counts[1])} (expected 7)`);
+    console.log(`Arc Phases:         ${toNum(counts[2])} (expected 28)`);
+    console.log(`Journey Types:      ${toNum(counts[3])} (expected 4)`);
+    console.log(`Ritual Templates:   ${toNum(counts[4])} (expected 4)`);
 
     await verifySession.close();
+
+    if (failed > 0) {
+      console.log('\nSome statements failed. Check errors above.');
+      process.exit(1);
+    } else {
+      console.log('\nMigration completed successfully!');
+    }
   } finally {
     await driver.close();
   }

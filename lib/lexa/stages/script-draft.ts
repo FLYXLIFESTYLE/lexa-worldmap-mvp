@@ -33,7 +33,7 @@ export async function generateScriptEngineOutput(
     // Dynamic import to avoid circular dependency issues
     const { generateStage1 } = await import('@/lib/script-engine/stages/stage1');
 
-    const region = state.brief.where_at?.destination || state.brief.where_at?.region || 'French Riviera';
+    const region = state.brief.where_at?.destination || state.brief.where_at?.regions?.[0] || 'French Riviera';
     const duration = state.brief.duration?.days || 8;
 
     const stage1 = await generateStage1({

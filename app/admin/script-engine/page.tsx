@@ -19,7 +19,7 @@ export default function ScriptEnginePage() {
   ];
 
   return (
-    <PortalShell>
+    <PortalShell title="Experience Script Engine" subtitle="Create, generate, and manage LEXA experience scripts">
       <AdminNav />
 
       <div className="max-w-6xl mx-auto px-4 py-8">

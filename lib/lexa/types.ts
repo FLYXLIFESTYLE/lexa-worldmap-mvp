@@ -140,13 +140,17 @@ export interface SessionState {
     signature_moments: string[];
     protocols: string[];
     legacy_artifact: string | null;
+    // Script Engine fields (added when arc matching generates a script)
+    engine_output?: unknown;
+    arc_code?: string | null;
   };
   
   briefing_progress: {
-    fields_collected: string[]; // Track which fields have been collected
+    fields_collected: string[];
     suggestions_offered: boolean;
-    retry_count: number; // For MIRROR stage retries
-    intake_step?: 'THEME_SELECT' | 'THEME_CUSTOM' | 'THEME_WHY' | 'MEMORY' | 'HOOK_CONFIRM' | 'LOGISTICS';
+    retry_count: number;
+    intake_step?: 'THEME_SELECT' | 'THEME_CUSTOM' | 'THEME_WHY' | 'MEMORY' | 'HOOK_CONFIRM' | 'LOGISTICS' | 'CLARIFY' | 'DONE';
+    raw_user_desire?: string;
     intake_questions_asked?: number; // counts “big questions” asked before the hook (target: 3)
     logistics_step?: 'DURATION' | 'WEEKEND_PATTERN' | 'STRUCTURE' | 'WHEN' | 'WHERE' | 'BUDGET' | 'ALTERNATIVES' | 'DONE';
     seasonal_guidance_shown?: {
