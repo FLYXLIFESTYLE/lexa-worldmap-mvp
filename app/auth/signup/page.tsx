@@ -11,6 +11,7 @@ import Link from 'next/link';
 import LuxuryBackground from '@/components/luxury-background';
 
 export default function SignUpPage() {
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -25,11 +26,15 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
+      const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, '');
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${baseUrl}/auth/callback`,
+          data: {
+            full_name: fullName.trim() || null,
+          },
         },
       });
 
@@ -99,6 +104,21 @@ export default function SignUpPage() {
                   {error}
                 </div>
               )}
+
+              <div>
+                <label htmlFor="fullName" className="block text-sm font-semibold text-zinc-700 mb-2">
+                  Full Name
+                </label>
+                <input
+                  id="fullName"
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  className="w-full rounded-xl border-2 border-zinc-200 px-4 py-3 text-zinc-900 focus:border-lexa-gold focus:outline-none focus:ring-2 focus:ring-lexa-gold/20 transition-all"
+                  placeholder="Your full name"
+                />
+              </div>
 
               <div>
                 <label htmlFor="email" className="block text-sm font-semibold text-zinc-700 mb-2">
