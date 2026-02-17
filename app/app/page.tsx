@@ -52,6 +52,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [stage, setStage] = useState('WELCOME');
   const [userEmail, setUserEmail] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
   const [showResetModal, setShowResetModal] = useState(false);
   const starterPrompts = [
     {
@@ -219,6 +220,27 @@ export default function ChatPage() {
       
       setUserEmail(user.email || '');
       
+      // Load the user's real name from profile or auth metadata
+      let name = user.email?.split('@')[0] || '';
+      if (user.user_metadata?.full_name) {
+        name = user.user_metadata.full_name;
+      }
+      // Try to get the name from the profile API
+      try {
+        const profileRes = await fetch('/api/user/profile');
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          if (profileData.profile?.full_name) {
+            name = profileData.profile.full_name;
+          } else if (profileData.profile?.first_name) {
+            name = profileData.profile.first_name;
+          }
+        }
+      } catch {
+        // Fallback already set
+      }
+      setUserName(name);
+      
       if (messages.length === 0) await startConversation();
     }
     
@@ -284,8 +306,8 @@ export default function ChatPage() {
                 className="text-right hover:opacity-80 transition-opacity cursor-pointer"
                 title="Go to Account Dashboard"
               >
-                <p className="text-sm font-medium text-zinc-100">{userEmail?.split('@')[0]}</p>
-                <p className="text-xs text-zinc-400">{userEmail?.split('@')[1]}</p>
+                <p className="text-sm font-medium text-zinc-100">{userName || userEmail?.split('@')[0]}</p>
+                <p className="text-xs text-zinc-400">{userEmail}</p>
               </button>
               <button
                 onClick={handleSignOut}

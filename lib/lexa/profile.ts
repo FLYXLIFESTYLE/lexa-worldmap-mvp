@@ -1,15 +1,21 @@
 import type { SessionState } from './types';
+import type { EmotionalExtraction } from './emotional-extractor';
 
 /**
  * Convert the current session state into a durable user profile patch.
- * Keep this conservative: store what the user actually said + stable inferences.
+ * Now includes data from the emotional extractor and the Script Engine.
  */
-export function profilePatchFromState(state: SessionState) {
+export function profilePatchFromState(
+  state: SessionState,
+  emotionalExtraction?: EmotionalExtraction | null
+) {
   const themes = (state.brief?.themes?.length ? state.brief.themes : state.brief?.theme ? [state.brief.theme] : [])
     .filter(Boolean) as string[];
 
-  const emotional_profile = {
+  // Build emotional profile — combine session state + extraction
+  const emotional_profile: Record<string, unknown> = {
     themes,
+    // From session state (legacy fields)
     desired_feelings: state.emotions?.desired ?? [],
     avoid_fears: state.emotions?.avoid_fears ?? [],
     best_experiences: state.brief?.best_experiences ?? [],
@@ -19,6 +25,28 @@ export function profilePatchFromState(state: SessionState) {
     signals: state.signals ?? {},
     updated_from_stage: state.stage,
   };
+
+  // Merge in emotional extraction data (richer, from Claude analysis)
+  if (emotionalExtraction) {
+    emotional_profile.desired_feelings = mergeUnique(
+      emotional_profile.desired_feelings as string[],
+      emotionalExtraction.desired_feelings
+    );
+    emotional_profile.avoid_fears = mergeUnique(
+      emotional_profile.avoid_fears as string[],
+      emotionalExtraction.avoid_fears
+    );
+    emotional_profile.life_context = emotionalExtraction.life_context;
+    emotional_profile.personality_signals = emotionalExtraction.personality_signals;
+    emotional_profile.companion_type = emotionalExtraction.companion_type;
+    emotional_profile.urgency = emotionalExtraction.urgency;
+  }
+
+  // Include Script Engine arc code if available
+  const arcCode = (state.script as Record<string, unknown>)?.arc_code;
+  if (arcCode) {
+    emotional_profile.matched_arc_code = arcCode;
+  }
 
   const preferences = {
     language: state.client?.language ?? 'en',
@@ -30,11 +58,13 @@ export function profilePatchFromState(state: SessionState) {
   return { emotional_profile, preferences };
 }
 
-export function mergeProfileJson(oldObj: any, patch: any) {
-  // Shallow merge, but arrays overwrite (to keep “latest truth” simple).
+export function mergeProfileJson(oldObj: unknown, patch: unknown) {
   const safeOld = oldObj && typeof oldObj === 'object' ? oldObj : {};
   const safePatch = patch && typeof patch === 'object' ? patch : {};
   return { ...safeOld, ...safePatch };
 }
 
-
+function mergeUnique(a: string[], b: string[]): string[] {
+  const set = new Set([...(a || []), ...(b || [])].map(s => String(s).toLowerCase().trim()).filter(Boolean));
+  return Array.from(set);
+}

@@ -18,6 +18,15 @@ type ToolCard = {
 // Section 1: Active Tools (for now)
 const activeTools: ToolCard[] = [
   {
+    id: 'script-engine',
+    name: 'Script Engine',
+    description: 'Create, generate, and manage LEXA experience scripts for the marketplace',
+    icon: '🎭',
+    href: '/admin/script-engine',
+    accentClass: 'bg-lexa-gold',
+    features: ['Create experiences', 'Batch generate', 'Arc matching', '5-stage documents'],
+  },
+  {
     id: 'users',
     name: 'User Management',
     description: 'Manage user accounts, roles, and permissions',

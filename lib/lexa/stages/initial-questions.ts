@@ -1,17 +1,16 @@
 /**
- * INITIAL_QUESTIONS Stage (Experience-first concierge intake)
+ * INITIAL_QUESTIONS Stage — Streamlined 3-message flow
  *
- * Flow:
- * 1) User shares intent in their own words (themes optional)
- * 2) Ask why + what they want to feel (and what to avoid)
- * 3) Ask for best recent travel memory (+ optional worst)
- * 4) Present a concierge "hook" + high-level emotional direction + signature highlights (no destination required)
- * 5) If user confirms direction, proceed to logistics (duration / timing / destination / budget)
+ * NEW FLOW (3 messages to script):
+ * 1. User shares what they want (any format — "adrenaline + yacht dinner", themes, free text)
+ * 2. LEXA acknowledges + asks 1-2 clarifying questions (region, duration, who's joining)
+ * 3. User answers → LEXA generates Stage 1 script immediately via Script Engine
+ *
+ * The old 12-step flow is replaced. We ask the minimum, then generate and refine.
  */
 
 import { SessionState, StageTransitionResult, Brief } from '../types';
 import { LEXA_THEMES_12, LEXA_THEME_UI, LEXA_THEME_COPY, parseThemeSelection } from '../themes';
-import { searchDestinationEvents, searchWeather } from '@/lib/integrations/tavily-client';
 import { extractBriefField } from '@/lib/lexa/claude-client';
 
 export async function processInitialQuestionsStage(
@@ -19,8 +18,6 @@ export async function processInitialQuestionsStage(
   userInput: string
 ): Promise<StageTransitionResult> {
   const intakeStep = state.briefing_progress.intake_step ?? 'THEME_SELECT';
-  const questionsAsked = state.briefing_progress.intake_questions_asked ?? 0;
-  const logisticsStep = state.briefing_progress.logistics_step ?? 'DURATION';
 
   const setBrief = (patch: Partial<Brief>) => ({ ...state.brief, ...patch });
   const setProgress = (patch: Partial<SessionState['briefing_progress']>) => ({
@@ -28,7 +25,7 @@ export async function processInitialQuestionsStage(
     ...patch,
   });
 
-  // User can type "restart" any time during intake.
+  // User can type "restart" any time
   if (userInput.trim().toLowerCase() === 'restart') {
     return {
       nextStage: 'INITIAL_QUESTIONS',
@@ -43,741 +40,362 @@ export async function processInitialQuestionsStage(
     };
   }
 
+  // ========================================================================
+  // STEP 1: User shares initial desire (THEME_SELECT)
+  // Capture EVERYTHING from their first message, then ask clarifiers
+  // ========================================================================
   if (intakeStep === 'THEME_SELECT') {
-    // Even before themes are chosen, users often write a full request (e.g. "Weekend in Vienna with my wife").
-    // We opportunistically capture logistics hints so LEXA doesn't ignore them later.
-    const earlyDestination = extractDestinationLoose(userInput);
-    const earlyCompanion = extractCompanionLoose(userInput);
-    let nextBrief = state.brief;
-    if ((earlyDestination || earlyCompanion) && !state.brief.where_at) {
-      const hints = [earlyCompanion].filter(Boolean).join(' ');
-      nextBrief = setBrief({
-        where_at: {
-          destination: earlyDestination ?? null,
-          regions: [],
-          hints: hints || null,
-        },
-      });
-    }
-
-    if (userInput.trim() === '__custom_theme__') {
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          briefing_progress: setProgress({ intake_step: 'THEME_CUSTOM', intake_questions_asked: questionsAsked }),
-        },
-        message:
-          `Perfect.\n\nDescribe the experience in your own words - even if it feels messy.\n\nWhat do you want the story to feel like, and what do you absolutely *not* want?`,
-      };
-    }
-
+    // Parse theme card selections
     const selected = parseThemeSelection(userInput);
-    const hasSubstantiveInput = isSubstantiveInput(userInput, earlyDestination, earlyCompanion);
-    if (selected.length === 0) {
-      if (hasSubstantiveInput) {
-        return {
-          nextStage: 'INITIAL_QUESTIONS',
-          updatedState: {
-            brief: nextBrief,
-            briefing_progress: setProgress({ intake_step: 'THEME_WHY', intake_questions_asked: 1 }),
-          },
-          message: withAckAndRecap(userInput, nextBrief, state.travel_preferences ?? {}, themeWhyPrompt(selected)),
-        };
-      }
+    
+    // Extract all hints from free text
+    const destination = extractDestinationLoose(userInput);
+    const companion = extractCompanionLoose(userInput);
+    const days = extractDaysLoose(userInput);
+    const month = extractMonthLoose(userInput);
+
+    // Build brief from everything the user gave us
+    const nextBrief: Brief = { ...state.brief };
+    
+    if (selected.length > 0) {
+      nextBrief.theme = selected[0];
+      nextBrief.themes = selected;
+    }
+    
+    if (destination) {
+      nextBrief.where_at = { destination, regions: [], hints: companion || null };
+    } else if (companion) {
+      nextBrief.where_at = { ...(nextBrief.where_at || { destination: null, regions: [] }), hints: companion };
+    }
+    
+    if (days) {
+      nextBrief.duration = { days, flexibility: 'flexible' };
+    }
+    
+    if (month) {
+      nextBrief.when_at = { timeframe: month, dates: null, flexibility: 'flexible_by_days' };
+    }
+
+    // Store the user's raw text for the Script Engine arc matcher
+    const rawUserDesire = userInput.trim();
+    
+    const isSubstantive = rawUserDesire.length > 10 || selected.length > 0 || destination;
+
+    if (!isSubstantive) {
+      // Empty or greeting-only input — show themes
       return {
         nextStage: 'INITIAL_QUESTIONS',
         updatedState: {
           brief: nextBrief,
-          briefing_progress: setProgress({ intake_step: 'THEME_SELECT', intake_questions_asked: questionsAsked }),
+          briefing_progress: setProgress({ intake_step: 'THEME_SELECT', intake_questions_asked: 0 }),
         },
         message: themeSelectPrompt(),
         ui: themeUi(),
       };
     }
 
-    const primary = selected[0] ?? null;
+    // Substantive input received — move to CLARIFY
+    // Store the raw desire for arc matching later
     return {
       nextStage: 'INITIAL_QUESTIONS',
       updatedState: {
-        brief: { ...nextBrief, theme: primary, themes: selected },
-        briefing_progress: setProgress({ intake_step: 'THEME_WHY', intake_questions_asked: 1 }),
+        brief: nextBrief,
+        briefing_progress: setProgress({
+          intake_step: 'CLARIFY',
+          intake_questions_asked: 1,
+          raw_user_desire: rawUserDesire,
+        }),
       },
-      message: themeWhyPrompt(selected),
+      message: buildClarifyMessage(nextBrief, rawUserDesire),
+      ui: buildClarifyButtons(nextBrief),
     };
   }
 
-  if (intakeStep === 'THEME_CUSTOM') {
-    const custom = userInput.trim();
-    if (!custom) {
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          briefing_progress: setProgress({ intake_step: 'THEME_CUSTOM', intake_questions_asked: questionsAsked }),
-        },
-        message: `Take your time - a few words is enough.\n\nWhat do you want this to feel like?`,
-      };
-    }
-
-    // Store as primary theme text; we keep themes[] empty so it doesn't pretend to map to canonical ones yet.
-    return {
-      nextStage: 'INITIAL_QUESTIONS',
-      updatedState: {
-        brief: setBrief({ theme: custom, themes: [] }),
-        briefing_progress: setProgress({ intake_step: 'THEME_WHY', intake_questions_asked: 1 }),
-      },
-      message:
-        `Good. I have your direction.\n\nOne gentle question so I can design this accurately: why this theme, *now*?\nWhat do you want to feel - and what do you want to avoid?`,
-    };
-  }
-
-  if (intakeStep === 'THEME_WHY') {
-    const desired = extractFeelings(userInput);
-    const avoid = extractAvoid(userInput);
-
-    return {
-      nextStage: 'INITIAL_QUESTIONS',
-      updatedState: {
-        emotions: {
-          ...state.emotions,
-          desired: mergeUnique(state.emotions.desired, desired),
-          avoid_fears: mergeUnique(state.emotions.avoid_fears, avoid),
-        },
-        briefing_progress: setProgress({ intake_step: 'MEMORY', intake_questions_asked: 2 }),
-      },
-      message: memoryPrompt(),
-    };
-  }
-
-  if (intakeStep === 'MEMORY') {
-    const best = userInput.trim();
-    const bestItem = best ? [{ experience: best, why: '' }] : [];
-
-    const selectedThemes = state.brief.themes?.length ? state.brief.themes : state.brief.theme ? [state.brief.theme] : [];
-    const destinationHint = state.brief.where_at?.destination ?? null;
-    const companionHint = state.brief.where_at?.hints ? extractCompanionLoose(state.brief.where_at.hints) : null;
-
-    const hook = buildHook({
-      themes: selectedThemes,
-      desiredFeelings: state.emotions.desired,
-      bestMoment: best || null,
-      destination: destinationHint,
-      companion: companionHint,
-    });
-    const highlights = buildSignatureHighlights({
-      themes: selectedThemes,
-      desiredFeelings: state.emotions.desired,
-      destination: destinationHint,
-      companion: companionHint,
-    });
-
-    return {
-      nextStage: 'INITIAL_QUESTIONS',
-      updatedState: {
-        brief: setBrief({ best_experiences: [...state.brief.best_experiences, ...bestItem] }),
-        micro_wow: { delivered: true, hook },
-        script: { ...state.script, signature_moments: highlights },
-        briefing_progress: setProgress({ intake_step: 'HOOK_CONFIRM', intake_questions_asked: 3 }),
-      },
-      message: hookConfirmPrompt({
-        themes: selectedThemes,
-        hook,
-        highlights,
-        isTrial: true,
-      }),
-    };
-  }
-
-  if (intakeStep === 'HOOK_CONFIRM') {
-    const yes = looksLikeYes(userInput);
-    const no = looksLikeNo(userInput);
-
-    if (no) {
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          briefing_progress: setProgress({ intake_step: 'THEME_SELECT', intake_questions_asked: 0 }),
-          micro_wow: { ...state.micro_wow, delivered: false, hook: null },
-          script: { ...state.script, signature_moments: [] },
-        },
-        message: `Understood. Let’s recalibrate - quietly and precisely.\n\nWhat kind of experience calls to you instead? (Tap up to three themes below.)`,
-        ui: themeUi(),
-      };
-    }
-
-    if (!yes) {
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          briefing_progress: setProgress({ intake_step: 'HOOK_CONFIRM', intake_questions_asked: 3 }),
-        },
-        message: `Quick check - does that direction feel right?`,
-        ui: {
-          quickReplies: [
-            { id: 'yes', label: 'Yes', value: 'yes', kind: 'yes_no', accent: 'gold' },
-            { id: 'no', label: 'Not quite', value: 'no', kind: 'yes_no', accent: 'navy' },
-          ],
-        },
-      };
-    }
-
-    return {
-      nextStage: 'INITIAL_QUESTIONS',
-      updatedState: {
-        briefing_progress: setProgress({ intake_step: 'LOGISTICS', intake_questions_asked: 3, logistics_step: 'DURATION' }),
-      },
-      message: durationPrompt(),
-      ui: {
-        quickReplies: [
-          { id: 'wknd', label: 'Weekend', value: 'Weekend', kind: 'duration', accent: 'navy' },
-          { id: 'wk', label: '5–7 days', value: '7 days', kind: 'duration', accent: 'gold' },
-          { id: 'ten', label: '10 days', value: '10 days', kind: 'duration', accent: 'amber' },
-          { id: 'two', label: '2 weeks', value: '14 days', kind: 'duration', accent: 'emerald' },
-        ],
-      },
-    };
-  }
-
-  if (intakeStep === 'LOGISTICS') {
-    // Adaptive parsing: user may answer multiple items at once.
+  // ========================================================================
+  // STEP 2: Ask what's missing (CLARIFY)
+  // User already told us what they want. Ask for missing pieces only.
+  // ========================================================================
+  if (intakeStep === 'CLARIFY') {
+    // Parse the clarifying answers
+    const destination = extractDestinationLoose(userInput);
     const days = extractDaysLoose(userInput);
     const month = extractMonthLoose(userInput);
-    const budget = extractBudgetLoose(userInput);
-    const destination = extractDestinationLoose(userInput);
     const companion = extractCompanionLoose(userInput);
+    const density = extractPlanningDensityLoose(userInput);
 
-    const next: Partial<SessionState> = {};
-    const nextBrief: any = { ...state.brief };
-    const nextPrefs: any = { ...(state.travel_preferences ?? {}) };
+    const nextBrief: Brief = { ...state.brief };
 
-    if (days && !nextBrief.duration) nextBrief.duration = { days, flexibility: 'flexible' };
-    if (month && !nextBrief.when_at) {
+    if (destination && !nextBrief.where_at?.destination) {
+      nextBrief.where_at = { destination, regions: [], hints: nextBrief.where_at?.hints || null };
+    }
+    if (days && !nextBrief.duration?.days) {
+      nextBrief.duration = { days, flexibility: 'flexible' };
+    }
+    if (month && !nextBrief.when_at?.timeframe) {
       nextBrief.when_at = { timeframe: month, dates: null, flexibility: 'flexible_by_days' };
     }
-    if (destination && !nextBrief.where_at?.destination) {
-      nextBrief.where_at = { destination, regions: [], hints: '' };
-    }
-    if (companion) {
+    if (companion && !nextBrief.where_at?.hints) {
       if (!nextBrief.where_at) nextBrief.where_at = { destination: null, regions: [], hints: companion };
-      if (!nextBrief.where_at.hints) nextBrief.where_at.hints = companion;
-    }
-    if (budget && !nextBrief.budget) {
-      nextBrief.budget = { amount: budget.amount, currency: budget.currency, sensitivity: null };
+      else nextBrief.where_at.hints = companion;
     }
 
-    // Planning density preference (curated vs flexible)
-    const density = extractPlanningDensityLoose(userInput);
-    if (density && !nextPrefs.planning_density) nextPrefs.planning_density = density;
-
-    // Alternatives preference
-    const includeAlt = extractIncludeAlternativesLoose(userInput);
-    if (typeof includeAlt === 'boolean' && typeof nextPrefs.include_alternatives !== 'boolean') {
-      nextPrefs.include_alternatives = includeAlt;
-    }
-
-    next.brief = nextBrief;
-    next.travel_preferences = nextPrefs;
-
-    // If our heuristic can't see the destination, use Claude extraction as a safety net (best-effort).
-    // This prevents "I already said Vienna" loops when the user provides a real place name.
-    if (!nextBrief.where_at?.destination && !destination && seemsLikeContainsPlaceName(userInput)) {
+    // Use Claude to extract destination if our heuristic missed it
+    if (!nextBrief.where_at?.destination && seemsLikeContainsPlaceName(userInput)) {
       try {
         const extracted = await extractBriefField({
           userMessage: userInput,
           fieldName: 'where',
           currentState: state,
         });
-        const value = extracted.fieldValue as any;
-        const dest =
-          typeof value === 'string'
-            ? value
-            : value && typeof value === 'object' && typeof value.destination === 'string'
-              ? value.destination
-              : null;
+        const value = extracted.fieldValue as Record<string, unknown>;
+        const dest = typeof value === 'string' ? value :
+          value && typeof value === 'object' && typeof value.destination === 'string' ? value.destination : null;
         if (dest) {
           nextBrief.where_at = {
             destination: String(dest),
             regions: Array.isArray(value?.regions) ? value.regions.map(String) : [],
-            hints: typeof value?.hints === 'string' ? value.hints : nextBrief.where_at?.hints ?? null,
+            hints: nextBrief.where_at?.hints || null,
           };
-          next.brief = nextBrief;
         }
-      } catch {
-        // ignore - heuristic-only fallback
-      }
+      } catch { /* ignore */ }
     }
 
-    // If we’re in a dedicated "weekend pattern" question, handle that before deciding next prompts.
-    if (logisticsStep === 'WEEKEND_PATTERN' && !nextBrief.duration?.days) {
-      const weekendDays = extractWeekendPatternDays(userInput);
-      if (!weekendDays) {
-        return {
-          nextStage: 'INITIAL_QUESTIONS',
-          updatedState: {
-            ...next,
-            briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'WEEKEND_PATTERN' }),
-          },
-          message: withAckAndRecap(userInput, nextBrief, nextPrefs, weekendPatternPrompt()),
-          ui: weekendPatternUi(),
-        };
-      }
-
-      nextBrief.duration = { days: weekendDays, flexibility: 'exact' };
-      next.brief = nextBrief;
-    }
-
-    // Decide what to ask next based on missing fields.
+    // Check what we still need
     const hasDuration = !!nextBrief.duration?.days;
-    const hasWhen = !!nextBrief.when_at?.timeframe;
     const hasWhere = !!nextBrief.where_at?.destination;
-    const hasBudget = !!nextBrief.budget?.amount;
-    const hasStructure = !!nextPrefs.planning_density;
-    const hasAlternativesPref = typeof nextPrefs.include_alternatives === 'boolean';
 
-    // If user gave a destination + month, apply gentle seasonal guidance.
-    if (hasWhere && hasWhen) {
-      const seasonal = seasonalGuidance(nextBrief.where_at.destination, nextBrief.when_at.timeframe);
-      const alreadyShownForThisCombo =
-        !!state.briefing_progress.seasonal_guidance_shown &&
-        state.briefing_progress.seasonal_guidance_shown.destination.toLowerCase() ===
-          String(nextBrief.where_at.destination).toLowerCase() &&
-        state.briefing_progress.seasonal_guidance_shown.month.toLowerCase() ===
-          String(nextBrief.when_at.timeframe).toLowerCase();
-
-      if (seasonal?.type === 'caution') {
-        // Show this warning once per (destination, month) combo, otherwise it becomes a loop.
-        if (alreadyShownForThisCombo) {
-          // continue
-        } else {
-        return {
-          nextStage: 'INITIAL_QUESTIONS',
-          updatedState: {
-            ...next,
-            briefing_progress: setProgress({
-              intake_step: 'LOGISTICS',
-              logistics_step: logisticsStep,
-              seasonal_guidance_shown: {
-                destination: String(nextBrief.where_at.destination),
-                month: String(nextBrief.when_at.timeframe),
-              },
-            }),
-          },
-          message: seasonal.message + `\n\nAlso: if weather shifts or plans change, you can always come back here and I'll give you elegant alternatives that still fit your themes.`,
-        };
-        }
-      }
+    // If we still don't have duration AND destination, ask once more
+    if (!hasDuration && !hasWhere) {
+      return {
+        nextStage: 'INITIAL_QUESTIONS',
+        updatedState: {
+          brief: nextBrief,
+          briefing_progress: setProgress({
+            intake_step: 'CLARIFY',
+            intake_questions_asked: 2,
+          }),
+        },
+        message: `Got it. Two quick things so I can design this properly:\n\n1. **Where** are you thinking? (Or I can suggest the perfect fit)\n2. **How long** — a weekend, a week, or longer?`,
+        ui: {
+          quickReplies: [
+            { id: 'fr', label: 'French Riviera', value: 'French Riviera, 7 days', kind: 'other' as const, accent: 'gold' as const },
+            { id: 'med', label: 'Mediterranean', value: 'Mediterranean, 8 days', kind: 'other' as const, accent: 'navy' as const },
+            { id: 'car', label: 'Caribbean', value: 'Caribbean, 7 days', kind: 'other' as const, accent: 'sky' as const },
+            { id: 'suggest', label: 'Surprise me', value: 'Suggest the best fit, 7 days', kind: 'other' as const, accent: 'amber' as const },
+          ],
+        },
+      };
     }
 
-    // Optional Tavily real-time snapshot (best-effort, only when we have where+when).
-    // This is intentionally small so it feels like concierge context, not a report.
-    let realtimeNote: string | null = null;
-    if (hasWhere && hasWhen) {
-      try {
-        const dest = String(nextBrief.where_at.destination);
-        const m = String(nextBrief.when_at.timeframe);
-        const [w, e] = await Promise.all([searchWeather(dest, m), searchDestinationEvents(dest, m)]);
-        const weatherLine = w.results?.[0]?.title ? `Weather: ${w.results[0].title}` : null;
-        const eventLine = e.results?.[0]?.title ? `Events: ${e.results[0].title}` : null;
-        const lines = [weatherLine, eventLine].filter(Boolean);
-        if (lines.length) realtimeNote = `Quick real-time snapshot (I can refine later):\n- ${lines.join('\n- ')}`;
-      } catch {
-        // Ignore if Tavily isn't configured or request fails.
-      }
-    }
-
+    // Default duration if missing (don't ask again — just default to 7 days)
     if (!hasDuration) {
-      // Special case: "Weekend" should not become "3 days" - ask the natural follow-up.
-      if (looksLikeWeekend(userInput)) {
-        return {
-          nextStage: 'INITIAL_QUESTIONS',
-          updatedState: {
-            ...next,
-            briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'WEEKEND_PATTERN' }),
-          },
-          message: withAckAndRecap(userInput, nextBrief, nextPrefs, weekendPatternPrompt()),
-          ui: weekendPatternUi(),
-        };
-      }
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          ...next,
-          briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'DURATION' }),
-        },
-        message: withAckAndRecap(userInput, nextBrief, nextPrefs, durationPrompt()),
-        ui: {
-          quickReplies: [
-            { id: 'wknd', label: 'Weekend', value: 'Weekend', kind: 'duration', accent: 'navy' },
-            { id: 'wk', label: '5–7 days', value: '7 days', kind: 'duration', accent: 'gold' },
-            { id: 'ten', label: '10 days', value: '10 days', kind: 'duration', accent: 'amber' },
-            { id: 'two', label: '2 weeks', value: '14 days', kind: 'duration', accent: 'emerald' },
-          ],
-        },
-      };
+      nextBrief.duration = { days: 7, flexibility: 'flexible' };
     }
 
-    if (!hasStructure) {
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          ...next,
-          briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'STRUCTURE' }),
-        },
-        message: withAckAndRecap(userInput, nextBrief, nextPrefs, structurePrompt(nextBrief.duration?.days)),
-        ui: {
-          quickReplies: [
-            { id: 'curated', label: 'Curated', value: 'curated', kind: 'structure', accent: 'gold' },
-            { id: 'balanced', label: 'Balanced', value: 'balanced', kind: 'structure', accent: 'navy' },
-            { id: 'free', label: 'Mostly free', value: 'free', kind: 'structure', accent: 'emerald' },
-          ],
-        },
-      };
-    }
-
-    if (!hasWhen) {
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          ...next,
-          briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'WHEN' }),
-        },
-        message: withAckAndRecap(userInput, nextBrief, nextPrefs, whenPrompt(nextBrief.duration?.days)),
-        ui: {
-          quickReplies: [
-            { id: 'next', label: 'Next month', value: 'next month', kind: 'other', accent: 'gold' },
-            { id: 'spring', label: 'Spring', value: 'spring', kind: 'other', accent: 'emerald' },
-            { id: 'summer', label: 'Summer', value: 'summer', kind: 'other', accent: 'amber' },
-            { id: 'not_sure', label: 'Not sure yet', value: 'flexible', kind: 'other', accent: 'navy' },
-          ],
-        },
-      };
-    }
-
+    // Default region if missing
     if (!hasWhere) {
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          ...next,
-          briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'WHERE' }),
-        },
-        message: withAckAndRecap(userInput, nextBrief, nextPrefs, wherePrompt(nextBrief.when_at?.timeframe)),
-        ui: {
-          quickReplies: [
-            { id: 'suggest', label: 'Suggest the best fit', value: 'please suggest', kind: 'other', accent: 'gold' },
-            { id: 'monaco', label: 'Monaco', value: 'Monaco', kind: 'other', accent: 'navy' },
-            { id: 'riviera', label: 'French Riviera', value: 'French Riviera', kind: 'other', accent: 'amber' },
-            { id: 'caribbean', label: 'Caribbean', value: 'Caribbean', kind: 'other', accent: 'sky' },
-          ],
-        },
-      };
+      nextBrief.where_at = { destination: 'French Riviera', regions: [], hints: nextBrief.where_at?.hints || null };
     }
 
-    if (!hasBudget) {
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          ...next,
-          briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'BUDGET' }),
-        },
-        message: withAckAndRecap(userInput, nextBrief, nextPrefs, budgetPrompt()),
-        ui: {
-          quickReplies: [
-            { id: '10k', label: '€10k', value: 'budget: 10000 eur', kind: 'budget', accent: 'navy' },
-            { id: '20k', label: '€20k', value: 'budget: 20000 eur', kind: 'budget', accent: 'gold' },
-            { id: '50k', label: '€50k+', value: 'budget: 50000 eur', kind: 'budget', accent: 'amber' },
-            { id: 'unsure', label: 'Not sure', value: 'budget: not sure', kind: 'budget', accent: 'emerald' },
-          ],
-        },
-      };
-    }
+    // Store travel preferences
+    const nextPrefs = { ...(state.travel_preferences ?? {}) };
+    if (density) nextPrefs.planning_density = density;
 
-    if (!hasAlternativesPref) {
-      return {
-        nextStage: 'INITIAL_QUESTIONS',
-        updatedState: {
-          ...next,
-          briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'ALTERNATIVES' }),
-        },
-        message:
-          withAckAndRecap(userInput, nextBrief, nextPrefs, alternativesPrompt()) + (realtimeNote ? `\n\n${realtimeNote}` : ''),
-        ui: {
-          quickReplies: [
-            { id: 'alt_yes', label: 'Yes, include', value: 'yes', kind: 'alternatives', accent: 'gold' },
-            { id: 'alt_needed', label: 'Only if needed', value: 'only if needed', kind: 'alternatives', accent: 'navy' },
-            { id: 'alt_no', label: 'No, I’ll ask live', value: 'no', kind: 'alternatives', accent: 'emerald' },
-          ],
-        },
-      };
-    }
+    // We have enough — go directly to SCRIPT_DRAFT
+    const rawDesire = (state.briefing_progress as Record<string, unknown>).raw_user_desire as string || userInput;
 
-    // All logistics collected: move to COMMIT (next phase can route into destination suggestions + retrieval).
     return {
-      nextStage: 'COMMIT',
+      nextStage: 'SCRIPT_DRAFT',
       updatedState: {
-        ...next,
-        briefing_progress: setProgress({ intake_step: 'LOGISTICS', logistics_step: 'DONE' }),
+        brief: nextBrief,
+        travel_preferences: nextPrefs,
+        briefing_progress: setProgress({
+          intake_step: 'DONE',
+          intake_questions_asked: (state.briefing_progress.intake_questions_asked || 0) + 1,
+          raw_user_desire: rawDesire,
+        }),
       },
-      message:
-        `Perfect. I have enough to start designing this properly.\n\nReassurance: if weather shifts or something is sold out, come back in the moment - I'll adapt your plan with options that still match your themes.\n\nIf you want, one last nuance: do you want this to feel more private and quiet, more social and vibrant, or more ultra-indulgent?` +
-        (realtimeNote ? `\n\n${realtimeNote}` : ''),
+      message: `Perfect. I have everything I need. Let me design your experience...`,
     };
   }
 
+  // Fallback — restart
   return {
     nextStage: 'INITIAL_QUESTIONS',
     updatedState: {
       briefing_progress: setProgress({ intake_step: 'THEME_SELECT', intake_questions_asked: 0 }),
     },
     message: themeSelectPrompt(),
+    ui: themeUi(),
   };
 }
 
+// ============================================================================
+// SYSTEM PROMPT
+// ============================================================================
+
 export function getInitialQuestionsSystemPrompt(): string {
-  return `You are LEXA, a world-class luxury experience designer. You are warm, helpful, and conversational.
+  return `You are LEXA, a world-class luxury yacht experience designer. You are warm, insightful, and genuinely helpful.
 
-**INITIAL_QUESTIONS Stage Goal:**
-Guide the user through understanding their emotional desires while being GENUINELY HELPFUL in every response.
+**Your Core Promise:** Understand what the user REALLY wants and design an experience that transforms them.
 
-**Your approach:**
-- Welcome open-ended requests - themes are optional and can be inferred
-- ALWAYS offer 3-6 specific ideas or suggestions before asking your next question
-- Be warm and conversational, never interrogative or robotic
-- Think "How can I help?" not "What data do I need?"
+**CRITICAL RULES:**
+1. ALWAYS reflect back what the user said. If they said "adrenaline + yacht dinner", your response MUST reference adrenaline and yacht dinners specifically.
+2. NEVER give generic destination suggestions that ignore what they told you. If they want adrenaline, suggest adrenaline experiences. If they want romance, suggest romance.
+3. Offer 2-3 SPECIFIC ideas that match what they described before asking any question.
+4. Ask maximum 1-2 clarifying questions per message (where? how long?). Do NOT interrogate.
+5. Be concise. Maximum 150 words per response.
+6. If the user gave enough info (what they want + region + duration), skip questions and say "Let me design this for you."
 
-**Flow (but Claude-generated, not templated):**
-1. Understand what they're craving (theme/emotion/desire)
-2. Ask why + what they want to feel (offer initial ideas first!)
-3. Ask about their best travel memory (offer initial signature moments first!)
-4. Present a hook + highlights and confirm direction
+**What you should ask (ONLY if not already provided):**
+- Where are you thinking? (offer 2-3 region suggestions that match their vibe)
+- How long? (suggest a duration that fits)
 
-**Critical rules:**
-- Give VALUE in every message - offer ideas, paint pictures, be helpful
-- Never respond with only questions
-- Be natural and warm, not clinical or transactional
-- If they mention a destination, offer a few initial suggestions for that place
-- If they describe an emotion, suggest 2-3 experiences that could deliver it
+**What you should NEVER ask:**
+- Budget (we figure that out later)
+- Best/worst travel memories (wastes time)
+- "What do you want to feel?" (they already told you)
+- Planning density / structure preferences
+- Weather alternatives
 
-**Remember:** You are a refined, helpful friend - not a form, not a quiz, not a data collector.`;
+**Remember:** You are a concierge, not a form. 3 messages maximum before delivering a script.`;
 }
+
+// ============================================================================
+// PROMPT HELPERS
+// ============================================================================
 
 function themeSelectPrompt() {
-  return `Tell me what you're craving in your own words.\n\nIf it helps, you can also choose up to three themes below to set the emotional direction. You can refine it anytime.`;
+  return `Tell me what you're craving — in your own words, or tap a theme below.\n\nBe specific: "adrenaline experiences with a dinner on a yacht" works better than "something nice."`;
 }
 
-function themeWhyPrompt(themes: string[]) {
-  if (!themes.length) {
-    return `Beautiful. I have your direction.\n\nOne gentle question so I can design this accurately: what do you want to feel when you’re living this trip?\n\n(If there’s something you want to avoid, tell me - it helps me protect the experience.)`;
+function buildClarifyMessage(brief: Brief, rawDesire: string): string {
+  const parts: string[] = [];
+  
+  const hasDuration = !!brief.duration?.days;
+  const hasWhere = !!brief.where_at?.destination;
+  
+  if (hasDuration && hasWhere) {
+    return `Love it. I have everything I need — let me design this for you.`;
   }
-  const t = themes.join(' + ');
-  return `Beautiful. ${t}.\n\nOne gentle question so I can design this accurately: what made you choose those - and what do you want to feel when you’re living this trip?\n\n(If there’s something you want to avoid, tell me - it helps me protect the experience.)`;
+  
+  if (!hasWhere && !hasDuration) {
+    parts.push('Two quick things so I can make this real:');
+    parts.push('1. **Where** are you thinking? (Or I can suggest the perfect fit)');
+    parts.push('2. **How long** — a weekend, a week, or longer?');
+  } else if (!hasWhere) {
+    parts.push('Where are you thinking? I can suggest the perfect region for this.');
+  } else if (!hasDuration) {
+    parts.push('How long do you have? A weekend, a week, or more?');
+  }
+  
+  return parts.join('\n');
 }
 
-function memoryPrompt() {
-  return `Last question - then you decide if I'm understanding you.\n\nTell me about the best moment from your last great holiday - the 60 seconds you still replay.\nWhat made it work?\n\n(If anything ever ruined a trip for you, mention it - I’ll design around it.)`;
-}
+function buildClarifyButtons(brief: Brief): StageTransitionResult['ui'] {
+  const hasWhere = !!brief.where_at?.destination;
+  const hasDuration = !!brief.duration?.days;
 
-function hookConfirmPrompt(params: { themes: string[]; hook: string; highlights: string[]; isTrial: boolean }) {
-  const intro = params.isTrial
-    ? `You can decide after this: if I don't feel like your concierge, you can walk away - no pressure.`
-    : '';
+  if (hasWhere && hasDuration) return undefined;
 
-  const themeLine = params.themes.length ? `Themes: ${params.themes.join(' · ')}` : '';
-
-  return [
-    intro,
-    themeLine,
-    '',
-    `Here’s the direction I’d design for you:`,
-    `**${params.hook}**`,
-    '',
-    `Signature highlights (no destination required yet):`,
-    ...params.highlights.map((h) => `- ${h}`),
-    '',
-    `Does this feel like the right emotional direction? Reply **yes** or **no**.`,
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
-function logisticsPrompt() {
-  return `Good. Now we make it real.\n\nTell me:\n1) How many days?\n2) When do you want to go (month or dates)?\n3) Any destinations you’re drawn to - or should I suggest the best fit?\n\nReply in one message; bullets are fine.`;
-}
-
-function looksLikeYes(input: string) {
-  const s = input.trim().toLowerCase();
-  if (!s) return false;
-  if (s.length <= 3 && (s === 'y' || s === 'ye' || s === 'yes')) return true;
-  return /\b(yes|yeah|yep|correct|exactly|nailed it|that's it|thats it)\b/.test(s);
-}
-
-function looksLikeNo(input: string) {
-  const s = input.trim().toLowerCase();
-  if (!s) return false;
-  if (s.length <= 3 && (s === 'n' || s === 'no')) return true;
-  // Important: do NOT include generic words like "off" (breaks on "off-season").
-  return /\b(no|nope|not really|not quite|wrong|miss)\b/.test(s);
-}
-
-function mergeUnique(a: string[], b: string[]) {
-  const out = [...a];
-  for (const x of b) if (x && !out.includes(x)) out.push(x);
-  return out;
-}
-
-function extractFeelings(input: string): string[] {
-  const s = input.toLowerCase();
-  const vocab = [
-    'peace',
-    'calm',
-    'alive',
-    'aliveness',
-    'romance',
-    'connection',
-    'intimacy',
-    'freedom',
-    'adventure',
-    'confidence',
-    'reset',
-    'renewal',
-    'joy',
-    'awe',
-    'belonging',
-    'luxury',
-  ];
-  return vocab.filter((w) => s.includes(w)).slice(0, 5);
-}
-
-function extractAvoid(input: string): string[] {
-  const s = input.toLowerCase();
-  const vocab = ['crowds', 'touristy', 'stress', 'rushed', 'pretense', 'pretence', 'noise', 'chaos', 'boring'];
-  return vocab.filter((w) => s.includes(w)).slice(0, 5);
-}
-
-function buildHook(params: {
-  themes: string[];
-  desiredFeelings: string[];
-  bestMoment: string | null;
-  destination: string | null;
-  companion: string | null;
-}) {
-  const t = params.themes.slice(0, 2).join(' + ') || 'your taste';
-  const feeling = params.desiredFeelings[0] ?? null;
-  const destinationLine = params.destination ? ` in ${params.destination}` : '';
-  const companionLine = params.companion ? ` with ${params.companion}` : '';
-
-  if (params.bestMoment) {
-    return `A ${t} escape${destinationLine}${companionLine} - designed to bring you back to the feeling you just described, with one signature moment you’ll replay for years.`;
+  if (!hasDuration) {
+    return {
+      quickReplies: [
+        { id: 'wknd', label: 'Weekend', value: 'Weekend', kind: 'duration' as const, accent: 'navy' as const },
+        { id: 'wk', label: '7 days', value: '7 days', kind: 'duration' as const, accent: 'gold' as const },
+        { id: 'ten', label: '10 days', value: '10 days', kind: 'duration' as const, accent: 'amber' as const },
+        { id: 'two', label: '2 weeks', value: '14 days', kind: 'duration' as const, accent: 'emerald' as const },
+      ],
+    };
   }
 
-  if (feeling) {
-    return `A ${t} escape${destinationLine}${companionLine} - built around ${feeling}, with a calm, elegant rhythm and one “we'll remember this” peak.`;
-  }
-
-  return `A ${t} escape${destinationLine}${companionLine} - quiet, intentional, and unmistakably yours.`;
-}
-
-function buildSignatureHighlights(params: {
-  themes: string[];
-  desiredFeelings: string[];
-  destination: string | null;
-  companion: string | null;
-}) {
-  const t = params.themes.map((x) => x.toLowerCase()).join(' ');
-  const out: string[] = [];
-
-  if (t.includes('water') || t.includes('marine')) out.push('A private water moment at the perfect light - no crowds, no noise.');
-  if (t.includes('culinary')) out.push('A single, unforgettable meal: chef’s story, local ingredients, and a table you won’t find online.');
-  if (t.includes('wellness')) out.push('A reset ritual you can feel in your nervous system - slow mornings, body care, and silence.');
-  if (t.includes('romance')) out.push('A “just us” scene: a view, a drink, and time that doesn’t rush you.');
-  if (t.includes('art') || t.includes('architecture')) out.push('A private culture window - one place, one story, one detail you’ll remember.');
-  if (t.includes('adventure') || t.includes('exploration')) out.push('A controlled edge: something thrilling, but designed to feel safe and elevated.');
-
-  out.push('A signature arrival moment that instantly shifts you into holiday mode.');
-  out.push('One micro-wow every day: small, curated, and deeply personal.');
-
-  const feeling = params.desiredFeelings[0];
-  if (feeling) out.push(`A closing moment that locks in the feeling you came for: ${feeling}.`);
-
-  return out.slice(0, 6);
-}
-
-function extractMonthLoose(input: string): string | null {
-  const s = input.toLowerCase();
-  const months = [
-    'january',
-    'february',
-    'march',
-    'april',
-    'may',
-    'june',
-    'july',
-    'august',
-    'september',
-    'october',
-    'november',
-    'december',
-  ];
-  for (const m of months) {
-    if (s.includes(m)) return m[0].toUpperCase() + m.slice(1);
-  }
-  return null;
-}
-
-function extractDaysLoose(input: string): number | null {
-  const m = input.match(/\b(\d{1,2})\s*(day|days|nacht|nights)\b/i);
-  if (!m) return null;
-  const n = Number(m[1]);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return n;
-}
-
-function durationPrompt() {
-  return `Now we make it real.\n\nHow long do you want to enjoy this experience?\nI’m asking because the rhythm (and how “deep” it can feel) changes with time.`;
-}
-
-function weekendPatternPrompt() {
-  return `When you say "weekend", do you mean:\n- Friday to Sunday\n- or Saturday and Sunday?\n\nI ask because it changes how much we can curate (without it feeling rushed).`;
-}
-
-function weekendPatternUi(): StageTransitionResult['ui'] {
   return {
     quickReplies: [
-      { id: 'fri_sun', label: 'Fri-Sun', value: 'Friday to Sunday', kind: 'duration', accent: 'navy' },
-      { id: 'sat_sun', label: 'Sat-Sun', value: 'Saturday and Sunday', kind: 'duration', accent: 'gold' },
+      { id: 'fr', label: 'French Riviera', value: 'French Riviera', kind: 'other' as const, accent: 'gold' as const },
+      { id: 'med', label: 'Mediterranean', value: 'Mediterranean', kind: 'other' as const, accent: 'navy' as const },
+      { id: 'car', label: 'Caribbean', value: 'Caribbean', kind: 'other' as const, accent: 'sky' as const },
+      { id: 'suggest', label: 'Surprise me', value: 'Suggest the best fit', kind: 'other' as const, accent: 'amber' as const },
     ],
   };
 }
 
-function whenPrompt(days?: number | null) {
-  const hint = days ? ` (for ${days} days)` : '';
-  return `Perfect${hint}.\n\nWhen would you like to travel? (a month or season is enough)\nI ask because timing changes weather, crowd energy, and what feels effortless.`;
+// ============================================================================
+// EXTRACTION HELPERS
+// ============================================================================
+
+function extractMonthLoose(input: string): string | null {
+  const s = input.toLowerCase();
+  const months = [
+    'january', 'february', 'march', 'april', 'may', 'june',
+    'july', 'august', 'september', 'october', 'november', 'december',
+  ];
+  for (const m of months) {
+    if (s.includes(m)) return m[0].toUpperCase() + m.slice(1);
+  }
+  // Seasons
+  if (s.includes('spring')) return 'Spring';
+  if (s.includes('summer')) return 'Summer';
+  if (s.includes('autumn') || s.includes('fall')) return 'Autumn';
+  if (s.includes('winter')) return 'Winter';
+  return null;
 }
 
-function wherePrompt(month?: string | null) {
-  const m = month ? ` for ${month}` : '';
-  return `Got it${m}.\n\nDo you already have a destination in mind - or would you like me to suggest the best fit for your themes?`;
+function extractDaysLoose(input: string): number | null {
+  const lower = input.toLowerCase();
+  if (/\bweekend\b/.test(lower)) return 3;
+  const m = input.match(/\b(\d{1,2})\s*(day|days|nights?)\b/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function budgetPrompt() {
-  return `One practical detail so I recommend in the right universe.\n\nWhat budget range should I design within? (Ballpark is fine - per week, per trip, or per night.)`;
+function extractDestinationLoose(input: string): string | null {
+  const raw = input.trim();
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  const known = [
+    'vienna', 'monaco', 'french riviera', 'amalfi', 'adriatic',
+    'caribbean', 'bahamas', 'dubai', 'greece', 'italy', 'croatia',
+    'mediterranean', 'maldives', 'thailand', 'ibiza', 'mallorca',
+    'mykonos', 'santorini', 'st tropez', 'capri', 'sardinia',
+    'corsica', 'sicily', 'bvi', 'usvi', 'antigua',
+  ];
+  for (const k of known) {
+    if (lower.includes(k)) return k.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+  }
+  // Heuristic: extract after "to/in/at"
+  const m = raw.match(/\b(?:to|in|at|around|near)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/);
+  if (m?.[1]) return m[1];
+  return null;
 }
 
-function structurePrompt(days?: number | null) {
-  const short = days !== null && days !== undefined && days <= 4;
-  const example = short
-    ? `For a short trip, the key decision is rhythm: do you want it lightly curated, or mostly free time together?`
-    : `This is about rhythm: a curated arc, or breathing room with spontaneity?`;
-
-  return (
-    `${example}\n\nChoose a style:\n` +
-    `- Curated: 1-2 planned moments per day + lunch/dinner intelligently placed.\n` +
-    `- Balanced: 1-2 signature moments for the whole trip + 1 dinner anchor per day.\n` +
-    `- Mostly free: you decide live - and you can come back anytime for spontaneous options that are actually available.\n\n` +
-    `What fits you best?`
-  );
+function extractCompanionLoose(input: string): string | null {
+  const s = input.toLowerCase();
+  if (s.includes('my wife')) return 'your wife';
+  if (s.includes('my husband')) return 'your husband';
+  if (s.includes('my partner')) return 'your partner';
+  if (s.includes('my girlfriend')) return 'your girlfriend';
+  if (s.includes('my boyfriend')) return 'your boyfriend';
+  if (s.includes('my family')) return 'your family';
+  if (s.includes('my friends')) return 'your friends';
+  if (s.includes('couple')) return 'as a couple';
+  return null;
 }
 
-function alternativesPrompt() {
-  return `One more preference so I protect the experience.\n\nIf weather is unpredictable or plans change, would you like me to include a couple of bad-weather alternatives (and backups in general) that still match your themes?\n\nMy recommendation is **yes** (it keeps the trip smooth) - but you can also say **no** if you prefer to decide in the moment.\n\nReply: "yes", "no", or "only if needed".`;
+function extractPlanningDensityLoose(input: string): 'curated' | 'balanced' | 'free' | null {
+  const s = input.toLowerCase();
+  if (s.includes('curated') || s.includes('planned') || s.includes('structured')) return 'curated';
+  if (s.includes('balanced') || s.includes('mix')) return 'balanced';
+  if (s.includes('free') || s.includes('flexible') || s.includes('spontan')) return 'free';
+  return null;
+}
+
+function seemsLikeContainsPlaceName(input: string): boolean {
+  const raw = input.trim();
+  if (!raw) return false;
+  if (/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(raw)) return false;
+  if (/\b(spring|summer|autumn|fall|winter)\b/i.test(raw)) return false;
+  return /\b[A-Z][a-z]{2,}\b/.test(raw);
 }
 
 function themeUi(): StageTransitionResult['ui'] {
@@ -805,229 +423,3 @@ function themeUi(): StageTransitionResult['ui'] {
     multiSelect: { enabled: true, max: 3, submitLabel: 'Continue' },
   };
 }
-
-function extractBudgetLoose(input: string): { amount: number; currency: string } | null {
-  const s = input.trim();
-  const lower = s.toLowerCase();
-
-  // Guardrails: avoid mis-parsing durations like "10 days" as a budget.
-  const hasCurrencySignal =
-    s.includes('€') ||
-    s.includes('$') ||
-    s.includes('£') ||
-    /\b(eur|usd|gbp|euro|dollar|pound|budget)\b/i.test(s);
-  if (!hasCurrencySignal) return null;
-  if (/\b(day|days|night|nights|nacht)\b/i.test(s) && !/[€$£]/.test(s) && !/\b(eur|usd|gbp)\b/i.test(s)) {
-    return null;
-  }
-
-  // Very simple: look for a number and an optional currency symbol/code.
-  const m = s.match(/(?:(€|\\$|£)\s*)?(\d{1,3}(?:[.,]\d{3})*|\d+)(?:\s*(k|K|m|M))?\s*(?:€|\\$|£|eur|usd|gbp)?/);
-  if (!m) return null;
-  const sym = m[1];
-  const rawNum = m[2].replace(/,/g, '');
-  const scale = m[3]?.toLowerCase();
-  let n = Number(rawNum);
-  if (!Number.isFinite(n)) return null;
-  if (scale === 'k') n *= 1000;
-  if (scale === 'm') n *= 1000000;
-
-  const currency =
-    sym === '€' || lower.includes('eur') || lower.includes('euro')
-      ? 'EUR'
-      : sym === '£' || lower.includes('gbp') || lower.includes('pound')
-        ? 'GBP'
-        : sym === '$' || lower.includes('usd') || lower.includes('dollar')
-          ? 'USD'
-          : 'EUR';
-
-  return { amount: Math.round(n), currency };
-}
-
-function extractDestinationLoose(input: string): string | null {
-  const raw = input.trim();
-  if (!raw) return null;
-  const lower = raw.toLowerCase();
-
-  // Small allowlist (fast path)
-  const known = [
-    'vienna',
-    'monaco',
-    'french riviera',
-    'amalfi',
-    'adriatic',
-    'caribbean',
-    'bahamas',
-    'dubai',
-    'greece',
-    'italy',
-  ];
-  for (const k of known) {
-    if (lower.includes(k)) return titleCaseWords(k);
-  }
-
-  // Heuristic: extract a destination after a preposition like "to Vienna" / "in St Tropez"
-  const m = raw.match(/\b(?:to|in|at|around|near)\s+([A-Za-z][A-Za-z]+(?:\s+[A-Za-z][A-Za-z]+){0,3})\b/);
-  if (m?.[1]) {
-    const candidate = cleanupDestinationCandidate(m[1]);
-    if (candidate) return titleCaseWords(candidate);
-  }
-
-  // If the user just wrote a plausible place name by itself ("Vienna", "St Tropez")
-  if (/^[A-Za-z][A-Za-z]+(?:\s+[A-Za-z][A-Za-z]+){0,2}$/.test(raw)) {
-    const candidate = cleanupDestinationCandidate(raw);
-    if (candidate) return titleCaseWords(candidate);
-  }
-
-  return null;
-}
-
-function cleanupDestinationCandidate(candidate: string): string | null {
-  const c = candidate.trim().replace(/[.,!?]/g, '');
-  if (!c) return null;
-  const cl = c.toLowerCase();
-  const months = [
-    'january',
-    'february',
-    'march',
-    'april',
-    'may',
-    'june',
-    'july',
-    'august',
-    'september',
-    'october',
-    'november',
-    'december',
-  ];
-  const seasons = ['spring', 'summer', 'autumn', 'fall', 'winter'];
-  if (months.includes(cl) || seasons.includes(cl)) return null;
-  if (cl === 'weekend' || cl === 'next month' || cl === 'this month') return null;
-  if (/\b(day|days|night|nights|week|weeks)\b/.test(cl)) return null;
-  if (cl === 'here') return null;
-  return c;
-}
-
-function titleCaseWords(s: string): string {
-  return s
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w[0].toUpperCase() + w.slice(1))
-    .join(' ');
-}
-
-function extractCompanionLoose(input: string): string | null {
-  const s = input.toLowerCase();
-  if (s.includes('my wife')) return 'your wife';
-  if (s.includes('my husband')) return 'your husband';
-  if (s.includes('my partner')) return 'your partner';
-  if (s.includes('my girlfriend')) return 'your girlfriend';
-  if (s.includes('my boyfriend')) return 'your boyfriend';
-  return null;
-}
-
-function seemsLikeContainsPlaceName(input: string): boolean {
-  // Rough heuristic: user wrote at least one capitalized word (e.g. "Vienna", "St Tropez").
-  // Avoid obvious false positives like months/seasons.
-  const raw = input.trim();
-  if (!raw) return false;
-  if (/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(raw)) return false;
-  if (/\b(spring|summer|autumn|fall|winter)\b/i.test(raw)) return false;
-  if (/\bweekend\b/i.test(raw)) return false;
-  return /\b[A-Z][a-z]{2,}\b/.test(raw);
-}
-
-function looksLikeWeekend(input: string): boolean {
-  const s = input.toLowerCase();
-  return /\bweekend\b/.test(s);
-}
-
-function extractWeekendPatternDays(input: string): 2 | 3 | null {
-  const s = input.toLowerCase();
-  if (s.includes('friday') && s.includes('sunday')) return 3;
-  if (s.includes('fri') && s.includes('sun')) return 3;
-  if (s.includes('saturday') && s.includes('sunday')) return 2;
-  if (s.includes('sat') && s.includes('sun')) return 2;
-  return null;
-}
-
-function withAckAndRecap(userInput: string, brief: Brief, prefs: any, message: string): string {
-  const ack = buildAckLine(userInput);
-  const recap = buildRecapLine(brief, prefs);
-  const prefix = [ack, recap].filter(Boolean).join(' ');
-  return prefix ? `${prefix}\n\n${message}` : message;
-}
-
-function buildAckLine(userInput: string): string {
-  const t = userInput.trim();
-  if (!t) return '';
-  if (looksLikeYes(t)) return 'Nice.';
-  if (looksLikeNo(t)) return 'Got it.';
-  return 'Nice.';
-}
-
-function isSubstantiveInput(input: string, destinationHint?: string | null, companionHint?: string | null): boolean {
-  const trimmed = input.trim();
-  if (!trimmed) return false;
-  const lower = trimmed.toLowerCase();
-  const isGreetingOnly = /^(hi|hello|hey|hallo|hola|yo|sup)(\s|!|\.|$)/.test(lower);
-  if (isGreetingOnly) return false;
-
-  const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
-  if (wordCount >= 4) return true;
-  if (trimmed.length >= 18) return true;
-  if (destinationHint || companionHint) return true;
-  if (seemsLikeContainsPlaceName(trimmed)) return true;
-  return false;
-}
-
-function buildRecapLine(brief: Brief, prefs: any): string {
-  const bits: string[] = [];
-  const dest = brief.where_at?.destination;
-  const when = brief.when_at?.timeframe;
-  const days = brief.duration?.days;
-  const companion = brief.where_at?.hints ? extractCompanionLoose(brief.where_at.hints) : null;
-  if (dest) bits.push(dest);
-  if (companion) bits.push(companion);
-  if (days) bits.push(days <= 3 ? 'Weekend' : `${days} days`);
-  if (when) bits.push(when);
-  if (prefs?.planning_density) bits.push(String(prefs.planning_density));
-  if (!bits.length) return '';
-  return `Quick recap: ${bits.slice(0, 4).join(' · ')}.`;
-}
-
-function extractPlanningDensityLoose(input: string): 'curated' | 'balanced' | 'free' | null {
-  const s = input.toLowerCase();
-  if (s.includes('curated') || s.includes('planned') || s.includes('plan') || s.includes('structured')) return 'curated';
-  if (s.includes('balanced') || s.includes('mix') || s.includes('bit of both')) return 'balanced';
-  if (s.includes('free') || s.includes('flexible') || s.includes('spont') || s.includes('unplanned')) return 'free';
-  return null;
-}
-
-function extractIncludeAlternativesLoose(input: string): boolean | null {
-  const s = input.toLowerCase().trim();
-  if (!s) return null;
-  if (s.includes('only if') || s.includes('if needed') || s.includes('just in case')) return true;
-  if (looksLikeYes(s)) return true;
-  if (looksLikeNo(s)) return false;
-  return null;
-}
-
-function seasonalGuidance(destination: string, month: string): { type: 'caution'; message: string } | null {
-  const d = destination.toLowerCase();
-  const m = month.toLowerCase();
-
-  const isWinter = ['november', 'december', 'january', 'february'].some((x) => m.includes(x));
-  if (!isWinter) return null;
-
-  const isMonacoLike = d.includes('monaco') || d.includes('riviera') || d.includes('adriatic');
-  if (!isMonacoLike) return null;
-
-  return {
-    type: 'caution',
-    message:
-      `One quick concierge note: ${destination} in ${month} can feel quieter - some places reduce hours and the energy is more off-season.\n\nIf you're choosing it intentionally, I'm in. But if what you want is sun + effortless water moments, would you rather I suggest a better-fit region for ${month} (e.g. Caribbean), or do you want ${destination} for a specific reason?`,
-  };
-}
-
-

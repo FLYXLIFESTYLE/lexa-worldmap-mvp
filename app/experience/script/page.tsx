@@ -1,35 +1,31 @@
 /**
  * Experience Script Preview
- * Shows the final composed script with theme, hook, and highlights
+ *
+ * Displays the Stage 1 Discovery Output from the Script Engine
+ * with proper formatting: name, tagline, hook, description,
+ * highlights, target profile, and quick facts.
+ *
+ * Falls back to the legacy compose-script flow if no Script Engine
+ * output is available.
  */
 
 'use client';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
-import { useRouter } from 'next/navigation';
-import { Sparkles, Download, Share2, Calendar, MapPin, Heart } from 'lucide-react';
-import { lexaAPI, loadFromLocalStorage } from '@/lib/api/lexa-client';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Sparkles, Download, Share2, Calendar, MapPin, Heart, Anchor, User } from 'lucide-react';
 import { LegalDisclaimer } from '@/components/legal-disclaimer';
-
-interface ScriptData {
-  themeName: string;
-  inspiringHook: string;
-  emotionalDescription: string;
-  signatureHighlights: string[];
-  destination: string;
-  month: string;
-  duration: string;
-}
+import type { Stage1Output } from '@/lib/script-engine/types';
 
 export default function ScriptPreviewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
-  const [userEmail, setUserEmail] = useState('');
-  const [script, setScript] = useState<ScriptData | null>(null);
+  const [script, setScript] = useState<Stage1Output | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [briefId, setBriefId] = useState<string | null>(null);
 
-  // Check auth and generate script
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -37,110 +33,71 @@ export default function ScriptPreviewPage() {
         router.push('/auth/signin');
         return;
       }
-      setUserEmail(user.email || '');
 
-      // Load LEXA account
-      const lexaAccount = loadFromLocalStorage('lexa_account');
-      if (!lexaAccount) {
-        router.push('/auth/signin?redirectTo=/experience');
-        return;
+      // Priority 1: Load from briefId URL param (from account or handoff)
+      const urlBriefId = searchParams.get('briefId');
+      if (urlBriefId) {
+        setBriefId(urlBriefId);
+        try {
+          const res = await fetch(`/api/user/scripts/${urlBriefId}`);
+          if (res.ok) {
+            const data = await res.json();
+            const engineOutput = data.script?.additional_context?.script_engine_output;
+            if (engineOutput) {
+              setScript(engineOutput as Stage1Output);
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch {
+          console.error('Failed to load script from briefId');
+        }
       }
 
-      // Load builder state and conversation
-      const builderState = JSON.parse(localStorage.getItem('lexa_builder_state') || '{}');
-      const conversation = JSON.parse(localStorage.getItem('lexa_conversation') || '[]');
-
-      if (!builderState.destination) {
-        router.push('/experience');
-        return;
+      // Priority 2: Load from localStorage (set by chat)
+      const engineOutputRaw = localStorage.getItem('lexa_script_engine_output');
+      if (engineOutputRaw) {
+        try {
+          const engineOutput: Stage1Output = JSON.parse(engineOutputRaw);
+          setScript(engineOutput);
+          setIsLoading(false);
+          return;
+        } catch {
+          console.error('Failed to parse Script Engine output from localStorage');
+        }
       }
 
-      // Call backend to compose script
+      // Priority 3: Load the most recent script from the user's account
       try {
-        const scriptResponse = await lexaAPI.composeScript({
-          account_id: lexaAccount.account_id,
-          session_id: lexaAccount.session_id,
-          selected_choices: {
-            destination: builderState.destination.name,
-            theme: builderState.theme.name,
-            time: `${builderState.time.month} ${builderState.time.year}`,
-            // Extract budget, duration, must_haves from conversation if available
-          },
-        });
-
-        // Transform backend response to frontend format
-        const transformedScript: ScriptData = {
-          themeName: scriptResponse.title,
-          inspiringHook: scriptResponse.cinematic_hook,
-          emotionalDescription: scriptResponse.emotional_arc,
-          signatureHighlights: scriptResponse.preview_narrative.split('\n').filter(line => line.trim()),
-          destination: builderState.destination.name,
-          month: builderState.time.month?.charAt(0).toUpperCase() + builderState.time.month?.slice(1),
-          duration: `${scriptResponse.duration_days} days`,
-        };
-
-        setScript(transformedScript);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Failed to compose script:', error);
-        
-        // Fallback to mock data
-        const mockScript: ScriptData = {
-          themeName: `The ${builderState.theme.name} - ${builderState.destination.name}`,
-          inspiringHook: `Imagine the golden hour in ${builderState.destination.name}. The Mediterranean whispers secrets only you will hear. This isn't a vacation-it's a chapter you'll return to in your mind for years to come.`,
-          emotionalDescription: `This experience is designed for those who seek more than beauty-you're seeking *resonance*. Every moment is curated to help you feel deeply connected, profoundly present, and utterly free. No tours. No itineraries. Just a series of perfect moments that understand what you came here to feel.`,
-          signatureHighlights: [
-            `🥂 **Private sunset aperitivo** at a cliffside villa known only to locals-Champagne, silence, and the Mediterranean at your feet`,
-            `🍽️ **Chef's table at Le Louis XV** (3 Michelin stars) - An 8-course journey where each dish tells a story`,
-            `⛵ **Morning yacht charter** to hidden coves-swim in water so clear it feels like flying`,
-            `🎨 **Private gallery viewing** at a contemporary art space, followed by meeting the artist over wine`,
-            `💆 **Thermes Marins spa ritual** - 3-hour deep tissue and marine therapy designed to release what you're holding`,
-            `🌅 **Final evening: private rooftop dinner** in Monaco-live jazz trio, handwritten menu, stars above`,
-          ],
-          destination: builderState.destination.name,
-          month: builderState.time.month?.charAt(0).toUpperCase() + builderState.time.month?.slice(1),
-          duration: '5 days, 4 nights',
-        };
-
-        setScript(mockScript);
-        setIsLoading(false);
+        const res = await fetch('/api/user/scripts?limit=1');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.scripts?.[0]?.additional_context?.script_engine_output) {
+            setScript(data.scripts[0].additional_context.script_engine_output as Stage1Output);
+            setBriefId(data.scripts[0].id);
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch {
+        // No scripts found
       }
+
+      setIsLoading(false);
     }
     init();
-  }, [router, supabase.auth]);
+  }, [router, supabase.auth, searchParams]);
 
-  // Handle PDF download
-  const handleDownload = async () => {
-    try {
-      // Get script ID from localStorage or state
-      const lexaAccount = loadFromLocalStorage('lexa_account');
-      if (!lexaAccount) {
-        alert('No account found. Please sign in again.');
-        return;
-      }
-
-      // For now, show message that PDF will be generated
-      alert('PDF generation is being processed! This feature will download your script shortly.');
-      
-      // TODO: Implement actual PDF download when backend endpoint is ready
-      // const blob = await lexaAPI.downloadScriptPDF(scriptId);
-      // const url = window.URL.createObjectURL(blob);
-      // const a = document.createElement('a');
-      // a.href = url;
-      // a.download = `LEXA-Experience-${Date.now()}.pdf`;
-      // document.body.appendChild(a);
-      // a.click();
-      // window.URL.revokeObjectURL(url);
-      // document.body.removeChild(a);
-    } catch (error) {
-      console.error('Failed to download PDF:', error);
-      alert('Failed to download PDF. Please try again.');
-    }
+  const handleDownload = () => {
+    alert('PDF generation coming soon! Your script will be downloadable shortly.');
   };
 
-  // Handle share
-  const handleShare = async () => {
+  const handleShare = () => {
     alert('Share functionality coming soon!');
+  };
+
+  const handleSaveToAccount = () => {
+    alert('Script saved to your account! Day-by-day journey coming soon.');
   };
 
   if (isLoading) {
@@ -155,7 +112,11 @@ export default function ScriptPreviewPage() {
   }
 
   if (!script) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-zinc-500">No script data available.</p>
+      </div>
+    );
   }
 
   return (
@@ -170,10 +131,9 @@ export default function ScriptPreviewPage() {
               </span>
             </h1>
             <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest mt-0.5">
-              Your Experience Script
+              Curated Experiences
             </p>
           </div>
-          
           <div className="flex items-center gap-3">
             <button
               onClick={handleShare}
@@ -191,88 +151,135 @@ export default function ScriptPreviewPage() {
             </button>
           </div>
         </div>
-        
-        {/* Decorative gradient line */}
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-lexa-gold to-transparent opacity-50" />
       </header>
 
-      {/* Script Content */}
       <main className="max-w-4xl mx-auto px-4 py-12 space-y-12">
-        {/* Meta Info */}
-        <div className="flex flex-wrap gap-6 justify-center text-sm text-zinc-600">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-lexa-gold" />
-            <span>{script.destination}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-lexa-gold" />
-            <span>{script.month} • {script.duration}</span>
-          </div>
-        </div>
-
-        {/* Theme Name */}
+        {/* Experience Name & Tagline */}
         <div className="text-center space-y-4">
-          <div className="inline-block px-4 py-1 rounded-full bg-lexa-gold/10 border border-lexa-gold/30 mb-4">
+          <div className="inline-block px-4 py-1 rounded-full bg-lexa-gold/10 border border-lexa-gold/30">
             <span className="text-sm font-semibold text-lexa-navy uppercase tracking-wider">
-              Your Experience Script
+              {script.quick_facts.region} · {script.quick_facts.season}
             </span>
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-lexa-navy leading-tight">
-            {script.themeName}
+            {script.experience_name}&#8482;
           </h2>
+          {script.tagline && (
+            <p className="text-xl text-zinc-500 italic">
+              {script.tagline}
+            </p>
+          )}
         </div>
 
-        {/* Inspiring Hook */}
-        <div className="relative">
-          <div className="absolute -left-4 top-0 text-6xl text-lexa-gold/20 font-serif">"</div>
-          <p className="text-xl md:text-2xl text-zinc-700 leading-relaxed italic pl-8 pr-8">
-            {script.inspiringHook}
-          </p>
-          <div className="absolute -right-4 bottom-0 text-6xl text-lexa-gold/20 font-serif">"</div>
+        {/* Separator */}
+        <div className="flex justify-center">
+          <span className="text-lexa-gold text-2xl tracking-widest">&#9866; &#9670; &#9866;</span>
         </div>
+
+        {/* Hook */}
+        {script.hook && (
+          <div className="relative bg-white rounded-2xl p-8 shadow-lg border-2 border-zinc-100">
+            <div className="absolute -left-2 top-4 text-5xl text-lexa-gold/20 font-serif leading-none">&ldquo;</div>
+            <p className="text-xl md:text-2xl text-zinc-700 leading-relaxed pl-6 pr-6">
+              {script.hook}
+            </p>
+            <div className="absolute -right-2 bottom-4 text-5xl text-lexa-gold/20 font-serif leading-none">&rdquo;</div>
+          </div>
+        )}
 
         {/* Emotional Description */}
-        <div className="bg-white rounded-2xl p-8 shadow-lg border-2 border-zinc-100">
-          <div className="flex items-center gap-2 mb-4">
-            <Heart className="w-5 h-5 text-lexa-gold" />
-            <h3 className="text-lg font-semibold text-lexa-navy">The Essence</h3>
+        {script.description && (
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-zinc-100">
+            <div className="flex items-center gap-2 mb-4">
+              <Heart className="w-5 h-5 text-lexa-gold" />
+              <h3 className="text-lg font-semibold text-lexa-navy">The Experience</h3>
+            </div>
+            <p className="text-base text-zinc-700 leading-relaxed whitespace-pre-line">
+              {script.description}
+            </p>
           </div>
-          <p className="text-base text-zinc-700 leading-relaxed">
-            {script.emotionalDescription}
-          </p>
-        </div>
+        )}
 
         {/* Signature Highlights */}
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Sparkles className="w-6 h-6 text-lexa-gold" />
-            <h3 className="text-2xl font-bold text-lexa-navy">Signature Highlights</h3>
-          </div>
-          
-          <div className="space-y-4">
-            {script.signatureHighlights.map((highlight, index) => (
-              <div
-                key={index}
-                className="bg-white rounded-xl p-6 shadow-sm border-2 border-zinc-100 hover:border-lexa-gold/30 transition-all group"
-              >
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-lexa-gold/10 flex items-center justify-center text-sm font-bold text-lexa-navy group-hover:bg-lexa-gold group-hover:text-white transition-all">
-                    {index + 1}
+        {script.highlights && script.highlights.length > 0 && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-lexa-gold" />
+              <h3 className="text-2xl font-bold text-lexa-navy">A Glimpse of What Awaits</h3>
+            </div>
+            <div className="space-y-4">
+              {script.highlights.map((highlight, index) => (
+                <div
+                  key={index}
+                  className="bg-white rounded-xl p-6 shadow-sm border border-zinc-100 hover:border-lexa-gold/30 transition-all group"
+                >
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-lexa-gold/10 flex items-center justify-center text-lexa-gold font-bold text-sm">
+                      &#9672;
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-zinc-900 mb-1">{highlight.title}</h4>
+                      <p className="text-sm text-zinc-600 leading-relaxed">
+                        {highlight.description}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-base text-zinc-700 leading-relaxed flex-1">
-                    {highlight.replace(/\*\*/g, '')}
-                  </p>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Target Profile */}
+        {script.target_profile && (
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-zinc-100">
+            <div className="flex items-center gap-2 mb-4">
+              <User className="w-5 h-5 text-lexa-gold" />
+              <h3 className="text-lg font-semibold text-lexa-navy">
+                {script.target_profile.intro}
+              </h3>
+            </div>
+            <div className="space-y-3">
+              {script.target_profile.criteria.map((criterion, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <span className="text-lexa-gold mt-0.5">&#9670;</span>
+                  <p className="text-sm text-zinc-700">{criterion}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Facts */}
+        <div className="flex flex-wrap gap-4 justify-center">
+          <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border border-zinc-100">
+            <Calendar className="w-4 h-4 text-lexa-gold" />
+            <span className="text-sm text-zinc-700 font-medium">{script.quick_facts.duration}</span>
+          </div>
+          <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border border-zinc-100">
+            <MapPin className="w-4 h-4 text-lexa-gold" />
+            <span className="text-sm text-zinc-700 font-medium">{script.quick_facts.region}</span>
+          </div>
+          <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border border-zinc-100">
+            <Anchor className="w-4 h-4 text-lexa-gold" />
+            <span className="text-sm text-zinc-700 font-medium">{script.quick_facts.embarkation}</span>
           </div>
         </div>
 
-        {/* CTA Section */}
+        {/* Separator */}
+        <div className="flex justify-center">
+          <span className="text-lexa-gold text-2xl tracking-widest">&#9866; &#9670; &#9866;</span>
+        </div>
+
+        {/* Save to Account CTA */}
         <div className="bg-gradient-to-br from-lexa-navy via-zinc-900 to-black rounded-2xl p-12 text-center text-white">
-          <h3 className="text-2xl font-bold mb-4">Ready to make this real?</h3>
+          <h3 className="text-2xl font-bold mb-4">
+            Would you like to see the day-by-day journey?
+          </h3>
           <p className="text-zinc-300 mb-8 max-w-2xl mx-auto">
-            This script is the beginning. Book a consultation with a LEXA travel curator to bring this vision to life - or let LEXA refine it further.
+            Save this experience to your account to unlock the full script with daily narratives,
+            memory anchors, and your personal Experience Kit.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <button
@@ -282,20 +289,24 @@ export default function ScriptPreviewPage() {
               Create Another Experience
             </button>
             <button
-              onClick={() => alert('Booking flow coming soon!')}
+              onClick={handleSaveToAccount}
               className="rounded-xl bg-gradient-to-r from-lexa-gold to-yellow-600 px-6 py-3 font-semibold text-zinc-900 hover:scale-105 hover:shadow-2xl hover:shadow-lexa-gold/50 transition-all"
             >
-              Book Consultation
+              Save to My Account
             </button>
           </div>
         </div>
 
-        {/* Footer Note */}
-        <div className="text-center text-sm text-zinc-500 pt-8">
-          <p>Crafted by LEXA • Powered by emotional intelligence • {new Date().toLocaleDateString()}</p>
+        {/* Footer */}
+        <div className="text-center space-y-2">
+          <p className="text-xs text-zinc-400 uppercase tracking-widest">
+            {script.experience_name}&#8482; &middot; {script.tagline}
+          </p>
+          <p className="text-xs text-zinc-400">
+            A LEXA Curated Experience &middot; Never Ask &lsquo;Now What?&rsquo; Again.
+          </p>
         </div>
-        
-        {/* Legal Disclaimer */}
+
         <div className="mt-8">
           <LegalDisclaimer variant="inline" />
         </div>
@@ -303,5 +314,3 @@ export default function ScriptPreviewPage() {
     </div>
   );
 }
-
-

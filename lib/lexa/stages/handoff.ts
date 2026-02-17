@@ -1,8 +1,12 @@
 /**
  * HANDOFF Stage - Operations Agent Handoff
+ *
+ * Now integrates with the Script Engine to save Stage 1 output
+ * and trigger background Stage 2 generation.
  */
 
 import { SessionState, StageTransitionResult, ExperienceBrief } from '../types';
+import type { Stage1Output } from '@/lib/script-engine/types';
 
 export function processHandoffStage(
   state: SessionState,
@@ -83,10 +87,21 @@ export function createExperienceBriefFromState(
       script_theme: state.script.theme,
       signature_moments: state.script.signature_moments,
       protocols: state.script.protocols,
+      // Script Engine data (if available)
+      script_engine_output: (state.script as Record<string, unknown>)?.engine_output || null,
+      arc_code: (state.script as Record<string, unknown>)?.arc_code || null,
     },
     
     status: 'complete',
   };
+}
+
+/**
+ * Extract Script Engine Stage 1 output from session state.
+ * Returns null if the Script Engine was not used.
+ */
+export function getScriptEngineOutput(state: SessionState): Stage1Output | null {
+  return ((state.script as Record<string, unknown>)?.engine_output as Stage1Output) || null;
 }
 
 function deriveConversationTone(signals: SessionState['signals']): string {

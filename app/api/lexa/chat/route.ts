@@ -72,10 +72,12 @@ export async function POST(request: NextRequest) {
     
     if (user?.email) {
       userEmail = user.email;
-      // Extract first name from email (before @) as fallback
-      userName = user.email.split('@')[0];
       
-      // Try to get actual name from user metadata or profile
+      // Priority chain for user name:
+      // 1. lexa_user_profiles.first_name
+      // 2. lexa_user_profiles.full_name (take first word)
+      // 3. Supabase auth user_metadata.full_name (take first word)
+      // 4. Email prefix (last resort)
       try {
         const { data: profile } = await supabaseAdmin
           .from('lexa_user_profiles')
@@ -87,14 +89,20 @@ export async function POST(request: NextRequest) {
           userName = profile.first_name;
         } else if (profile?.full_name) {
           userName = profile.full_name.split(' ')[0];
-        }
-        
-        // Also check user_metadata from auth
-        if (user.user_metadata?.full_name && !profile?.full_name) {
-          userName = user.user_metadata.full_name.split(' ')[0];
+        } else if (user.user_metadata?.full_name) {
+          userName = String(user.user_metadata.full_name).split(' ')[0];
         }
       } catch {
-        // Fallback already set from email
+        // Try auth metadata as fallback
+        if (user.user_metadata?.full_name) {
+          userName = String(user.user_metadata.full_name).split(' ')[0];
+        }
+      }
+      
+      // Last resort: email prefix, but capitalise it
+      if (!userName) {
+        const prefix = user.email.split('@')[0];
+        userName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
       }
     }
     
@@ -170,24 +178,11 @@ export async function POST(request: NextRequest) {
     let updatedState: Partial<SessionState> = {};
     let ui: any = null;
     let assistantMessageId: string | null = null;
-    
-    // Special handling for BRIEFING_COLLECT stage
-    if (sessionState.stage === 'BRIEFING_COLLECT' || 
-        sessionState.stage === 'BRIEFING_FAST' ||
-        sessionState.stage === 'BRIEFING_DEEP') {
+
+    if (sessionState.stage === 'WELCOME' || sessionState.stage === 'INITIAL_QUESTIONS') {
+      // STREAMLINED FLOW: state machine handles transitions + Claude generates response
       
-      const briefingResult = await processBriefingInput(sessionState, userMessage);
-      updatedState = briefingResult.updatedState;
-      assistantMessage = briefingResult.nextPrompt;
-      
-      if (briefingResult.isComplete) {
-        updatedState.stage = 'SCRIPT_DRAFT';
-      }
-    } else if (sessionState.stage === 'WELCOME' || sessionState.stage === 'INITIAL_QUESTIONS') {
-      // New approach: ALWAYS use Claude for warm, helpful responses
-      // State machine handles state transitions, Claude handles conversation quality
-      
-      // 1. Get state transition logic (for state updates and UI)
+      // 1. State transition (determines next step and captures user data)
       const transition = await transitionStage(sessionState, isSyntheticStart ? '' : userMessage);
       ui = transition.ui ?? null;
       updatedState = {
@@ -195,34 +190,146 @@ export async function POST(request: NextRequest) {
         ...transition.updatedState,
         stage: transition.nextStage,
       };
-      
-      // 2. Generate warm, helpful response via Claude with full guidelines
-      let systemPrompt = getSystemPromptForStage(sessionState);
-      
-      // Add user personalization context
-      if (userName && sessionState.stage === 'WELCOME') {
-        systemPrompt = `${systemPrompt}\n\n**User context:**\n- First name: ${userName}\n- Email: ${userEmail || 'unknown'}\n\nUse their first name naturally in your welcome message to create warmth and personalization.`;
-      }
-      
-      // Add guidance based on current intake step
-      if (sessionState.stage === 'INITIAL_QUESTIONS') {
-        const intakeStep = sessionState.briefing_progress?.intake_step;
-        const guidanceNote = buildIntakeGuidanceNote(sessionState, intakeStep);
-        if (guidanceNote) {
-          systemPrompt = `${systemPrompt}\n\n${guidanceNote}`;
+
+      // 2. If transitioning to SCRIPT_DRAFT, generate Script Engine output
+      if (transition.nextStage === 'SCRIPT_DRAFT') {
+        try {
+          const { generateScriptEngineOutput } = await import('@/lib/lexa/stages/script-draft');
+          const mergedState = { ...sessionState, ...transition.updatedState } as SessionState;
+          
+          // Also pass the raw user desire to the arc matcher
+          const rawDesire = (mergedState.briefing_progress as any)?.raw_user_desire || userMessage;
+          
+          // Use the Script Engine to generate Stage 1
+          const { matchArcsFromText } = await import('@/lib/script-engine/arc-matcher');
+          const { generateStage1 } = await import('@/lib/script-engine/stages/stage1');
+          
+          const region = mergedState.brief?.where_at?.destination || 'French Riviera';
+          const duration = mergedState.brief?.duration?.days || 7;
+          
+          const { matches, journey_type } = await matchArcsFromText(rawDesire);
+          
+          if (matches.length > 0) {
+            const stage1 = await generateStage1({
+              arc_code: matches[0].arc_code,
+              journey_type,
+              region,
+              duration,
+              guest_keywords: rawDesire.split(/\s+/).filter((w: string) => w.length > 3),
+            });
+
+            // Store in state for the system prompt to use
+            updatedState = {
+              ...updatedState,
+              script: {
+                ...(sessionState.script || {}),
+                engine_output: stage1 as any,
+                arc_code: matches[0].arc_code,
+              },
+            };
+
+            // Build the script display directly as the assistant message
+            const scriptLines = [
+              `## ${stage1.experience_name}\u2122`,
+              `*${stage1.tagline}*`,
+              '',
+              '\u2500\u2500\u2500',
+              '',
+              stage1.hook,
+              '',
+              '\u2500\u2500\u2500',
+              '',
+              stage1.description,
+              '',
+              '\u2500\u2500\u2500',
+              '',
+              '### A Glimpse of What Awaits',
+              '',
+              ...stage1.highlights.map(h => `\u25C8 **${h.title}**\n${h.description}`),
+              '',
+              '\u2500\u2500\u2500',
+              '',
+              `### ${stage1.target_profile.intro}`,
+              '',
+              ...stage1.target_profile.criteria.map(c => `\u25C6 ${c}`),
+              '',
+              '\u2500\u2500\u2500',
+              '',
+              `**${stage1.quick_facts.duration}** \u00B7 **${stage1.quick_facts.region}** \u00B7 **${stage1.quick_facts.type}**`,
+              '',
+              '\u2500\u2500\u2500',
+              '',
+              '*What would you like to adjust? I can change the intensity, the region, the duration, or refine specific moments. Or say "perfect" to finalise.*',
+            ];
+
+            assistantMessage = scriptLines.join('\n');
+            updatedState.stage = 'REFINE';
+            
+            ui = {
+              quickReplies: [
+                { id: 'perfect', label: 'Perfect — save it', value: 'perfect', kind: 'other', accent: 'gold' },
+                { id: 'more_intense', label: 'More intense', value: 'Make it more intense and adventurous', kind: 'other', accent: 'amber' },
+                { id: 'more_calm', label: 'More calm', value: 'Make it calmer and more restorative', kind: 'other', accent: 'navy' },
+                { id: 'different_region', label: 'Different region', value: 'Suggest a different region', kind: 'other', accent: 'emerald' },
+              ],
+            };
+          } else {
+            // No arc match — fallback to Claude-generated script
+            const systemPrompt = getSystemPromptForStage({ ...sessionState, stage: 'SCRIPT_DRAFT' } as SessionState);
+            const claudeResponse = await generateResponseWithRetry({
+              sessionState,
+              userMessage,
+              systemPrompt,
+            });
+            assistantMessage = claudeResponse.assistantMessage;
+          }
+        } catch (err) {
+          console.error('[Chat] Script Engine error, falling back to Claude:', err);
+          const systemPrompt = getSystemPromptForStage({ ...sessionState, stage: 'SCRIPT_DRAFT' } as SessionState);
+          const claudeResponse = await generateResponseWithRetry({
+            sessionState,
+            userMessage,
+            systemPrompt,
+          });
+          assistantMessage = claudeResponse.assistantMessage;
         }
+      } else {
+        // Not yet at SCRIPT_DRAFT — generate Claude response for clarification
+        let systemPrompt = getSystemPromptForStage(sessionState);
+        
+        if (userName && sessionState.stage === 'WELCOME') {
+          systemPrompt = `${systemPrompt}\n\n**User context:**\n- First name: ${userName}\n- Email: ${userEmail || 'unknown'}\n\nUse their first name naturally in your welcome message.`;
+        }
+        
+        // Add the user's actual words to the prompt so Claude reflects them back
+        if (sessionState.stage === 'INITIAL_QUESTIONS' && !isSyntheticStart) {
+          const briefContext = [];
+          if (sessionState.brief?.theme) briefContext.push(`Theme: ${sessionState.brief.theme}`);
+          if (sessionState.brief?.where_at?.destination) briefContext.push(`Destination: ${sessionState.brief.where_at.destination}`);
+          if (sessionState.brief?.duration?.days) briefContext.push(`Duration: ${sessionState.brief.duration.days} days`);
+          
+          systemPrompt += `\n\n**What the user has told us so far:**\n${briefContext.join('\n') || 'First message from user'}\n\n**CRITICAL:** Your response MUST acknowledge and reflect back what the user just said. Do NOT ignore their input. If they said "adrenaline + yacht dinner", talk about adrenaline and yacht dinners specifically.`;
+        }
+        
+        const claudeResponse = await generateResponseWithRetry({
+          sessionState,
+          userMessage: isSyntheticStart ? 'Hello' : userMessage,
+          systemPrompt,
+        });
+        
+        assistantMessage = claudeResponse.assistantMessage;
       }
       
-      const claudeResponse = await generateResponseWithRetry({
-        sessionState,
-        userMessage: isSyntheticStart ? 'Hello' : userMessage,
-        systemPrompt,
-      });
-      
-      assistantMessage = claudeResponse.assistantMessage;
+    } else if (sessionState.stage === 'BRIEFING_COLLECT' ||
+               sessionState.stage === 'BRIEFING_FAST' ||
+               sessionState.stage === 'BRIEFING_DEEP') {
+      // Legacy briefing stages — redirect to SCRIPT_DRAFT
+      const transition = await transitionStage(sessionState, userMessage);
+      updatedState = { ...transition.updatedState, stage: transition.nextStage };
+      assistantMessage = transition.message || 'Let me design your experience now.';
       
     } else {
-      // Use Claude for conversational stages
+      // REFINE, HANDOFF, FOLLOWUP, etc.
       let systemPrompt = getSystemPromptForStage(sessionState);
       const grounding = await buildGroundedPoiContext(sessionState);
       if (grounding) systemPrompt = `${systemPrompt}\n\n${grounding}`;
@@ -235,7 +342,6 @@ export async function POST(request: NextRequest) {
       
       assistantMessage = claudeResponse.assistantMessage;
       
-      // Apply state machine transition
       const transition = await transitionStage(sessionState, userMessage);
       updatedState = {
         ...updatedState,
@@ -250,7 +356,7 @@ export async function POST(request: NextRequest) {
       ...updatedState,
     };
     
-    // 8. Handle HANDOFF stage - create experience brief
+    // 8. Handle HANDOFF stage - create experience brief + trigger Stage 2
     if (newState.stage === 'HANDOFF' && sessionState.stage !== 'HANDOFF') {
       const experienceBrief = createExperienceBriefFromState(
         newState,
@@ -258,9 +364,65 @@ export async function POST(request: NextRequest) {
         userId
       );
       
-      await supabaseAdmin
+      // Save the Script Engine Stage 1 output in the brief's metadata
+      const scriptEngineOutput = (newState.script as any)?.engine_output || null;
+      const arcCode = (newState.script as any)?.arc_code || null;
+      
+      if (scriptEngineOutput) {
+        experienceBrief.additional_context = {
+          ...experienceBrief.additional_context,
+          script_engine_output: scriptEngineOutput,
+          arc_code: arcCode,
+        };
+        // Also store hook and description for the script library card
+        (experienceBrief as any).hook = scriptEngineOutput.hook;
+        (experienceBrief as any).description = scriptEngineOutput.description;
+        (experienceBrief as any).theme_category = scriptEngineOutput.experience_name;
+      }
+      
+      const { data: insertedBrief } = await supabaseAdmin
         .from('experience_briefs')
-        .insert(experienceBrief);
+        .insert(experienceBrief)
+        .select('id')
+        .single();
+      
+      // Trigger async Stage 2 generation in background (non-blocking)
+      if (scriptEngineOutput && arcCode && insertedBrief?.id) {
+        (async () => {
+          try {
+            const { generateStage2 } = await import('@/lib/script-engine/stages/stage2');
+            const region = newState.brief?.where_at?.destination || 'French Riviera';
+            const duration = newState.brief?.duration?.days || 7;
+            
+            const stage2 = await generateStage2({
+              script_id: insertedBrief.id,
+              stage1: scriptEngineOutput,
+              arc_code: arcCode,
+              region,
+              duration,
+              journey_type: scriptEngineOutput.journey_type || 'INDIVIDUAL',
+            });
+            
+            // Store Stage 2 output in the experience brief
+            await supabaseAdmin
+              .from('experience_briefs')
+              .update({
+                additional_context: {
+                  ...experienceBrief.additional_context,
+                  script_engine_output: scriptEngineOutput,
+                  arc_code: arcCode,
+                  stage2_output: stage2,
+                  stage2_generated_at: new Date().toISOString(),
+                },
+              })
+              .eq('id', insertedBrief.id);
+            
+            console.log(`[HANDOFF] Stage 2 generated for brief ${insertedBrief.id}`);
+          } catch (err) {
+            console.error('[HANDOFF] Stage 2 background generation failed:', err);
+          }
+        })();
+      }
     }
     
     // 9. Update session
@@ -273,9 +435,33 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', session.id);
 
-    // 9b. Update durable user profile memory (best-effort)
+    // 9b. Update durable user profile memory + emotional extraction (best-effort)
     try {
-      const patch = profilePatchFromState(newState);
+      // Auto-extract emotional signals from user message
+      let emotionalExtraction = null;
+      if (!isSyntheticStart && userMessage.length >= 15) {
+        try {
+          const { extractEmotionalSignals } = await import('@/lib/lexa/emotional-extractor');
+          const { data: epData } = await supabaseAdmin
+            .from('lexa_user_profiles')
+            .select('emotional_profile')
+            .eq('user_id', userId)
+            .maybeSingle();
+          const ep = epData?.emotional_profile || {};
+          emotionalExtraction = await extractEmotionalSignals(userMessage, {
+            desired_feelings: ep.desired_feelings || [],
+            avoid_fears: ep.avoid_fears || [],
+            life_context: ep.life_context || null,
+            personality_signals: ep.personality_signals || [],
+            companion_type: ep.companion_type || null,
+            urgency: ep.urgency || null,
+          });
+        } catch (extractErr) {
+          console.warn('Emotional extraction skipped:', extractErr);
+        }
+      }
+
+      const patch = profilePatchFromState(newState, emotionalExtraction);
       const { data: existing } = await supabaseAdmin
         .from('lexa_user_profiles')
         .select('emotional_profile,preferences')
@@ -432,74 +618,39 @@ function looksLikeUserQuestion(text: string): boolean {
 
 function buildIntakeGuidanceNote(state: SessionState, intakeStep?: string): string {
   const step = intakeStep ?? state.briefing_progress?.intake_step ?? 'THEME_SELECT';
-  const logisticsStep = state.briefing_progress?.logistics_step ?? 'DURATION';
-  const selectedThemes = state.brief?.themes?.length ? state.brief.themes : state.brief?.theme ? [state.brief.theme] : [];
-  
-  let guidance = '';
-  
+
   if (step === 'THEME_SELECT') {
-    guidance = `**Current goal:** The user just started. They may describe what they want in their own words, or they may select from theme categories visible in the UI.
+    return `**Current goal:** The user just started. They may describe what they want in their own words.
 
 **Your job:**
 1) Welcome them warmly (use their name if provided)
-2) Reflect what they said if they gave input, or invite them to share what's on their mind
-3) Optionally mention the theme cards visible in the UI as inspiration (don't force it)
-4) Ask ONE warm question to understand their emotional goal
+2) If they gave input, REFLECT IT BACK SPECIFICALLY — do NOT give generic suggestions
+3) Ask at most 1-2 things: Where? How long?
+4) Maximum 150 words
 
-Remember: BE HELPFUL! If they mentioned a destination or desire, reflect it back and offer a few initial ideas before asking your question.`;
-  } else if (step === 'THEME_WHY') {
-    const themeContext = selectedThemes.length ? `They chose: ${selectedThemes.join(' + ')}` : 'They described their own theme/desire';
-    guidance = `**Current goal:** Understand WHY they want this experience and what they want to FEEL.
+CRITICAL: If the user says "adrenaline + yacht dinner", your entire response must be about adrenaline experiences and yacht dinners. Do NOT suggest generic destinations or unrelated experiences.`;
+  }
 
-${themeContext}
-
-**Your job:**
-1) Acknowledge their theme/desire warmly
-2) Offer 2-3 initial ideas of what this could look like (destinations, moments, or experiences)
-3) Then ask: what do they want to feel, and what do they want to avoid?
-
-Be warm and helpful, not interrogative!`;
-  } else if (step === 'MEMORY') {
-    guidance = `**Current goal:** Understand their past peak experiences to design better.
-
-**Your job:**
-1) Thank them for sharing their feelings/desires
-2) Offer 1-2 ideas of signature moments that could deliver those feelings
-3) Then gently ask: what was the best moment from their last great holiday, and what made it work?
-
-Optional: mention they can also share what ruined a trip, so you can design around it.`;
-  } else if (step === 'HOOK_CONFIRM') {
-    const hook = state.micro_wow?.hook || 'your experience direction';
-    const highlights = state.script?.signature_moments || [];
-    guidance = `**Current goal:** Present the emotional direction you'd design for them and get confirmation.
-
-Your hook: "${hook}"
-Signature highlights: ${highlights.length ? highlights.join('; ') : 'None yet'}
-
-**Your job:**
-1) Present the hook and 3-5 signature highlights in an inspiring way
-2) Ask if this feels like the right emotional direction (yes/no)
-
-Make it feel like a proposal, not a quiz!`;
-  } else if (step === 'LOGISTICS') {
+  if (step === 'CLARIFY') {
     const whatWeKnow = [];
-    if (state.brief?.duration?.days) whatWeKnow.push(`${state.brief.duration.days} days`);
-    if (state.brief?.when_at?.timeframe) whatWeKnow.push(state.brief.when_at.timeframe);
-    if (state.brief?.where_at?.destination) whatWeKnow.push(state.brief.where_at.destination);
-    
-    guidance = `**Current goal:** Gather practical details (duration, timing, destination) to make the experience real.
+    if (state.brief?.theme) whatWeKnow.push(`Desire: ${state.brief.theme}`);
+    if (state.brief?.where_at?.destination) whatWeKnow.push(`Destination: ${state.brief.where_at.destination}`);
+    if (state.brief?.duration?.days) whatWeKnow.push(`Duration: ${state.brief.duration.days} days`);
 
-What we know so far: ${whatWeKnow.length ? whatWeKnow.join(', ') : 'Nothing yet'}
+    return `**Current goal:** Get the 1-2 missing details to generate a script.
+
+What we know: ${whatWeKnow.join(', ') || 'Their desire (see user message)'}
 
 **Your job:**
-1) Acknowledge the emotional direction you've established
-2) Offer initial destination suggestions based on their themes/desires (2-3 options with brief why)
-3) Then ask about practical details: How many days? When? Any destinations in mind?
+1) Acknowledge what they want — be SPECIFIC to their words
+2) Offer 2-3 ideas that MATCH what they described
+3) Ask ONLY for what's missing (where? how long?)
+4) Maximum 120 words
 
-You can ask about multiple logistics in ONE question if it flows naturally - but still offer ideas first!`;
+Do NOT ask about budget, memories, feelings, structure, or alternatives. Just where and how long.`;
   }
   
-  return guidance || '';
+  return '';
 }
 
 function buildIntakeFallbackSystemPrompt(state: SessionState): string {

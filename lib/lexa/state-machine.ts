@@ -1,6 +1,12 @@
 /**
  * LEXA UI Agent - Core State Machine
- * Deterministic conversation flow with 10+ stages
+ *
+ * STREAMLINED FLOW (3-4 messages to script):
+ *
+ *   WELCOME → INITIAL_QUESTIONS (1-2 messages) → SCRIPT_DRAFT → REFINE → HANDOFF → FOLLOWUP
+ *
+ * The old stages (DISARM, MIRROR, MICRO_WOW, COMMIT, BRIEFING_*)
+ * are bypassed. Users get a script in 3 messages, then refine.
  */
 
 import {
@@ -23,39 +29,41 @@ export async function transitionStage(
   switch (stage) {
     case 'WELCOME':
       return handleWelcomeStage(currentState, userInput);
-    
+
     case 'INITIAL_QUESTIONS':
       return await handleInitialQuestionsStage(currentState, userInput);
-    
+
+    // Legacy stages — redirect to INITIAL_QUESTIONS to avoid getting stuck
     case 'DISARM':
-      return handleDisarmStage(currentState, userInput);
-    
     case 'MIRROR':
-      return handleMirrorStage(currentState, userInput);
-    
     case 'MICRO_WOW':
-      return handleMicroWowStage(currentState, userInput);
-    
     case 'COMMIT':
-      return handleCommitStage(currentState, userInput);
-    
     case 'BRIEFING_FAST':
     case 'BRIEFING_DEEP':
     case 'BRIEFING_COLLECT':
-      return handleBriefingStages(currentState, userInput);
-    
+      return {
+        nextStage: 'INITIAL_QUESTIONS',
+        updatedState: {
+          briefing_progress: {
+            ...currentState.briefing_progress,
+            intake_step: 'CLARIFY',
+          },
+        },
+        message: `Let me focus on what matters. Tell me where and how long, and I'll design your experience.`,
+      };
+
     case 'SCRIPT_DRAFT':
       return handleScriptDraftStage(currentState, userInput);
-    
+
     case 'REFINE':
       return handleRefineStage(currentState, userInput);
-    
+
     case 'HANDOFF':
       return handleHandoffStage(currentState, userInput);
-    
+
     case 'FOLLOWUP':
       return handleFollowupStage(currentState, userInput);
-    
+
     default:
       return {
         nextStage: 'WELCOME',
@@ -75,39 +83,22 @@ export function getNextStagePrompt(state: SessionState): string {
   switch (stage) {
     case 'WELCOME':
       return getWelcomePrompt(state);
-    
+
     case 'INITIAL_QUESTIONS':
       return getInitialQuestionsPrompt(state);
-    
-    case 'DISARM':
-      return getDisarmPrompt(state);
-    
-    case 'MIRROR':
-      return getMirrorPrompt(state);
-    
-    case 'MICRO_WOW':
-      return getMicroWowPrompt(state);
-    
-    case 'COMMIT':
-      return getCommitPrompt(state);
-    
-    case 'BRIEFING_FAST':
-    case 'BRIEFING_DEEP':
-    case 'BRIEFING_COLLECT':
-      return getBriefingPrompt(state);
-    
+
     case 'SCRIPT_DRAFT':
       return getScriptDraftPrompt(state);
-    
+
     case 'REFINE':
       return getRefinePrompt(state);
-    
+
     case 'HANDOFF':
       return getHandoffPrompt(state);
-    
+
     case 'FOLLOWUP':
       return getFollowupPrompt(state);
-    
+
     default:
       return 'I\'m LEXA. Let\'s start fresh.';
   }
@@ -119,27 +110,13 @@ export function getNextStagePrompt(state: SessionState): string {
 
 export function canProgressToBriefing(state: SessionState): boolean {
   const { when_at, where_at, theme } = state.brief;
-  // At least ONE of the core trio must be provided
   return !!(when_at || where_at || theme);
 }
 
 export function areAllBriefFieldsCollected(state: SessionState): boolean {
-  const { brief, emotions } = state;
-  
-  const requiredFields = [
-    brief.when_at,
-    brief.where_at,
-    brief.theme,
-    brief.budget,
-    brief.duration,
-    brief.must_haves.length > 0,
-    brief.best_experiences.length > 0,
-    brief.worst_experiences.length > 0,
-    brief.bucket_list.length > 0,
-    emotions.success_definition,
-  ];
-  
-  return requiredFields.every(field => !!field);
+  const { brief } = state;
+  // Streamlined: we only need destination + duration to generate a script
+  return !!(brief.where_at?.destination && brief.duration?.days);
 }
 
 // ============================================================================
@@ -155,7 +132,7 @@ function handleWelcomeStage(
     updatedState: {
       client: {
         ...state.client,
-        voice_reply_enabled: false, // MVP: text-only
+        voice_reply_enabled: false,
       },
       briefing_progress: {
         ...state.briefing_progress,
@@ -164,7 +141,7 @@ function handleWelcomeStage(
       },
     },
     message:
-      `Welcome to LEXA.\n\nTell me what you’re craving - in your own words.\n\nIf you want inspiration, you can tap one of the example prompts beside the chat.\n\nWhat’s on your mind?`,
+      `Welcome to LEXA.\n\nTell me what you're craving — in your own words. Be specific.\n\nFor example: "Adrenaline experiences on the French Riviera with a sunset dinner on a yacht" or "A quiet wellness retreat for two in Greece."\n\nYou can also tap a theme below, or hold the microphone to speak.`,
   };
 }
 
@@ -172,149 +149,8 @@ async function handleInitialQuestionsStage(
   state: SessionState,
   userInput: string
 ): Promise<StageTransitionResult> {
-  // Import the handler from initial-questions stage
   const { processInitialQuestionsStage } = await import('./stages/initial-questions');
   return await processInitialQuestionsStage(state, userInput);
-}
-
-function handleDisarmStage(
-  state: SessionState,
-  userInput: string
-): StageTransitionResult {
-  // Extract emotional signals from user response
-  // This will be enhanced with Claude integration
-  
-  return {
-    nextStage: 'MIRROR',
-    updatedState: {
-      emotions: {
-        ...state.emotions,
-        current_state: 'analyzing', // Will be replaced by Claude extraction
-      },
-    },
-    message: `I'm listening. Tell me more.`,
-  };
-}
-
-function handleMirrorStage(
-  state: SessionState,
-  userInput: string
-): StageTransitionResult {
-  const lowerInput = userInput.toLowerCase();
-  
-  // Check for score (will be enhanced with Claude)
-  const scoreMatch = lowerInput.match(/(\d+)/);
-  const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
-  
-  if (score >= 7) {
-    return {
-      nextStage: 'MICRO_WOW',
-      updatedState: {
-        signals: {
-          ...state.signals,
-          trust: 0.7 + (score - 7) * 0.1,
-        },
-      },
-      message: `Good. Now let me show you what I mean.`,
-    };
-  } else if (score >= 4 && state.briefing_progress.retry_count < 1) {
-    return {
-      nextStage: 'MIRROR',
-      updatedState: {
-        briefing_progress: {
-          ...state.briefing_progress,
-          retry_count: state.briefing_progress.retry_count + 1,
-        },
-      },
-      message: `What part is wrong: the feeling, the blocker, or both?`,
-    };
-  } else {
-    return {
-      nextStage: 'DISARM',
-      updatedState: {},
-      message: `Let me try again. Give me one sentence: "I want to feel ___, but I'm tired of ___."`,
-    };
-  }
-}
-
-function handleMicroWowStage(
-  state: SessionState,
-  userInput: string
-): StageTransitionResult {
-  return {
-    nextStage: 'COMMIT',
-    updatedState: {
-      micro_wow: {
-        delivered: true,
-        hook: 'stub_recommendation', // Will be replaced by actual recommender
-      },
-    },
-    message: `If you like this direction, I'll design a full Experience Script.`,
-  };
-}
-
-function handleCommitStage(
-  state: SessionState,
-  userInput: string
-): StageTransitionResult {
-  const lowerInput = userInput.toLowerCase();
-  
-  const wantsFast = lowerInput.includes('fast') || lowerInput.includes('quick') || lowerInput.includes('2');
-  const wantsDeep = lowerInput.includes('deep') || lowerInput.includes('detail') || lowerInput.includes('7');
-  
-  if (wantsFast) {
-    return {
-      nextStage: 'BRIEFING_FAST',
-      updatedState: {
-        intent: {
-          ...state.intent,
-          urgency: 'fast',
-        },
-      },
-      message: `Fast Path it is. Let's get the essentials.`,
-    };
-  } else {
-    return {
-      nextStage: 'BRIEFING_DEEP',
-      updatedState: {
-        intent: {
-          ...state.intent,
-          urgency: 'deep',
-        },
-      },
-      message: `Deep Path chosen. This will be worth it.`,
-    };
-  }
-}
-
-function handleBriefingStages(
-  state: SessionState,
-  userInput: string
-): StageTransitionResult {
-  // Move to BRIEFING_COLLECT if not already there
-  if (state.stage !== 'BRIEFING_COLLECT') {
-    return {
-      nextStage: 'BRIEFING_COLLECT',
-      updatedState: {},
-      message: `Let's gather what I need to design this.`,
-    };
-  }
-  
-  // Check if all fields are collected
-  if (areAllBriefFieldsCollected(state)) {
-    return {
-      nextStage: 'SCRIPT_DRAFT',
-      updatedState: {},
-      message: `Perfect. I have everything I need.`,
-    };
-  }
-  
-  // Continue collecting (detailed logic in briefing-collect.ts)
-  return {
-    nextStage: 'BRIEFING_COLLECT',
-    updatedState: {},
-    message: `Next question coming...`,
-  };
 }
 
 function handleScriptDraftStage(
@@ -338,9 +174,11 @@ function handleRefineStage(
   userInput: string
 ): StageTransitionResult {
   const lowerInput = userInput.toLowerCase();
-  
-  const isDone = lowerInput.includes('done') || lowerInput.includes('perfect') || lowerInput.includes('ready');
-  
+
+  const isDone = lowerInput.includes('done') || lowerInput.includes('perfect') ||
+    lowerInput.includes('ready') || lowerInput.includes('love it') ||
+    lowerInput.includes('yes') || lowerInput.includes('book');
+
   if (isDone) {
     return {
       nextStage: 'HANDOFF',
@@ -348,7 +186,7 @@ function handleRefineStage(
       message: `Excellent. Let me prepare your handoff.`,
     };
   }
-  
+
   return {
     nextStage: 'REFINE',
     updatedState: {},
@@ -379,113 +217,31 @@ function handleFollowupStage(
 }
 
 // ============================================================================
-// PROMPT GETTERS (exact prompts for each stage)
+// PROMPT GETTERS
 // ============================================================================
 
 function getWelcomePrompt(state: SessionState): string {
-  return `Welcome to LEXA.
-
-Tell me what you’re craving - in your own words.
-
-What’s on your mind?`;
+  return `Welcome to LEXA.\n\nTell me what you're craving — in your own words.\n\nWhat's on your mind?`;
 }
 
 function getInitialQuestionsPrompt(state: SessionState): string {
-  return `Three questions to begin:
-
-**When** might you travel? 
-**Where** does your imagination wander? 
-**What kind of experience** are you seeking?
-
-Share whatever comes to mind first. One answer is enough to start.`;
-}
-
-function getDisarmPrompt(state: SessionState): string {
-  const { skepticism, arrogance } = state.signals;
-  
-  if (skepticism > 0.5 || arrogance > 0.5) {
-    return `What would make even a perfect experience feel pointless to you?`;
-  }
-  
-  if (state.emotions.current_state === 'tired' || state.emotions.current_state === 'burned_out') {
-    return `When did luxury last work on you-what did it give you emotionally?`;
-  }
-  
-  return `What feeling do you want more than anything right now?`;
-}
-
-function getMirrorPrompt(state: SessionState): string {
-  const desired = state.emotions.desired[0] || 'something meaningful';
-  const avoid = state.emotions.avoid_fears[0] || 'disappointment';
-  
-  return `Here's my hypothesis. You're not chasing luxury. You're chasing ${desired}, and what ruins it is ${avoid}.
-
-How close am I-0 to 10?`;
-}
-
-function getMicroWowPrompt(state: SessionState): string {
-  return `I'm not recommending [activity]. I'm recommending [protocol version].
-
-Because you want [desired feeling] and you want to avoid [fear].
-
-If you like this direction, I'll design a full Experience Script.`;
-}
-
-function getCommitPrompt(state: SessionState): string {
-  return `Choose your path:
-
-**Fast Path (2 minutes)**: a strong first draft.
-
-**Deep Path (7 minutes)**: built to change how this feels.`;
-}
-
-function getBriefingPrompt(state: SessionState): string {
-  return `Let me gather what I need to design this experience.`;
+  return `Tell me what kind of experience you're looking for. Be as specific as you like — I'll design around exactly what you describe.`;
 }
 
 function getScriptDraftPrompt(state: SessionState): string {
-  return `**Your Experience Script**
-
-[Title / Theme]
-
-[Why this will work on you]
-
-**3 Signature Moments:**
-- [Moment 1]
-- [Moment 2]
-- [Moment 3]
-
-**Protocols:**
-- [Privacy/Time/Crowds/Safety]
-
-**Legacy Artifact:**
-- [Memory keeper]
-
-Two refinements: more private or more social? more calm or more edge?`;
+  return `Here's your Experience Script — designed around what you described.`;
 }
 
 function getRefinePrompt(state: SessionState): string {
-  return `What should feel more private?
-
-More intensity or more calm?
-
-Is this a memory for you-or a legacy for someone else?`;
+  return `What would you like to adjust? I can make it more intense, more intimate, change the region, or refine specific moments.`;
 }
 
 function getHandoffPrompt(state: SessionState): string {
-  return `If you want, I can now:
-
-- Generate the Operational Brief (for crew/concierge).
-- Generate the Booking Requirements (partners).
-- Turn this into a SYCC-ready Travel Script™.`;
+  return `Your Experience Script is complete. I can now:\n\n- Save it to your account\n- Generate the full day-by-day journey\n- Prepare booking assets for your charter team`;
 }
 
 function getFollowupPrompt(state: SessionState): string {
-  return `Which moment stayed with you?
-
-What surprised you emotionally?
-
-What would you never want again?`;
+  return `How did it feel? Which moment stayed with you?`;
 }
 
 // ============================================================================
@@ -500,5 +256,3 @@ export function initializeSession(userId: string): SessionState {
     },
   };
 }
-
-
