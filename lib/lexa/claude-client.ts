@@ -23,6 +23,7 @@ export interface ClaudeRequest {
   sessionState: SessionState;
   userMessage: string;
   systemPrompt: string;
+  conversationHistory?: { role: 'user' | 'assistant'; content: string }[];
 }
 
 export interface ClaudeResponse {
@@ -34,22 +35,38 @@ export interface ClaudeResponse {
 export async function generateResponse(
   request: ClaudeRequest
 ): Promise<ClaudeResponse> {
-  const { sessionState, userMessage, systemPrompt } = request;
+  const { sessionState, userMessage, systemPrompt, conversationHistory } = request;
   
   try {
+    // Build messages array with conversation history for context
+    const messages: { role: 'user' | 'assistant'; content: string }[] = [];
+    
+    if (conversationHistory && conversationHistory.length > 0) {
+      // Include up to the last 10 messages for context (avoid token overflow)
+      const recentHistory = conversationHistory.slice(-10);
+      for (const msg of recentHistory) {
+        messages.push({ role: msg.role, content: msg.content });
+      }
+    }
+    
+    // Add the current user message
+    messages.push({ role: 'user', content: userMessage });
+    
+    // Ensure messages alternate correctly (Claude requirement)
+    const cleanedMessages = ensureAlternatingRoles(messages);
+    
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
       system: buildSystemPrompt(systemPrompt, sessionState),
-      messages: [
-        {
-          role: 'user',
-          content: userMessage,
-        },
-      ],
+      messages: cleanedMessages,
     });
     
-    const assistantMessage = extractTextFromResponse(response);
+    let assistantMessage = extractTextFromResponse(response);
+    
+    // SAFETY: Prevent system prompt from leaking into the response
+    assistantMessage = sanitizeResponse(assistantMessage);
+    
     const extractedSignals = extractSignalsFromResponse(assistantMessage, sessionState);
     
     return {
@@ -61,12 +78,72 @@ export async function generateResponse(
   } catch (error) {
     console.error('Claude API error:', error);
     
-    // Fallback response
     return {
       assistantMessage: 'I\'m having trouble connecting. Can you repeat that?',
       extractedSignals: {},
     };
   }
+}
+
+/**
+ * Ensure messages alternate between user and assistant.
+ * Claude requires this pattern. Merge consecutive same-role messages.
+ */
+function ensureAlternatingRoles(
+  messages: { role: 'user' | 'assistant'; content: string }[]
+): { role: 'user' | 'assistant'; content: string }[] {
+  if (messages.length === 0) return [{ role: 'user', content: 'Hello' }];
+  
+  const result: { role: 'user' | 'assistant'; content: string }[] = [];
+  
+  for (const msg of messages) {
+    if (result.length > 0 && result[result.length - 1].role === msg.role) {
+      // Merge consecutive same-role messages
+      result[result.length - 1].content += '\n' + msg.content;
+    } else {
+      result.push({ ...msg });
+    }
+  }
+  
+  // Claude requires the first message to be from the user
+  if (result[0]?.role !== 'user') {
+    result.unshift({ role: 'user', content: 'Hello' });
+  }
+  
+  return result;
+}
+
+/**
+ * Remove system prompt fragments that Claude may accidentally echo back.
+ */
+function sanitizeResponse(text: string): string {
+  // Check for system prompt markers
+  const leakIndicators = [
+    '# System Prompt',
+    'Your refined character:',
+    'Your conversation style (CRITICAL',
+    'Anti-hallucination rule',
+    'Current engagement:\n- Stage:',
+    'Your mandate for this interaction:',
+    'Communication principles:',
+    '**Forbidden:**',
+  ];
+  
+  for (const indicator of leakIndicators) {
+    if (text.includes(indicator)) {
+      console.warn('[SAFETY] System prompt leak detected in Claude response, filtering out');
+      // Try to extract any useful content before the leak
+      const idx = text.indexOf(indicator);
+      const before = text.slice(0, idx).trim();
+      if (before.length > 20) {
+        return before;
+      }
+      // Full leak — return a safe fallback
+      return 'I have all the details. Let me design your experience now.';
+    }
+  }
+  
+  return text;
 }
 
 // ============================================================================

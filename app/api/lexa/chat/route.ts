@@ -174,6 +174,30 @@ export async function POST(request: NextRequest) {
       // Non-blocking -- continue without profile data
     }
 
+    // 4c. Load conversation history for Claude context
+    let conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [];
+    if (session?.id) {
+      try {
+        const { data: historyData } = await supabaseAdmin
+          .from('lexa_messages')
+          .select('role, content')
+          .eq('session_id', session.id)
+          .order('created_at', { ascending: true })
+          .limit(20);
+
+        if (historyData) {
+          conversationHistory = historyData
+            .filter((m: { role: string; content: string }) => m.role === 'user' || m.role === 'assistant')
+            .map((m: { role: string; content: string }) => ({
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+            }));
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
+
     // 5. Insert user message (skip for synthetic start)
     let userMessageId: string | null = null;
     if (!isSyntheticStart) {
@@ -305,6 +329,7 @@ export async function POST(request: NextRequest) {
               sessionState,
               userMessage,
               systemPrompt,
+              conversationHistory,
             });
             assistantMessage = claudeResponse.assistantMessage;
           }
@@ -315,6 +340,7 @@ export async function POST(request: NextRequest) {
             sessionState,
             userMessage,
             systemPrompt,
+            conversationHistory,
           });
           assistantMessage = claudeResponse.assistantMessage;
         }
@@ -343,6 +369,7 @@ export async function POST(request: NextRequest) {
           sessionState,
           userMessage: isSyntheticStart ? 'Hello' : userMessage,
           systemPrompt,
+          conversationHistory,
         });
         
         assistantMessage = claudeResponse.assistantMessage;
@@ -366,6 +393,7 @@ export async function POST(request: NextRequest) {
         sessionState,
         userMessage,
         systemPrompt,
+        conversationHistory,
       });
       
       assistantMessage = claudeResponse.assistantMessage;
