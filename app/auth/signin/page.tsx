@@ -121,12 +121,12 @@ function SignInForm() {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-zinc-600">
-              Not registered yet?{' '}
+              Want access?{' '}
               <Link
-                href="/auth/signup"
+                href="/"
                 className="font-semibold text-lexa-navy hover:text-lexa-gold transition-colors"
               >
-                Click here to sign up.
+                Request a demo
               </Link>
             </p>
           </div>
