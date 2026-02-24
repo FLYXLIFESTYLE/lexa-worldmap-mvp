@@ -144,8 +144,20 @@ export default function LandingPage() {
           </div>
         </div>
         
+        {/* Partner Link */}
+        <div className="mt-16 mb-8">
+          <a
+            href="https://lexa-partner-hub.base44.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-medium text-zinc-300 backdrop-blur-sm transition-all hover:border-lexa-gold/30 hover:text-lexa-gold hover:bg-white/10"
+          >
+            Partner with LEXA &rarr;
+          </a>
+        </div>
+
         {/* Footer Note */}
-        <div className="space-y-2 mt-20">
+        <div className="space-y-2 mt-12">
           <p className="text-sm text-zinc-500 tracking-wide">
             Powered by Claude Sonnet 4.5 &amp; Neo4j
           </p>
