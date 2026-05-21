@@ -4,12 +4,13 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import LuxuryBackground from '@/components/luxury-background';
+import { canShowUserLoginForm } from '@/lib/auth/user-access';
 
 function SignInForm() {
   const [email, setEmail] = useState('');
@@ -22,6 +23,7 @@ function SignInForm() {
 
   // Get redirectTo from URL params - default to account dashboard
   const redirectTo = searchParams.get('redirectTo') || '/account';
+  const showLoginForm = canShowUserLoginForm(redirectTo);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +73,21 @@ function SignInForm() {
         </div>
 
         {/* Form Card */}
+        {!showLoginForm ? (
+          <div className="rounded-2xl bg-white/95 backdrop-blur-lg p-8 shadow-2xl border border-zinc-200/50 text-center">
+            <div className="mb-4 text-5xl">🔒</div>
+            <h3 className="mb-3 text-2xl font-bold text-lexa-navy">User login disabled</h3>
+            <p className="text-zinc-600 mb-6">
+              LEXA is in private beta. User sign-in is currently unavailable.
+            </p>
+            <Link
+              href="/"
+              className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-lexa-gold to-yellow-600 px-4 py-4 font-semibold text-zinc-900 transition-all hover:shadow-xl hover:scale-105 inline-flex items-center justify-center"
+            >
+              Request a Demo
+            </Link>
+          </div>
+        ) : (
         <div className="rounded-2xl bg-white/95 backdrop-blur-lg p-8 shadow-2xl border border-zinc-200/50">
           <form onSubmit={handleSignIn} className="space-y-6">
             {error && (
@@ -131,6 +148,7 @@ function SignInForm() {
             </p>
           </div>
         </div>
+        )}
 
         {/* Back Link */}
         <div className="mt-6 text-center">

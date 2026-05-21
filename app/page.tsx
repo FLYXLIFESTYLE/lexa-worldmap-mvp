@@ -116,13 +116,6 @@ export default function LandingPage() {
             <span className="relative z-10">Request a Demo</span>
             <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-lexa-gold opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </button>
-          
-          <Link
-            href="/app"
-            className="rounded-full border-2 border-zinc-600 px-10 py-5 text-lg font-semibold text-white backdrop-blur-sm transition-all hover:border-lexa-gold hover:bg-white/5 hover:text-lexa-gold"
-          >
-            Welcome Back
-          </Link>
         </div>
         
         {/* Features Grid */}

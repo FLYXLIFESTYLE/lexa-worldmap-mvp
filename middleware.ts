@@ -5,6 +5,7 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { USER_LOGIN_ENABLED } from '@/lib/auth/user-access';
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -58,6 +59,10 @@ export async function middleware(request: NextRequest) {
   // Protect /app routes - redirect to signin if not authenticated
   if (path.startsWith('/app') && !user) {
     const url = request.nextUrl.clone();
+    if (!USER_LOGIN_ENABLED) {
+      url.pathname = '/';
+      return NextResponse.redirect(url);
+    }
     url.pathname = '/auth/signin';
     url.searchParams.set('redirectTo', path);
     return NextResponse.redirect(url);

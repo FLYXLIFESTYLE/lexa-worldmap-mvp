@@ -23,11 +23,13 @@ export default function ResendVerificationPage() {
     setLoading(true);
 
     try {
+      // Use NEXT_PUBLIC_SITE_URL in production so verification links point to your live site, not localhost
+      const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, '');
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${baseUrl}/auth/callback`,
         },
       });
 
@@ -144,12 +146,12 @@ export default function ResendVerificationPage() {
                 </Link>
               </p>
               <p className="text-sm text-zinc-600">
-                Not registered yet?{' '}
+                Need access?{' '}
                 <Link
-                  href="/auth/signup"
+                  href="/"
                   className="font-semibold text-lexa-navy hover:text-lexa-gold transition-colors"
                 >
-                  Sign up
+                  Request a demo
                 </Link>
               </p>
             </div>
