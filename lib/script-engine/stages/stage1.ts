@@ -116,7 +116,7 @@ async function generateHook(
     const primaryArchetype = archetypes[0];
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 200,
       messages: [
         {
@@ -165,7 +165,7 @@ async function generateDescription(
     const anthropic = new Anthropic();
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 400,
       messages: [
         {

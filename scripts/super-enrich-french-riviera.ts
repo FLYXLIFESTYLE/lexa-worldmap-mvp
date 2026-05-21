@@ -205,7 +205,7 @@ async function scrapeWebsite(url: string): Promise<WebsiteData | null> {
     
     // Use Claude to extract structured data from HTML
     const extraction = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       messages: [{
         role: 'user',
@@ -277,7 +277,7 @@ Return ONLY a JSON object:
 Include 2-4 items per category with confidence scores 0.6-1.0. Return only valid JSON.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 800,
       messages: [{ role: 'user', content: prompt }]
     });

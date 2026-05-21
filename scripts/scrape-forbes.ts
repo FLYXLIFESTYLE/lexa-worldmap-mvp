@@ -81,7 +81,7 @@ async function scrapeForbesPage(pageUrl: string, type: string, rating: string): 
     console.log('🤖 Using Claude AI to extract POIs...');
     
     const extraction = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4000,
       messages: [{
         role: 'user',

@@ -5,7 +5,7 @@
  * Voice input is transcribed in real-time and placed into the text field.
  */
 
-'use client';
+import { CLAUDE_SONNET_LABEL } from '@/lib/anthropic-config';
 
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { Mic, MicOff, Send } from 'lucide-react';
@@ -152,7 +152,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
           Press Enter to send, Shift+Enter for new line
           {voiceSupported && ' · Hold mic to speak'}
         </span>
-        <span className="text-lexa-gold">Powered by Claude Sonnet 4.5</span>
+        <span className="text-lexa-gold">Powered by {CLAUDE_SONNET_LABEL}</span>
       </div>
     </div>
   );

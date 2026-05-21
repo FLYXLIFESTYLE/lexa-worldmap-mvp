@@ -152,7 +152,7 @@ async function scrapeWebsite(url: string): Promise<{ description?: string; highl
     
     // Use Claude to extract meaningful content
     const extraction = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 2000,
       messages: [{
         role: 'user',
@@ -282,7 +282,7 @@ Return ONLY valid JSON:
 Use proper capitalization (e.g., "Fine Dining", "Tranquility", "Exclusivity", "Crowds").`;
 
     const analysis = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       messages: [{
         role: 'user',

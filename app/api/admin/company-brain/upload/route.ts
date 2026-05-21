@@ -95,7 +95,7 @@ export async function POST(req: Request) {
 
     // Claude extraction with structured output
     const anthropic = new Anthropic({ apiKey: anthropicKey });
-    const MODEL = 'claude-sonnet-4-5-20250929';
+    const MODEL = 'claude-sonnet-4-6';
 
     const system = `You are a company knowledge archaeologist for LEXA, a luxury travel AI.
 

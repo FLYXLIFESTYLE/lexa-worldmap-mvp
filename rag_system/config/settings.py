@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     default_llm: str = "anthropic"
     model_name: str = "claude-3-sonnet-20240229"
-    anthropic_model: str = "claude-sonnet-4-5-20250929"
+    anthropic_model: str = "claude-sonnet-4-6"
     openai_text_model: str = "gpt-4o-mini"
     openai_vision_model: str = "gpt-4o-mini"
     

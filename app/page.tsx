@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import LuxuryBackground from '@/components/luxury-background';
+import { CLAUDE_SONNET_LABEL } from '@/lib/anthropic-config';
 import { X, Loader2, Check, Send } from 'lucide-react';
 
 export default function LandingPage() {
@@ -152,7 +153,7 @@ export default function LandingPage() {
         {/* Footer Note */}
         <div className="space-y-2 mt-12">
           <p className="text-sm text-zinc-500 tracking-wide">
-            Powered by Claude Sonnet 4.5 &amp; Neo4j
+            Powered by {CLAUDE_SONNET_LABEL} &amp; Neo4j
           </p>
           <p className="text-xs text-zinc-600">
             Sophisticated travel experience design

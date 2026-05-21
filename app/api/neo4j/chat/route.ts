@@ -217,7 +217,7 @@ Now generate a Cypher query for the user's question. Return ONLY the Cypher quer
   ];
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: systemPrompt,
     messages,
@@ -265,7 +265,7 @@ ${results.length > 10 ? `\n(Showing first 10 of ${results.length} results)` : ''
 Provide a natural language summary:`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 512,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],

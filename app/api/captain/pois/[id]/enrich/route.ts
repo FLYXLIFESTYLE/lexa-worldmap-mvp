@@ -187,7 +187,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // 2) Claude extraction (ONLY from Tavily snippets we provide)
     const anthropic = new Anthropic({ apiKey: anthropicKey });
-    const MODEL = 'claude-sonnet-4-5-20250929';
+    const MODEL = 'claude-sonnet-4-6';
 
     const numberedSources = sources
       .map((r, i) => {

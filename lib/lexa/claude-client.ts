@@ -6,13 +6,14 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SessionState, ExtractedSignals } from './types';
 import { LEXA_COMMUNICATION_GUIDELINES } from './communication-guidelines';
+import { CLAUDE_SONNET_MODEL } from '@/lib/anthropic-config';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
 
-const MODEL = 'claude-sonnet-4-5-20250929';
+const MODEL = CLAUDE_SONNET_MODEL;
 const MAX_TOKENS = 1024;
 
 // ============================================================================

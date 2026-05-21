@@ -31,12 +31,12 @@ class IntelligenceExtractor:
             # Don't raise error on init - let it fail when actually called
             self.client = None
             # Use a currently supported Anthropic model
-            self.model = "claude-sonnet-4-20250514"
+            self.model = "claude-sonnet-4-6"
         else:
             print(f"Initializing Anthropic client with API key (length: {len(api_key)})")
             self.client = anthropic.Anthropic(api_key=api_key)
             # Use a currently supported Anthropic model
-            self.model = "claude-sonnet-4-20250514"
+            self.model = "claude-sonnet-4-6"
             print(f"Using model: {self.model}")
     
     async def extract_all_intelligence(
@@ -127,7 +127,7 @@ class IntelligenceExtractor:
             if '404' in error_msg or 'not_found' in error_msg.lower() or 'model' in error_msg.lower():
                 enhanced_error = (
                     f"Claude model '{self.model}' not found (404). "
-                    f"Try updating to a supported model (e.g. claude-sonnet-4-20250514). "
+                    f"Try updating to a supported model (e.g. claude-sonnet-4-6). "
                     f"Original error: {error_msg}"
                 )
                 print(f"⚠️ CRITICAL: {enhanced_error}")

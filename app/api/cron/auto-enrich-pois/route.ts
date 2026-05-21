@@ -147,7 +147,7 @@ export async function GET(req: Request) {
     }
 
     const anthropic = new Anthropic({ apiKey: anthropicKey });
-    const MODEL = 'claude-sonnet-4-5-20250929';
+    const MODEL = 'claude-sonnet-4-6';
 
     const processed: Array<{ id: string; ok: boolean; error?: string }> = [];
 

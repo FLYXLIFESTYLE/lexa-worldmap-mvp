@@ -42,7 +42,7 @@ class CompanyBrainAgent:
         else:
             self.client = anthropic.Anthropic(api_key=api_key)
         
-        self.model = "claude-sonnet-4-20250514"
+        self.model = "claude-sonnet-4-6"
         self.supabase = get_supabase()
     
     async def analyze_historical_conversation(

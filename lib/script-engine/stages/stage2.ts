@@ -83,7 +83,7 @@ async function generatePhilosophy(
   try {
     const anthropic = new Anthropic();
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 600,
       messages: [
         {
@@ -239,7 +239,7 @@ async function generateDayNarrative(
     const poiContext = pois.map((p) => `${p.name}: ${p.short_description}`).join("\n");
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 400,
       messages: [
         {

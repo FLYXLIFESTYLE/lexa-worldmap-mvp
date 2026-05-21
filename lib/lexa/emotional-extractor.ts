@@ -49,7 +49,7 @@ export async function extractEmotionalSignals(
     const anthropic = new Anthropic();
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 300,
       messages: [
         {

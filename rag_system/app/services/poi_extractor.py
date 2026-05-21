@@ -18,7 +18,7 @@ class POIExtractor:
             api_key=os.getenv('ANTHROPIC_API_KEY')
         )
         # Use a currently supported Anthropic model
-        self.model = "claude-sonnet-4-20250514"
+        self.model = "claude-sonnet-4-6"
     
     async def extract_pois_from_text(
         self,

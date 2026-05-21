@@ -151,7 +151,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // 2) Claude classify + extract structured signals from the provided snippets
     const anthropic = new Anthropic({ apiKey: anthropicKey });
-    const MODEL = 'claude-sonnet-4-5-20250929';
+    const MODEL = 'claude-sonnet-4-6';
 
     const numberedSources = sources
       .map((r, i) => {
