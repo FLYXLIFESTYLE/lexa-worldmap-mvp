@@ -11,7 +11,7 @@ import ChatTranscript from '@/components/chat/chat-transcript';
 import ChatInput from '@/components/chat/chat-input';
 import LuxuryBackground from '@/components/luxury-background';
 import { LegalDisclaimer } from '@/components/legal-disclaimer';
-import type { LexaUiPayload } from '@/lib/lexa/types';
+import type { LexaUiPayload, SessionState } from '@/lib/lexa/types';
 import { LEXA_THEMES_14, LEXA_THEME_UI, LEXA_THEME_COPY } from '@/lib/lexa/themes';
 import { getClientAuthUser, getDisplayName, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import { Heart, Mountain, Sparkles, Utensils, Landmark, Crown, Leaf, Waves, Palette, Users, PartyPopper, Moon, Music, Trophy } from 'lucide-react';
@@ -45,11 +45,19 @@ function getThemeIcon(iconName: string) {
   return icons[iconName] || Sparkles;
 }
 
+function toClientHistory(messages: Message[]) {
+  return messages
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .slice(-20)
+    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+}
+
 export default function ChatPage() {
   const router = useRouter();
   const supabase = createClient();
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [stage, setStage] = useState('WELCOME');
   const [userEmail, setUserEmail] = useState<string>('');
@@ -70,6 +78,35 @@ export default function ChatPage() {
     },
   ];
   const showStarters = messages.length <= 1 && !isLoading;
+
+  const buildChatPayload = (message: string, currentMessages: Message[]) => {
+    const payload: Record<string, unknown> = { message, sessionId };
+    if (sessionId && sessionState) {
+      payload.clientSessionState = sessionState;
+      payload.clientHistory = toClientHistory(currentMessages);
+    }
+    return payload;
+  };
+
+  const applyChatResponse = (data: {
+    sessionId?: string;
+    stage?: string;
+    sessionState?: SessionState;
+    message?: string;
+    assistantMessageId?: string;
+    ui?: LexaUiPayload | null;
+  }) => {
+    if (data.sessionId) setSessionId(data.sessionId);
+    if (data.stage) setStage(data.stage);
+    if (data.sessionState) setSessionState(data.sessionState);
+    return {
+      id: data.assistantMessageId || `msg-${Date.now()}`,
+      role: 'assistant' as const,
+      content: data.message || '',
+      created_at: new Date().toISOString(),
+      ui: data.ui ?? null,
+    };
+  };
   
   // Reset chat handler
   const handleResetChat = () => {
@@ -90,6 +127,7 @@ export default function ChatPage() {
       // Clear local state
       setMessages([]);
       setSessionId(null);
+      setSessionState(null);
       setStage('WELCOME');
       setShowResetModal(false);
       
@@ -115,15 +153,13 @@ export default function ChatPage() {
     
     setMessages(prev => [...prev, tempUserMsg]);
     setIsLoading(true);
+    const nextMessages = [...messages, tempUserMsg];
     
     try {
       const response = await fetch('/api/lexa/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: content,
-          sessionId,
-        }),
+        body: JSON.stringify(buildChatPayload(content, nextMessages)),
       });
       
       const data = await response.json().catch(() => ({}));
@@ -131,25 +167,7 @@ export default function ChatPage() {
         throw new Error(data.details || data.error || 'Failed to send message');
       }
       
-      // Update session ID if new
-      if (data.sessionId && !sessionId) {
-        setSessionId(data.sessionId);
-      }
-      
-      // Update stage
-      if (data.stage) {
-        setStage(data.stage);
-      }
-      
-      // Add assistant message
-      const assistantMsg: Message = {
-        id: data.assistantMessageId || `msg-${Date.now()}`,
-        role: 'assistant',
-        content: data.message,
-        created_at: new Date().toISOString(),
-        ui: data.ui ?? null,
-      };
-      
+      const assistantMsg = applyChatResponse(data);
       setMessages(prev => [...prev, assistantMsg]);
       
     } catch (error) {
@@ -182,14 +200,13 @@ export default function ChatPage() {
       const response = await fetch('/api/lexa/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: '__start__', sessionId }),
+        body: JSON.stringify(buildChatPayload('__start__', messages)),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(data.details || data.error || 'Failed to start chat');
       }
-      if (data.sessionId && !sessionId) setSessionId(data.sessionId);
-      if (data.stage) setStage(data.stage);
+      applyChatResponse(data);
       const welcomeMsg: Message = {
         id: 'welcome',
         role: 'assistant',

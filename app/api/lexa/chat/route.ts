@@ -53,7 +53,13 @@ export async function POST(request: NextRequest) {
     // Development-friendly fallback:
     // In production we require auth; in dev we allow a test userId so you can iterate on conversation quickly.
     const body = await request.json();
-    const { message: userMessage, sessionId, userId: devUserId } = body;
+    const {
+      message: userMessage,
+      sessionId,
+      userId: devUserId,
+      clientSessionState,
+      clientHistory,
+    } = body;
 
     const isProd = process.env.NODE_ENV === 'production';
     const DEV_USER_UUID = BYPASS_USER_ID;
@@ -98,7 +104,25 @@ export async function POST(request: NextRequest) {
     let sessionState: SessionState;
 
     try {
-      const loaded = await loadOrCreateChatSession(sessionId, userId);
+      const parsedClientState =
+        clientSessionState && typeof clientSessionState === 'object' && 'stage' in clientSessionState
+          ? (clientSessionState as SessionState)
+          : undefined;
+      const parsedClientHistory = Array.isArray(clientHistory)
+        ? clientHistory.filter(
+            (m: unknown) =>
+              typeof m === 'object' &&
+              m !== null &&
+              'role' in m &&
+              'content' in m &&
+              ((m as { role: string }).role === 'user' || (m as { role: string }).role === 'assistant')
+          )
+        : undefined;
+
+      const loaded = await loadOrCreateChatSession(sessionId, userId, {
+        sessionState: parsedClientState,
+        conversationHistory: parsedClientHistory,
+      });
       session = loaded.session;
       sessionState = loaded.sessionState;
     } catch (loadError) {
@@ -114,7 +138,10 @@ export async function POST(request: NextRequest) {
     }
     const storedEmotionalProfile = userProfile.emotional_profile;
     const storedGuestPreferences = userProfile.guest_preferences;
-    const conversationHistory = await loadConversationHistory(session);
+    const conversationHistory = await loadConversationHistory(
+      session,
+      Array.isArray(clientHistory) ? clientHistory : undefined
+    );
 
     // 5. Insert user message (skip for synthetic start)
     let userMessageId: string | null = null;
@@ -271,6 +298,10 @@ export async function POST(request: NextRequest) {
         // Inject stored emotional profile + preferences into Claude's context
         systemPrompt += buildProfileContext(storedEmotionalProfile, storedGuestPreferences);
         systemPrompt += offlineContextNote;
+        if (conversationHistory.length > 0 && sessionState.stage !== 'WELCOME') {
+          systemPrompt +=
+            '\n\n**CRITICAL:** This is a continuing conversation. Do NOT restart with a welcome message. Acknowledge what the user just said and build on everything discussed so far.';
+        }
         
         // Add the user's actual words to the prompt so Claude reflects them back
         if (sessionState.stage === 'INITIAL_QUESTIONS' && !isSyntheticStart) {
@@ -308,6 +339,10 @@ export async function POST(request: NextRequest) {
         : await buildGroundedPoiContext(sessionState, storedEmotionalProfile, storedGuestPreferences);
       if (grounding) systemPrompt = `${systemPrompt}\n\n${grounding}`;
       systemPrompt += offlineContextNote;
+      if (conversationHistory.length > 0) {
+        systemPrompt +=
+          '\n\n**CRITICAL:** This is a continuing conversation. Do NOT restart with a welcome message. Acknowledge what the user just said and build on everything discussed so far.';
+      }
       
       const claudeResponse = await generateResponseWithRetry({
         sessionState,
@@ -427,6 +462,7 @@ export async function POST(request: NextRequest) {
       ui,
       userMessageId,
       assistantMessageId,
+      sessionState: newState,
       memoryOnly: session.memoryOnly,
       offlineMode: session.memoryOnly || neo4jUnavailable,
     });

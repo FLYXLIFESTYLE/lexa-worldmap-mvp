@@ -32,6 +32,44 @@ export function serializeSessionState(state: SessionState): SessionState {
   return JSON.parse(JSON.stringify(state)) as SessionState;
 }
 
+export type ClientSessionSync = {
+  sessionState?: SessionState;
+  conversationHistory?: { role: 'user' | 'assistant'; content: string }[];
+};
+
+function seedMemoryMessages(
+  sessionId: string,
+  history?: { role: 'user' | 'assistant'; content: string }[]
+) {
+  if (!history?.length) return;
+  memoryMessages.set(
+    sessionId,
+    history.map((m) => ({
+      id: randomUUID(),
+      role: m.role,
+      content: m.content,
+    }))
+  );
+}
+
+function rehydrateMemorySession(
+  sessionId: string,
+  userId: string,
+  state: SessionState,
+  history?: { role: 'user' | 'assistant'; content: string }[]
+): ChatSessionRecord {
+  const session: ChatSessionRecord = {
+    id: sessionId,
+    user_id: userId,
+    stage: state.stage,
+    state,
+    memoryOnly: true,
+  };
+  memorySessions.set(sessionId, session);
+  seedMemoryMessages(sessionId, history);
+  return session;
+}
+
 function createMemorySession(userId: string, state: SessionState): ChatSessionRecord {
   const session: ChatSessionRecord = {
     id: randomUUID(),
@@ -47,7 +85,8 @@ function createMemorySession(userId: string, state: SessionState): ChatSessionRe
 
 export async function loadOrCreateChatSession(
   sessionId: string | null | undefined,
-  userId: string
+  userId: string,
+  clientSync?: ClientSessionSync
 ): Promise<{ session: ChatSessionRecord; sessionState: SessionState }> {
   if (sessionId) {
     if (isSupabaseAdminConfigured) {
@@ -69,6 +108,17 @@ export async function loadOrCreateChatSession(
     const memorySession = memorySessions.get(sessionId);
     if (memorySession && memorySession.user_id === userId) {
       return { session: memorySession, sessionState: memorySession.state };
+    }
+
+    if (clientSync?.sessionState && CHAT_MEMORY_FALLBACK_ENABLED) {
+      const state = serializeSessionState(clientSync.sessionState);
+      const session = rehydrateMemorySession(
+        sessionId,
+        userId,
+        state,
+        clientSync.conversationHistory
+      );
+      return { session, sessionState: state };
     }
 
     if (!CHAT_MEMORY_FALLBACK_ENABLED) {
@@ -142,13 +192,17 @@ export async function loadUserProfile(userId: string): Promise<{
 }
 
 export async function loadConversationHistory(
-  session: ChatSessionRecord
+  session: ChatSessionRecord,
+  clientHistory?: { role: 'user' | 'assistant'; content: string }[]
 ): Promise<{ role: 'user' | 'assistant'; content: string }[]> {
   if (session.memoryOnly) {
-    return (memoryMessages.get(session.id) || [])
+    const stored = (memoryMessages.get(session.id) || [])
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .slice(-20)
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+    if (stored.length > 0) return stored;
+    return (clientHistory || []).slice(-20);
   }
 
   if (!isSupabaseAdminConfigured) return [];
