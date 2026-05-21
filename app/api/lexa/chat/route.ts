@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { AUTH_DISABLED, BYPASS_USER_ID } from '@/lib/auth/user-access';
 import { SessionState, DEFAULT_SESSION_STATE } from '@/lib/lexa/types';
 import { transitionStage, getNextStagePrompt } from '@/lib/lexa/state-machine';
 import { generateResponseWithRetry, checkRateLimit } from '@/lib/lexa/claude-client';
@@ -42,11 +43,11 @@ export async function POST(request: NextRequest) {
     const { message: userMessage, sessionId, userId: devUserId } = body;
 
     const isProd = process.env.NODE_ENV === 'production';
-    const DEV_USER_UUID = '00000000-0000-0000-0000-000000000001';
+    const DEV_USER_UUID = BYPASS_USER_ID;
     const looksLikeUuid = (s: unknown) =>
       typeof s === 'string' &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
-    if ((authError || !user) && isProd) {
+    if ((authError || !user) && isProd && !AUTH_DISABLED) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

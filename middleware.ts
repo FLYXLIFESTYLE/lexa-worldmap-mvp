@@ -5,10 +5,15 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { USER_LOGIN_ENABLED } from '@/lib/auth/user-access';
+import { AUTH_DISABLED, USER_LOGIN_ENABLED } from '@/lib/auth/user-access';
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
+
+  // Private deployment: skip all auth checks
+  if (AUTH_DISABLED) {
+    return NextResponse.next();
+  }
   
   // Skip middleware for public routes
   if (!path.startsWith('/app') && !path.startsWith('/api') && !path.startsWith('/admin') && !path.startsWith('/knowledge') && !path.startsWith('/captain')) {

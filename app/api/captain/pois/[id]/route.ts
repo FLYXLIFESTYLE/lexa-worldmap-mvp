@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
+import { requireCaptainOrAdmin } from '@/lib/auth/server-auth';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 export const runtime = 'nodejs';
@@ -24,26 +24,6 @@ const PatchSchema = z
     metadata: z.record(z.string(), z.any()).optional(),
   })
   .strict();
-
-async function requireCaptainOrAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, status: 401 as const, user: null };
-
-  const { data: profile } = await supabase
-    .from('captain_profiles')
-    .select('role')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  const role = String(profile?.role || '').toLowerCase();
-  if (!role) return { ok: false as const, status: 403 as const, user: null };
-
-  const isAdmin = role === 'admin';
-  return { ok: true as const, status: 200 as const, user, isAdmin };
-}
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {

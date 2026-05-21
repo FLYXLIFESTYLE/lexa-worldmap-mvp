@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
 import AdminNav from '@/components/admin/admin-nav';
+import { getClientAuthUser, getDisplayName, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 
 interface Captain {
   name: string;
@@ -32,26 +33,28 @@ export default function CaptainPortalPage() {
 
   useEffect(() => {
     async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }
 
       // Prefer the captain's display_name (e.g. "Christian") over email prefix (e.g. "chh")
-      let displayName = '';
-      try {
-        const { data: profile } = await supabase
-          .from('captain_profiles')
-          .select('display_name')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        displayName = (profile?.display_name || '').trim();
-      } catch {}
+      let displayName = getDisplayName(user!);
+      if (!displayName) {
+        try {
+          const { data: profile } = await supabase
+            .from('captain_profiles')
+            .select('display_name')
+            .eq('user_id', user!.id)
+            .maybeSingle();
+          displayName = (profile?.display_name || '').trim();
+        } catch {}
+      }
 
       setCaptain({
-        name: displayName || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Captain',
+        name: displayName || 'Captain',
       });
       
       setLoading(false);

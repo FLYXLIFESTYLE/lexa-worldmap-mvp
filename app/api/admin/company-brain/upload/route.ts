@@ -17,7 +17,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/auth/server-auth';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
@@ -45,19 +45,6 @@ const ExtractionResultSchema = z.object({
     extraction_confidence: z.number().min(0).max(1).optional(),
   }).optional(),
 });
-
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, status: 401 as const, user: null };
-
-  const { data: profile } = await supabase.from('captain_profiles').select('role').eq('user_id', user.id).maybeSingle();
-  if (profile?.role !== 'admin') return { ok: false as const, status: 403 as const, user: null };
-
-  return { ok: true as const, status: 200 as const, user };
-}
 
 async function extractTextFromBuffer(buffer: Buffer, filename: string): Promise<string> {
   const ext = filename.toLowerCase().split('.').pop();
@@ -218,7 +205,7 @@ CRITICAL RULES:
 
     // Store in Supabase
     const uploadRecord = {
-      user_id: auth.user!.id,
+      user_id: auth.userId,
       filename: file.name,
       file_size: file.size,
       document_type: 'historic_chat',

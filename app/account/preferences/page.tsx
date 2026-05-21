@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import LuxuryBackground from '@/components/luxury-background';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import { Loader2, Check, ChevronDown, ChevronUp, X } from 'lucide-react';
 import {
   PREFERENCE_SECTIONS,
@@ -24,8 +25,8 @@ export default function PreferencesPage() {
 
   useEffect(() => {
     async function init() {
-      const { data } = await supabase.auth.getUser();
-      if (!data?.user) { router.push('/auth/signin'); return; }
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) { router.push('/auth/signin'); return; }
 
       try {
         const res = await fetch('/api/user/profile');

@@ -3,37 +3,21 @@
  * Updates order_index for drag-and-drop reordering within priority groups
  */
 
+import { requireStaff } from '@/lib/auth/server-auth';
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireStaff();
+    if (!auth.ok) {
+      return NextResponse.json(
+        { success: false, error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
+        { status: auth.status }
+      );
+    }
+
     const supabase = await createClient();
-    
-    // Verify authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Check user role
-    const { data: profile } = await supabase
-      .from('captain_profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!profile || !['admin', 'captain'].includes(profile.role)) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden' },
-        { status: 403 }
-      );
-    }
-
     const body = await request.json();
     const { items } = body; // Array of { id, order_index }
 
@@ -67,4 +51,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

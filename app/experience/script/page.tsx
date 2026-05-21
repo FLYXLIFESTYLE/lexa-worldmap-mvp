@@ -13,6 +13,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles, Download, Share2, Calendar, MapPin, Heart, Anchor, User } from 'lucide-react';
 import { LegalDisclaimer } from '@/components/legal-disclaimer';
@@ -43,8 +44,8 @@ function ScriptPreviewContent() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }

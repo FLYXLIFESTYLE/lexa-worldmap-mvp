@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import AdminNav from '@/components/admin/admin-nav';
 import { Bell, Plus, Edit2, Trash2, Check, X, ExternalLink, Clock } from 'lucide-react';
 import { keywordsAPI } from '@/lib/api/captain-portal';
@@ -79,8 +80,8 @@ export default function CaptainKeywordsPage() {
         setLoading(false);
         return;
       }
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }

@@ -2,6 +2,7 @@
  * API for managing individual upload records
  */
 
+import { getAuthenticatedUserId, requireCaptainOrAdmin } from '@/lib/auth/server-auth';
 import { NextResponse } from 'next/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
@@ -13,26 +14,22 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    // Read the current user session from cookies (standard project helper).
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Role check (captain/admin only)
-    const { data: profile } = await supabase
-      .from('captain_profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const staffAuth = await requireCaptainOrAdmin();
+    const isCaptainOrAdmin = staffAuth.ok;
 
-    const role = profile?.role || null;
-    const isCaptainOrAdmin = role === 'captain' || role === 'admin';
+    let userEmail = '';
+    if (!isCaptainOrAdmin) {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      userEmail = user?.email || '';
+    }
 
     // Use service role key for deletion (bypass RLS) but only after auth check above.
     const serviceKey =
@@ -59,8 +56,8 @@ export async function DELETE(
     }
 
     const isOwner =
-      upload.uploaded_by === user.id ||
-      (upload.uploaded_by_email || '').toLowerCase() === (user.email || '').toLowerCase();
+      upload.uploaded_by === userId ||
+      (upload.uploaded_by_email || '').toLowerCase() === userEmail.toLowerCase();
 
     if (!isCaptainOrAdmin && !isOwner) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
@@ -88,4 +85,3 @@ export async function DELETE(
     );
   }
 }
-

@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import AdminNav from '@/components/admin/admin-nav';
 import { scrapingAPI } from '@/lib/api/captain-portal';
 import PortalShell from '@/components/portal/portal-shell';
@@ -67,8 +68,8 @@ export default function CaptainURLsPage() {
   // Auth check
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }
@@ -77,7 +78,7 @@ export default function CaptainURLsPage() {
         const { data: profile } = await supabase
           .from('captain_profiles')
           .select('role')
-          .eq('user_id', user.id)
+          .eq('user_id', user!.id)
           .single();
         const admin = profile?.role === 'admin';
         setIsAdmin(admin);

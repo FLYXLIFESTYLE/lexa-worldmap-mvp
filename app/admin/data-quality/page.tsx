@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 
 interface QualityCheckResults {
   startTime: string;
@@ -117,8 +118,8 @@ export default function DataQualityAdminPage() {
   // Check authentication
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }

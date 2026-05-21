@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { createClient } from '@/lib/supabase/server';
+import { requireStaff } from '@/lib/auth/server-auth';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 export const runtime = 'nodejs';
@@ -28,21 +28,9 @@ interface MediaItem {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('captain_profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!profile || !['admin', 'captain'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const auth = await requireStaff();
+    if (!auth.ok) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: auth.status });
     }
 
     const body = await request.json();
@@ -107,7 +95,7 @@ export async function POST(request: NextRequest) {
 
       return {
         id: randomUUID(),
-        created_by: user.id,
+        created_by: auth.userId,
         name: dest.name,
         destination: dest.name,
         category,
@@ -181,21 +169,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('captain_profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!profile || !['admin', 'captain'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const auth = await requireStaff();
+    if (!auth.ok) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: auth.status });
     }
 
     const url = new URL(request.url);

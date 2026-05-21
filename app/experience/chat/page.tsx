@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import { useRouter } from 'next/navigation';
 import { Send, Sparkles } from 'lucide-react';
 import { lexaAPI, loadFromLocalStorage, saveToLocalStorage, formatConversationHistory, extractContextFromBuilder } from '@/lib/api/lexa-client';
@@ -40,12 +41,12 @@ export default function LexaChatPage() {
   // Check auth and load builder state
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }
-      setUserEmail(user.email || '');
+      setUserEmail(user!.email || '');
 
       // Load LEXA account from localStorage
       const lexaAccount = loadFromLocalStorage('lexa_account');

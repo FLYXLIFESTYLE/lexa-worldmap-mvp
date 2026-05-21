@@ -13,6 +13,7 @@ import LuxuryBackground from '@/components/luxury-background';
 import { LegalDisclaimer } from '@/components/legal-disclaimer';
 import type { LexaUiPayload } from '@/lib/lexa/types';
 import { LEXA_THEMES_14, LEXA_THEME_UI, LEXA_THEME_COPY } from '@/lib/lexa/themes';
+import { getClientAuthUser, getDisplayName, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import { Heart, Mountain, Sparkles, Utensils, Landmark, Crown, Leaf, Waves, Palette, Users, PartyPopper, Moon, Music, Trophy } from 'lucide-react';
 
 interface Message {
@@ -209,22 +210,15 @@ export default function ChatPage() {
   // Check auth and load initial message
   useEffect(() => {
     async function init() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/');
         return;
       }
-      
-      setUserEmail(user.email || '');
-      
-      // Load the user's real name from profile or auth metadata
-      let name = user.email?.split('@')[0] || '';
-      if (user.user_metadata?.full_name) {
-        name = user.user_metadata.full_name;
-      }
+
+      setUserEmail(user!.email || '');
+      let name = getDisplayName(user!);
       // Try to get the name from the profile API
       try {
         const profileRes = await fetch('/api/user/profile');

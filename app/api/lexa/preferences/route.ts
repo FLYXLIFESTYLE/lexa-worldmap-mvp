@@ -3,27 +3,20 @@
  * GET/PUT user preferences (voice, language)
  */
 
+import { getAuthenticatedUserId } from '@/lib/auth/server-auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 // GET preferences
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
-    
-    const userId = user.id;
     
     const { data, error } = await supabaseAdmin
       .from('lexa_preferences')
@@ -61,20 +54,13 @@ export async function GET() {
 // PUT preferences (update)
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
-    
-    const userId = user.id;
     
     const body = await request.json();
     const { voice_reply_enabled, language } = body;
@@ -126,4 +112,3 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
-

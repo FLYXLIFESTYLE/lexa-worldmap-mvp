@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import AdminNav from '@/components/admin/admin-nav';
 import PortalShell from '@/components/portal/portal-shell';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 
 type NuggetType =
   | 'note'
@@ -57,8 +58,8 @@ export default function CaptainNuggetsPage() {
   async function fetchNuggets() {
     setLoading(true);
     try {
-      const { data: session } = await supabase.auth.getUser();
-      if (!session.user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }
@@ -142,9 +143,8 @@ export default function CaptainNuggetsPage() {
       const category = prompt('Category (optional, e.g. hotel, restaurant, experience):', '');
 
       setBusyId(n.id);
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }
@@ -161,7 +161,7 @@ export default function CaptainNuggetsPage() {
         promoted_to_main: false,
         upload_id: n.upload_id,
         scrape_id: n.scrape_id,
-        created_by: user.id,
+        created_by: user!.id,
         // Keep provenance trail + link back to nugget
         metadata: { from_nugget_id: n.id, nugget_type: n.nugget_type },
       });

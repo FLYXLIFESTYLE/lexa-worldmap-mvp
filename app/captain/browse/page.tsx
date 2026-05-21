@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import AdminNav from '@/components/admin/admin-nav';
 import { poisAPI } from '@/lib/api/captain-portal';
 import PortalShell from '@/components/portal/portal-shell';
@@ -113,8 +114,8 @@ export default function CaptainBrowsePage() {
   // Auth check
   useEffect(() => {
     async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }

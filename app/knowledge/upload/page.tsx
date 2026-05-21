@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 /**
  * User Knowledge Upload
@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import LuxuryBackground from '@/components/luxury-background';
 
 interface UploadedFile {
@@ -36,12 +37,12 @@ export default function KnowledgeUploadPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }
-      setUserEmail(data.user.email || '');
+      setUserEmail(user!.email || '');
     })();
   }, [router, supabase.auth]);
 

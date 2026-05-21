@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import LuxuryBackground from '@/components/luxury-background';
 import { Sparkles, Calendar, MapPin, Heart, ArrowLeft, Anchor, User, Download } from 'lucide-react';
 import type { Stage1Output } from '@/lib/script-engine/types';
@@ -21,8 +22,8 @@ export default function ScriptDetailPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/auth/signin'); return; }
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) { router.push('/auth/signin'); return; }
 
       try {
         const res = await fetch(`/api/user/scripts/${scriptId}`);

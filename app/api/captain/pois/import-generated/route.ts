@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireCaptainOrAdmin } from '@/lib/auth/server-auth';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { z } from 'zod';
 import { isExperienceRelevant } from '@/lib/poi-quality-filters';
@@ -51,24 +51,6 @@ function sourceUrlFor(source: 'osm' | 'wikidata' | 'overture', sourceId: string)
     return `https://www.openstreetmap.org/${type}/${id}`;
   }
   return null;
-}
-
-async function requireCaptainOrAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, status: 401 as const, user: null };
-
-  const { data: profile } = await supabase
-    .from('captain_profiles')
-    .select('role')
-    .eq('user_id', user.id)
-    .maybeSingle();
-  const role = String(profile?.role || '').toLowerCase();
-  if (!role) return { ok: false as const, status: 403 as const, user: null };
-
-  return { ok: true as const, status: 200 as const, user };
 }
 
 export async function POST(req: Request) {

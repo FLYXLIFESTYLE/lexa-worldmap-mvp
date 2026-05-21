@@ -3,8 +3,8 @@
  * GET session history (messages + state)
  */
 
+import { getAuthenticatedUserId } from '@/lib/auth/server-auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 export async function GET(
@@ -12,20 +12,13 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
-    
-    const userId = user.id;
     
     const params = await context.params;
     const sessionId = params.id;
@@ -73,4 +66,3 @@ export async function GET(
     );
   }
 }
-

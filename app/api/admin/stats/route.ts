@@ -5,18 +5,15 @@
 
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
-import { createClient } from '@/lib/supabase/server';
+import { requireStaff } from '@/lib/auth/server-auth';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
   try {
-    // Authentication (keeps stats private to logged-in admins/captains)
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireStaff();
+    if (!auth.ok) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: auth.status });
     }
 
     const driver = getNeo4jDriver();

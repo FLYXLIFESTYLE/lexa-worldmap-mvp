@@ -1,16 +1,11 @@
+import { getAuthenticatedUserId } from '@/lib/auth/server-auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -36,7 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message not found' }, { status: 404 });
     }
 
-    if (msg.user_id !== user.id) {
+    if (msg.user_id !== userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -50,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Upsert by (user_id, message_id) would be ideal; keep it simple for MVP: insert duplicates allowed.
     const { error: insErr } = await supabaseAdmin.from('lexa_message_feedback').insert({
-      user_id: user.id,
+      user_id: userId,
       session_id: msg.session_id,
       message_id: msg.id,
       rating,
@@ -69,5 +64,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-
-

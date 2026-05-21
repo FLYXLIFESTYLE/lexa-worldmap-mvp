@@ -1,25 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/auth/server-auth';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 export const runtime = 'nodejs';
-
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, status: 401 as const };
-
-  const { data: profile } = await supabase
-    .from('captain_profiles')
-    .select('role')
-    .eq('user_id', user.id)
-    .maybeSingle();
-  if (profile?.role !== 'admin') return { ok: false as const, status: 403 as const };
-
-  return { ok: true as const, status: 200 as const };
-}
 
 function buildPublicUrl(bucket: string, path: string): string | null {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';

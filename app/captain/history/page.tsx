@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import AdminNav from '@/components/admin/admin-nav';
 import { uploadAPI } from '@/lib/api/captain-portal';
 import PortalShell from '@/components/portal/portal-shell';
@@ -67,14 +68,14 @@ export default function CaptainHistoryPage() {
   // Auth check and fetch
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }
       
-      setUserEmail(user.email || '');
-      fetchUploads(user.email || '');
+      setUserEmail(user!.email || '');
+      fetchUploads(user!.email || '');
     }
     init();
   }, [router, supabase.auth]);

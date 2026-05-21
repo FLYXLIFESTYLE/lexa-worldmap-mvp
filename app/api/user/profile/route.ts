@@ -1,8 +1,35 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  AUTH_DISABLED,
+  BYPASS_USER_EMAIL,
+  BYPASS_USER_ID,
+  BYPASS_USER_NAME,
+} from '@/lib/auth/user-access';
+
+function bypassProfileResponse() {
+  return NextResponse.json({
+    profile: {
+      user_id: BYPASS_USER_ID,
+      full_name: BYPASS_USER_NAME,
+      first_name: BYPASS_USER_NAME,
+      emotional_profile: {},
+      preferences: {},
+    },
+    user: {
+      id: BYPASS_USER_ID,
+      email: BYPASS_USER_EMAIL,
+      created_at: new Date().toISOString(),
+    },
+  });
+}
 
 export async function GET(request: NextRequest) {
   try {
+    if (AUTH_DISABLED) {
+      return bypassProfileResponse();
+    }
+
     const supabase = await createClient();
 
     // Get authenticated user
@@ -71,6 +98,18 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    if (AUTH_DISABLED) {
+      const body = await request.json();
+      return NextResponse.json({
+        profile: {
+          user_id: BYPASS_USER_ID,
+          full_name: body.full_name ?? BYPASS_USER_NAME,
+          first_name: body.first_name ?? BYPASS_USER_NAME,
+          ...body,
+        },
+      });
+    }
+
     const supabase = await createClient();
     const body = await request.json();
 

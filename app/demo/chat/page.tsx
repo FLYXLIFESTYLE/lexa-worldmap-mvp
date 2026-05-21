@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import { useRouter } from 'next/navigation';
 import { Send, Sparkles, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -42,21 +43,21 @@ export default function AdminDemoChatPage() {
   // Check admin auth
   useEffect(() => {
     async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getClientAuthUser(supabase);
       
-      if (!user) {
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin?redirectTo=/demo/chat');
         return;
       }
 
       // Check if user is admin (you can customize this check)
       // For now, any authenticated user can access (change this later)
-      setUserEmail(user.email || '');
+      setUserEmail(user!.email || '');
       setIsAdmin(true);
       setAuthChecking(false);
 
       // Initialize demo session
-      initializeDemoSession(user.email || 'demo@admin');
+      initializeDemoSession(user!.email || 'demo@admin');
     }
 
     checkAuth();

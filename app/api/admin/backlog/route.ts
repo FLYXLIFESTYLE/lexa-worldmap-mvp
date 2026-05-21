@@ -3,36 +3,21 @@
  * CRUD operations for backlog items with drag-and-drop reordering
  */
 
+import { requireStaff } from '@/lib/auth/server-auth';
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireStaff();
+    if (!auth.ok) {
+      return NextResponse.json(
+        { success: false, error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
+        { status: auth.status }
+      );
+    }
+
     const supabase = await createClient();
-    
-    // Verify user is authenticated and has captain/admin role
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Check user role
-    const { data: profile } = await supabase
-      .from('captain_profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!profile || !['admin', 'captain'].includes(profile.role)) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden' },
-        { status: 403 }
-      );
-    }
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -68,23 +53,31 @@ export async function GET(request: NextRequest) {
       .select('*');
 
     // Group by priority for frontend
+    type BacklogItem = { priority: string; status: string };
+    const typedItems = (items ?? []) as BacklogItem[];
+    const typedAllItems = (allItems ?? []) as BacklogItem[];
+
     const grouped = {
-      critical: items?.filter(item => item.priority === 'critical') || [],
-      high: items?.filter(item => item.priority === 'high') || [],
-      normal: items?.filter(item => item.priority === 'normal') || []
+      critical: typedItems.filter((item) => item.priority === 'critical'),
+      high: typedItems.filter((item) => item.priority === 'high'),
+      normal: typedItems.filter((item) => item.priority === 'normal'),
     };
 
     // Calculate stats from ALL items (not just filtered view)
     const stats = {
-      total: allItems?.length || 0,
-      open: allItems?.filter(item => ['pending', 'in_progress'].includes(item.status)).length || 0,
-      resolved: allItems?.filter(item => ['completed', 'cancelled'].includes(item.status)).length || 0,
-      pending: allItems?.filter(item => item.status === 'pending').length || 0,
-      in_progress: allItems?.filter(item => item.status === 'in_progress').length || 0,
-      completed: allItems?.filter(item => item.status === 'completed').length || 0,
-      cancelled: allItems?.filter(item => item.status === 'cancelled').length || 0,
-      critical: allItems?.filter(item => item.priority === 'critical' && ['pending', 'in_progress'].includes(item.status)).length || 0,
-      high: allItems?.filter(item => item.priority === 'high' && ['pending', 'in_progress'].includes(item.status)).length || 0
+      total: typedAllItems.length,
+      open: typedAllItems.filter((item) => ['pending', 'in_progress'].includes(item.status)).length,
+      resolved: typedAllItems.filter((item) => ['completed', 'cancelled'].includes(item.status)).length,
+      pending: typedAllItems.filter((item) => item.status === 'pending').length,
+      in_progress: typedAllItems.filter((item) => item.status === 'in_progress').length,
+      completed: typedAllItems.filter((item) => item.status === 'completed').length,
+      cancelled: typedAllItems.filter((item) => item.status === 'cancelled').length,
+      critical: typedAllItems.filter(
+        (item) => item.priority === 'critical' && ['pending', 'in_progress'].includes(item.status)
+      ).length,
+      high: typedAllItems.filter(
+        (item) => item.priority === 'high' && ['pending', 'in_progress'].includes(item.status)
+      ).length,
     };
 
     return NextResponse.json({
@@ -106,32 +99,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireStaff();
+    if (!auth.ok) {
+      return NextResponse.json(
+        { success: false, error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
+        { status: auth.status }
+      );
+    }
+
     const supabase = await createClient();
-    
-    // Verify authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Check user role
-    const { data: profile } = await supabase
-      .from('captain_profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!profile || !['admin', 'captain'].includes(profile.role)) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden' },
-        { status: 403 }
-      );
-    }
-
     const body = await request.json();
     const { title, description, priority, category, estimated_hours, tags, notes } = body;
 
@@ -167,7 +143,7 @@ export async function POST(request: NextRequest) {
         tags: tags || [],
         notes: notes || null,
         order_index: maxOrder + 1,
-        created_by: user.id,
+        created_by: auth.userId,
         status: 'pending'
       })
       .select()
@@ -193,32 +169,15 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await requireStaff();
+    if (!auth.ok) {
+      return NextResponse.json(
+        { success: false, error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
+        { status: auth.status }
+      );
+    }
+
     const supabase = await createClient();
-    
-    // Verify authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Check user role
-    const { data: profile } = await supabase
-      .from('captain_profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!profile || !['admin', 'captain'].includes(profile.role)) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden' },
-        { status: 403 }
-      );
-    }
-
     const body = await request.json();
     const { id, ...updates } = body;
 
@@ -261,32 +220,18 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await requireStaff({ adminOnly: true });
+    if (!auth.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: auth.status === 401 ? 'Unauthorized' : 'Only admins can delete backlog items',
+        },
+        { status: auth.status }
+      );
+    }
+
     const supabase = await createClient();
-    
-    // Verify authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Check user is admin (only admins can delete)
-    const { data: profile } = await supabase
-      .from('captain_profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!profile || profile.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: 'Only admins can delete backlog items' },
-        { status: 403 }
-      );
-    }
-
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
 

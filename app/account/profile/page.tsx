@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import LuxuryBackground from '@/components/luxury-background';
 import { createClient } from '@/lib/supabase/client-browser';
+import { getClientAuthUser, shouldBlockUnauthenticated } from '@/lib/auth/client-auth';
 import { Loader2, Check } from 'lucide-react';
 
 export default function AccountProfilePage() {
@@ -19,20 +20,19 @@ export default function AccountProfilePage() {
 
   useEffect(() => {
     async function init() {
-      const { data } = await supabase.auth.getUser();
-      const user = data?.user;
-      if (!user) {
+      const user = await getClientAuthUser(supabase);
+      if (shouldBlockUnauthenticated(user)) {
         router.push('/auth/signin');
         return;
       }
-      setEmail(user.email || null);
+      setEmail(user!.email || null);
 
       // Load current name from profile
       try {
         const res = await fetch('/api/user/profile');
         if (res.ok) {
           const profileData = await res.json();
-          const name = profileData.profile?.full_name || user.user_metadata?.full_name || '';
+          const name = profileData.profile?.full_name || user!.user_metadata?.full_name || '';
           setFullName(name);
           setOriginalName(name);
         }

@@ -8,6 +8,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { AUTH_DISABLED, BYPASS_USER_ID } from '@/lib/auth/user-access';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { getNeo4jDriver } from '@/lib/neo4j/client';
 import { slugifyDestination } from '@/lib/neo4j/destination-resolver';
@@ -36,6 +37,8 @@ function neo4jNameVariants(destinationGeoName: string): { primary: string; also:
 }
 
 async function requireAdminUser(): Promise<{ userId: string }> {
+  if (AUTH_DISABLED) return { userId: BYPASS_USER_ID };
+
   const supabase = await createClient();
   const {
     data: { user },

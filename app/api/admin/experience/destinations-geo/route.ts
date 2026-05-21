@@ -1,6 +1,6 @@
+import { requireStaff } from '@/lib/auth/server-auth';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
 const DestinationUpsertSchema = z.object({
@@ -22,19 +22,9 @@ const DestinationUpsertSchema = z.object({
 });
 
 export async function GET() {
-  // Require authenticated admin/captain (same pattern as other /api/admin routes)
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
-  }
-  const { data: profile } = await supabase
-    .from('captain_profiles')
-    .select('role')
-    .eq('user_id', user.id)
-    .single();
-  if (!profile || !['admin', 'captain'].includes(profile.role)) {
-    return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 });
+  const auth = await requireStaff();
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: auth.status });
   }
 
   const { data, error } = await supabaseAdmin
@@ -50,19 +40,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  // Require authenticated admin/captain (same pattern as other /api/admin routes)
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
-  }
-  const { data: profile } = await supabase
-    .from('captain_profiles')
-    .select('role')
-    .eq('user_id', user.id)
-    .single();
-  if (!profile || !['admin', 'captain'].includes(profile.role)) {
-    return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 });
+  const auth = await requireStaff();
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: auth.status });
   }
 
   const body = await req.json().catch(() => null);
@@ -113,5 +93,3 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, destination: data });
 }
-
-

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
-import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { requireCaptainOrAdmin } from '@/lib/auth/server-auth';
 
 export const runtime = 'nodejs';
 
@@ -49,25 +49,6 @@ function normalizeLuxury(value?: number): number | null {
   return Math.max(0, Math.min(10, Math.round(n)));
 }
 
-async function requireCaptainOrAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, status: 401 as const, user: null };
-
-  const { data: profile } = await supabase
-    .from('captain_profiles')
-    .select('role')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  const role = String(profile?.role || '').toLowerCase();
-  if (!role) return { ok: false as const, status: 403 as const, user: null };
-
-  const isAdmin = role === 'admin';
-  return { ok: true as const, status: 200 as const, user, isAdmin };
-}
 
 export async function GET(req: Request) {
   try {
