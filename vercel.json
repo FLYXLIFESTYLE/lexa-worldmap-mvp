@@ -3,11 +3,11 @@
   "crons": [
     {
       "path": "/api/cron/auto-enrich-pois",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/auto-import-generated",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 4 * * *"
     },
     {
       "path": "/api/cron/refresh-stale-pois",
