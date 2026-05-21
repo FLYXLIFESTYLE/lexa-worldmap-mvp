@@ -5,16 +5,25 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { supabaseAdmin } from '@/lib/supabase/client';
-import { AUTH_DISABLED, BYPASS_USER_ID } from '@/lib/auth/user-access';
-import { SessionState, DEFAULT_SESSION_STATE } from '@/lib/lexa/types';
+import { isSupabaseAdminConfigured, supabaseAdmin } from '@/lib/supabase/client';
+import { AUTH_DISABLED, BYPASS_USER_ID, BYPASS_USER_NAME } from '@/lib/auth/user-access';
+import { SessionState } from '@/lib/lexa/types';
 import { transitionStage, getNextStagePrompt } from '@/lib/lexa/state-machine';
 import { generateResponseWithRetry, checkRateLimit } from '@/lib/lexa/claude-client';
 import { processBriefingInput } from '@/lib/lexa/briefing-processor';
 import { createExperienceBriefFromState } from '@/lib/lexa/stages/handoff';
-import { profilePatchFromState, mergeProfileJson } from '@/lib/lexa/profile';
 import { formatThemeMenu } from '@/lib/lexa/themes';
 import { retrieveBrainCandidatesV2 } from '@/lib/brain/retrieve-v2';
+import { isNeo4jConfigured } from '@/lib/neo4j/client';
+import { getClaudeOnlyContextNote } from '@/lib/lexa/claude-only-context';
+import {
+  appendChatMessage,
+  loadConversationHistory,
+  loadOrCreateChatSession,
+  loadUserProfile,
+  persistUserProfileMemory,
+  saveChatSession,
+} from '@/lib/lexa/chat-persistence';
 import {
   getWelcomeSystemPrompt,
   getDisarmSystemPrompt,
@@ -30,6 +39,10 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseUnavailable = !isSupabaseAdminConfigured;
+    const neo4jUnavailable = !isNeo4jConfigured();
+    const offlineContextNote = getClaudeOnlyContextNote({ supabaseUnavailable, neo4jUnavailable });
+
     // 1. Authenticate with Supabase
     const supabase = await createClient();
     const {
@@ -67,155 +80,46 @@ export async function POST(request: NextRequest) {
 
     const isSyntheticStart = userMessage.trim() === '__start__';
     
-    // 3. Load user metadata for personalization
-    let userName: string | null = null;
-    let userEmail: string | null = null;
-    
-    if (user?.email) {
-      userEmail = user.email;
-      
-      // Priority chain for user name:
-      // 1. lexa_user_profiles.first_name
-      // 2. lexa_user_profiles.full_name (take first word)
-      // 3. Supabase auth user_metadata.full_name (take first word)
-      // 4. Email prefix (last resort)
-      try {
-        const { data: profile } = await supabaseAdmin
-          .from('lexa_user_profiles')
-          .select('full_name, first_name')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        if (profile?.first_name) {
-          userName = profile.first_name;
-        } else if (profile?.full_name) {
-          userName = profile.full_name.split(' ')[0];
-        } else if (user.user_metadata?.full_name) {
-          userName = String(user.user_metadata.full_name).split(' ')[0];
-        }
-      } catch {
-        // Try auth metadata as fallback
-        if (user.user_metadata?.full_name) {
-          userName = String(user.user_metadata.full_name).split(' ')[0];
-        }
-      }
-      
-      // Last resort: email prefix, but capitalise it
-      if (!userName) {
+    // 3. Personalization name (refined after profile load below)
+    let userName: string | null = AUTH_DISABLED ? BYPASS_USER_NAME : null;
+    let userEmail: string | null = user?.email ?? null;
+
+    if (user?.email && !userName) {
+      if (user.user_metadata?.full_name) {
+        userName = String(user.user_metadata.full_name).split(' ')[0];
+      } else {
         const prefix = user.email.split('@')[0];
         userName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
       }
     }
     
-    // 4. Load or create session
-    let session: any;
+    // 4. Load or create session (Supabase or in-memory fallback)
+    let session;
     let sessionState: SessionState;
-    
-    if (sessionId) {
-      // Load existing session
-      const { data, error } = await supabaseAdmin
-        .from('lexa_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .eq('user_id', userId)
-        .single();
-      
-      if (error || !data) {
-        return NextResponse.json(
-          { error: 'Session not found' },
-          { status: 404 }
-        );
-      }
-      
-      session = data;
-      sessionState = data.state as SessionState;
-    } else {
-      // Create new session
-      const newState = { ...DEFAULT_SESSION_STATE };
-      
-      const { data, error } = await supabaseAdmin
-        .from('lexa_sessions')
-        .insert({
-          user_id: userId,
-          stage: newState.stage,
-          state: newState,
-        })
-        .select()
-        .single();
-      
-      if (error || !data) {
-        console.error('Failed to create session:', error);
-        return NextResponse.json(
-          { error: 'Failed to create session' },
-          { status: 500 }
-        );
-      }
-      
-      session = data;
-      sessionState = newState;
-    }
-    
-    // 4b. Load stored emotional profile + guest preferences (for RAG grounding)
-    let storedEmotionalProfile: Record<string, unknown> = {};
-    let storedGuestPreferences: Record<string, unknown> = {};
+
     try {
-      const { data: profileData } = await supabaseAdmin
-        .from('lexa_user_profiles')
-        .select('emotional_profile, guest_preferences')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (profileData?.emotional_profile) {
-        storedEmotionalProfile = profileData.emotional_profile as Record<string, unknown>;
-      }
-      if (profileData?.guest_preferences) {
-        storedGuestPreferences = profileData.guest_preferences as Record<string, unknown>;
-      }
-    } catch {
-      // Non-blocking -- continue without profile data
+      const loaded = await loadOrCreateChatSession(sessionId, userId);
+      session = loaded.session;
+      sessionState = loaded.sessionState;
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : 'Failed to create session';
+      return NextResponse.json({ error: message }, { status: loadError instanceof Error && loadError.message === 'Session not found' ? 404 : 500 });
     }
 
-    // 4c. Load conversation history for Claude context
-    let conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [];
-    if (session?.id) {
-      try {
-        const { data: historyData } = await supabaseAdmin
-          .from('lexa_messages')
-          .select('role, content')
-          .eq('session_id', session.id)
-          .order('created_at', { ascending: true })
-          .limit(20);
-
-        if (historyData) {
-          conversationHistory = historyData
-            .filter((m: { role: string; content: string }) => m.role === 'user' || m.role === 'assistant')
-            .map((m: { role: string; content: string }) => ({
-              role: m.role as 'user' | 'assistant',
-              content: m.content,
-            }));
-        }
-      } catch {
-        // Non-blocking
-      }
+    const userProfile = await loadUserProfile(userId);
+    if (userProfile.first_name) {
+      userName = userProfile.first_name;
+    } else if (userProfile.full_name) {
+      userName = userProfile.full_name.split(' ')[0];
     }
+    const storedEmotionalProfile = userProfile.emotional_profile;
+    const storedGuestPreferences = userProfile.guest_preferences;
+    const conversationHistory = await loadConversationHistory(session);
 
     // 5. Insert user message (skip for synthetic start)
     let userMessageId: string | null = null;
     if (!isSyntheticStart) {
-      const { data: insertedUserMsg, error: userInsErr } = await supabaseAdmin
-        .from('lexa_messages')
-        .insert({
-          session_id: session.id,
-          user_id: userId,
-          role: 'user',
-          content: userMessage,
-          meta: {},
-        })
-        .select('id')
-        .single();
-
-      if (!userInsErr && insertedUserMsg?.id) userMessageId = insertedUserMsg.id;
-      if (userInsErr) console.warn('Failed to capture user message id:', userInsErr);
+      userMessageId = await appendChatMessage(session, userId, 'user', userMessage, {});
     }
     
     // 6. Process message based on current stage
@@ -236,8 +140,8 @@ export async function POST(request: NextRequest) {
         stage: transition.nextStage,
       };
 
-      // 2. If transitioning to SCRIPT_DRAFT, generate Script Engine output
-      if (transition.nextStage === 'SCRIPT_DRAFT') {
+      // 2. If transitioning to SCRIPT_DRAFT, generate Script Engine output (Neo4j required)
+      if (transition.nextStage === 'SCRIPT_DRAFT' && isNeo4jConfigured()) {
         try {
           const { generateScriptEngineOutput } = await import('@/lib/lexa/stages/script-draft');
           const mergedState = { ...sessionState, ...transition.updatedState } as SessionState;
@@ -345,6 +249,17 @@ export async function POST(request: NextRequest) {
           });
           assistantMessage = claudeResponse.assistantMessage;
         }
+      } else if (transition.nextStage === 'SCRIPT_DRAFT') {
+        let systemPrompt = getSystemPromptForStage({ ...sessionState, stage: 'SCRIPT_DRAFT' } as SessionState);
+        systemPrompt += offlineContextNote;
+        const claudeResponse = await generateResponseWithRetry({
+          sessionState: { ...sessionState, stage: 'SCRIPT_DRAFT' } as SessionState,
+          userMessage,
+          systemPrompt,
+          conversationHistory,
+        });
+        assistantMessage = claudeResponse.assistantMessage;
+        updatedState.stage = 'REFINE';
       } else {
         // Not yet at SCRIPT_DRAFT — generate Claude response for clarification
         let systemPrompt = getSystemPromptForStage(sessionState);
@@ -355,6 +270,7 @@ export async function POST(request: NextRequest) {
         
         // Inject stored emotional profile + preferences into Claude's context
         systemPrompt += buildProfileContext(storedEmotionalProfile, storedGuestPreferences);
+        systemPrompt += offlineContextNote;
         
         // Add the user's actual words to the prompt so Claude reflects them back
         if (sessionState.stage === 'INITIAL_QUESTIONS' && !isSyntheticStart) {
@@ -387,8 +303,11 @@ export async function POST(request: NextRequest) {
     } else {
       // REFINE, HANDOFF, FOLLOWUP, etc.
       let systemPrompt = getSystemPromptForStage(sessionState);
-      const grounding = await buildGroundedPoiContext(sessionState, storedEmotionalProfile, storedGuestPreferences);
+      const grounding = neo4jUnavailable
+        ? null
+        : await buildGroundedPoiContext(sessionState, storedEmotionalProfile, storedGuestPreferences);
       if (grounding) systemPrompt = `${systemPrompt}\n\n${grounding}`;
+      systemPrompt += offlineContextNote;
       
       const claudeResponse = await generateResponseWithRetry({
         sessionState,
@@ -414,7 +333,12 @@ export async function POST(request: NextRequest) {
     };
     
     // 8. Handle HANDOFF stage - create experience brief + trigger Stage 2
-    if (newState.stage === 'HANDOFF' && sessionState.stage !== 'HANDOFF') {
+    if (
+      newState.stage === 'HANDOFF' &&
+      sessionState.stage !== 'HANDOFF' &&
+      !session.memoryOnly &&
+      isSupabaseAdminConfigured
+    ) {
       const experienceBrief = createExperienceBriefFromState(
         newState,
         session.id,
@@ -483,77 +407,16 @@ export async function POST(request: NextRequest) {
     }
     
     // 9. Update session
-    await supabaseAdmin
-      .from('lexa_sessions')
-      .update({
-        stage: newState.stage,
-        state: newState,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', session.id);
+    await saveChatSession(session, newState);
 
-    // 9b. Update durable user profile memory + emotional extraction (best-effort)
-    try {
-      // Auto-extract emotional signals from user message
-      let emotionalExtraction = null;
-      if (!isSyntheticStart && userMessage.length >= 15) {
-        try {
-          const { extractEmotionalSignals } = await import('@/lib/lexa/emotional-extractor');
-          const { data: epData } = await supabaseAdmin
-            .from('lexa_user_profiles')
-            .select('emotional_profile')
-            .eq('user_id', userId)
-            .maybeSingle();
-          const ep = epData?.emotional_profile || {};
-          emotionalExtraction = await extractEmotionalSignals(userMessage, {
-            desired_feelings: ep.desired_feelings || [],
-            avoid_fears: ep.avoid_fears || [],
-            life_context: ep.life_context || null,
-            personality_signals: ep.personality_signals || [],
-            companion_type: ep.companion_type || null,
-            urgency: ep.urgency || null,
-          });
-        } catch (extractErr) {
-          console.warn('Emotional extraction skipped:', extractErr);
-        }
-      }
-
-      const patch = profilePatchFromState(newState, emotionalExtraction);
-      const { data: existing } = await supabaseAdmin
-        .from('lexa_user_profiles')
-        .select('emotional_profile,preferences')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      await supabaseAdmin.from('lexa_user_profiles').upsert(
-        {
-          user_id: userId,
-          emotional_profile: mergeProfileJson(existing?.emotional_profile, patch.emotional_profile),
-          preferences: mergeProfileJson(existing?.preferences, patch.preferences),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
-      );
-    } catch (e) {
-      // Don’t break chat if profile persistence fails (migration may not be applied yet).
-      console.warn('lexa_user_profiles upsert skipped/failed:', e);
-    }
+    // 9b. Update durable user profile memory (best-effort, Supabase only)
+    await persistUserProfileMemory(session, userId, newState, userMessage, isSyntheticStart);
     
-    // 10. Insert assistant message (capture id so UI can submit thumbs up/down feedback)
-    const { data: insertedAssistantMsg, error: asstInsErr } = await supabaseAdmin
-      .from('lexa_messages')
-      .insert({
-        session_id: session.id,
-        user_id: userId,
-        role: 'assistant',
-        content: assistantMessage,
-        meta: { stage: newState.stage, ui },
-      })
-      .select('id')
-      .single();
-
-    if (!asstInsErr && insertedAssistantMsg?.id) assistantMessageId = insertedAssistantMsg.id;
-    if (asstInsErr) console.warn('Failed to capture assistant message id:', asstInsErr);
+    // 10. Insert assistant message
+    assistantMessageId = await appendChatMessage(session, userId, 'assistant', assistantMessage, {
+      stage: newState.stage,
+      ui,
+    });
     
     // 11. Return response
     return NextResponse.json({
@@ -564,6 +427,8 @@ export async function POST(request: NextRequest) {
       ui,
       userMessageId,
       assistantMessageId,
+      memoryOnly: session.memoryOnly,
+      offlineMode: session.memoryOnly || neo4jUnavailable,
     });
     
   } catch (error) {
@@ -614,7 +479,7 @@ async function buildGroundedPoiContext(
   guestPrefs?: Record<string, unknown>
 ): Promise<string | null> {
   const destination = (state.brief?.where_at?.destination || '').trim();
-  if (!destination) return null;
+  if (!destination || !isNeo4jConfigured()) return null;
 
   try {
     // Combine themes from session + guest preferences for richer grounding

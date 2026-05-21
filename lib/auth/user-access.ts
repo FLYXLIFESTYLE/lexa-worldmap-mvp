@@ -6,8 +6,12 @@
 /** Auth off by default for private/unpublished site. Set NEXT_PUBLIC_AUTH_DISABLED=false to require login. */
 export const AUTH_DISABLED = process.env.NEXT_PUBLIC_AUTH_DISABLED !== 'false';
 
-/** Fallback user when auth is disabled (matches chat API dev user). */
-export const BYPASS_USER_ID = '00000000-0000-0000-0000-000000000001';
+/** Fallback user when auth is disabled — prefer a real Supabase auth user id when set. */
+export const BYPASS_USER_ID =
+  process.env.AUTH_BYPASS_USER_ID ||
+  process.env.CRON_POI_OWNER_ID ||
+  process.env.CRON_POI_USER_ID ||
+  '00000000-0000-0000-0000-000000000001';
 export const BYPASS_USER_EMAIL = 'dev@lexa.local';
 export const BYPASS_USER_NAME = 'LEXA Dev';
 

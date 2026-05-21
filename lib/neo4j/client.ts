@@ -7,6 +7,10 @@ import neo4j, { Driver, Session } from 'neo4j-driver';
 
 let driver: Driver | null = null;
 
+export function isNeo4jConfigured(): boolean {
+  return Boolean(process.env.NEO4J_URI && process.env.NEO4J_USER && process.env.NEO4J_PASSWORD);
+}
+
 /**
  * Initialize Neo4j driver (singleton pattern)
  */

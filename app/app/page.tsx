@@ -126,11 +126,10 @@ export default function ChatPage() {
         }),
       });
       
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        throw new Error(data.details || data.error || 'Failed to send message');
       }
-      
-      const data = await response.json();
       
       // Update session ID if new
       if (data.sessionId && !sessionId) {
@@ -155,12 +154,18 @@ export default function ChatPage() {
       
     } catch (error) {
       console.error('Error sending message:', error);
-      
+      const reason =
+        error instanceof Error && error.message && error.message !== 'Failed to send message'
+          ? error.message
+          : null;
+
       // Add error message
       const errorMsg: Message = {
         id: `error-${Date.now()}`,
         role: 'system',
-        content: 'Sorry, something went wrong. Please try again.',
+        content: reason
+          ? `Sorry, something went wrong. ${reason}`
+          : 'Sorry, something went wrong. Please try again.',
         created_at: new Date().toISOString(),
       };
       
@@ -179,8 +184,10 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: '__start__', sessionId }),
       });
-      if (!response.ok) throw new Error('Failed to start chat');
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.details || data.error || 'Failed to start chat');
+      }
       if (data.sessionId && !sessionId) setSessionId(data.sessionId);
       if (data.stage) setStage(data.stage);
       const welcomeMsg: Message = {
@@ -193,12 +200,13 @@ export default function ChatPage() {
       setMessages([welcomeMsg]);
     } catch (e) {
       console.error('Failed to start conversation:', e);
+      const reason =
+        e instanceof Error && e.message ? e.message : 'Could not connect to LEXA.';
       setMessages([
         {
-          id: 'welcome-fallback',
-          role: 'assistant',
-          content:
-            `Welcome. I'm LEXA.\n\nTell me what you're craving - and I'll shape the experience around it.`,
+          id: 'start-error',
+          role: 'system',
+          content: `Sorry, LEXA could not start a conversation. ${reason} Please refresh and try again.`,
           created_at: new Date().toISOString(),
         },
       ]);
